@@ -8,6 +8,60 @@
 - Sub-chains are indented under main chains
 - → indicates flow direction
 
+## File Management Chains
+
+### Document Processing Chain
+```
+[LOOP: {scan_interval}]
+FileTransferModule → DocManagementModule → 
+(IF organize) → FileOrganizerModule
+```
+
+### Cloud Storage Chain
+```
+FileTransferModule → GoogleAuthModule → 
+(IF upload) → upload_to_drive →
+(IF share) → DocManagementModule
+```
+
+### File Organization Chain
+```
+[LOOP: daily]
+FileTransferModule → _organize_files →
+(IF backup) → upload_to_drive
+```
+
+### File Distribution Chain
+```
+FileTransferModule →
+(IF slack) → send_to_slack →
+(IF email) → send_email →
+(IF drive) → upload_to_drive
+```
+
+## Voice Input Chains
+
+### Voice Command Chain
+```
+VoiceInputHandler → listen_and_type →
+(IF command) → process_command
+```
+
+## Project Management Chains
+
+### Project Setup Chain
+```
+ProjectSyncModule → BusinessContextModule →
+TrelloModule → SlackModule
+```
+
+### Task Synchronization Chain
+```
+[LOOP: hourly]
+ProjectSyncModule → TrelloModule →
+(IF update) → SlackModule
+```
+
 ## Administration & Organization Chains
 
 ### Email Management Chains
@@ -45,20 +99,6 @@
    ```
    CalendarModule → TaskCreationModule → 
    TaskDependencyModule → NotificationModule
-   ```
-
-### File Organization Chains
-1. **Document Processing Chain**
-   ```
-   [LOOP: {scan_interval}]
-   FileClassifierModule → FileRenamerModule → 
-   FolderStructureModule → DuplicateHandlerModule
-   ```
-
-2. **Cloud Storage Sync Chain**
-   ```
-   FileClassifierModule → DocCreationModule → 
-   DocSharingModule → StorageFormatterModule
    ```
 
 ### Data Entry Chains
@@ -120,7 +160,7 @@
    ```
    [LOOP: hourly]
    SocialMediaSearchModule → SentimentAnalysisModule → 
-   CategoryClassifierModule → NotificationModule
+   CategoryClassifierModule → NotificationModule -> LogSocialMediaModule
    ```
 
 ### Website Maintenance Chains

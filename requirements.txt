@@ -2,10 +2,20 @@ aiohttp>=3.8.0
 beautifulsoup4>=4.9.3
 google-auth-oauthlib>=0.4.6
 google-auth-httplib2>=0.1.0
-google-api-python-client>=2.0.0
+google-api-python-client>=2.86.0
 google-auth>=2.0.0
 python-dotenv>=0.19.0
-slack-sdk>=3.19.0
+slack-sdk>=3.19.5
 slack-sdk[rtm]>=3.19.0  # For real-time messaging
 openai>=1.0.0  # For GPT API integration
 tiktoken>=0.5.0  # For token counting with OpenAI 
+
+# Voice Input Requirements
+SpeechRecognition>=3.10.0
+PyAudio>=0.2.13
+pynput>=1.7.6
+
+# File Transfer Requirements
+pyyaml>=6.0.1
+markdown>=3.4.3
+python-dateutil>=2.8.2 

@@ -9,6 +9,7 @@ from datetime import datetime
 from ..utils.logging import get_logger
 from dotenv import load_dotenv
 import time
+import json
 
 logger = get_logger(__name__)
 
@@ -61,20 +62,19 @@ class SlackListener:
             if not event.get('user') or not event.get('text'):
                 return
 
-            # Skip bot messages (both our own and other bots)
+            # Skip bot messages
             if event.get('bot_id') or event.get('bot_profile'):
                 return
 
             text = event['text']
             user = event.get('user', 'Unknown')
-            
-            # Get channel ID from the event or use the main channel
             channel_id = event.get('channel', self.channel_id)
+            
             if not channel_id:
                 logger.error("No channel ID available")
                 return
             
-            # Check for bot mention (using Slack's mention format)
+            # Check for bot mention
             bot_info = self.client.auth_test()
             bot_id = f"<@{bot_info['user_id']}>"
             
@@ -82,51 +82,145 @@ class SlackListener:
                 return
 
             logger.info(f"Processing command from {user}: {text}")
+            clean_text = text.replace(bot_id, '').strip().lower()
 
-            # Remove bot mention and any extra whitespace from the message
-            clean_text = text.replace(bot_id, '').strip()
-
-            # Handle special commands
-            if clean_text.lower() == 'help':
-                logger.info("Sending help message...")
+            # Handle basic commands
+            if clean_text in ['help', 'hi', 'hello', '?']:
                 self.send_help_message(channel_id)
-            elif clean_text.lower() == 'status':
-                logger.info("Sending status...")
+                return
+            elif clean_text == 'status':
                 self.send_status(channel_id)
-            elif clean_text.lower() == 'stop':
-                logger.info("Stopping bot...")
+                return
+            elif clean_text == 'stop':
                 self.send_message(channel_id, "👋 Shutting down listener. Goodbye!")
                 self.stop()
-            elif clean_text.lower() == 'clear':
-                logger.info("Clearing conversation history...")
+                return
+            elif clean_text == 'clear':
                 self.gpt.clear_history(user)
                 self.send_message(channel_id, "🧹 Conversation history cleared!")
+                return
+
+            # Handle natural language commands
+            if any(phrase in clean_text for phrase in ['remember this', 'save this', 'update context']):
+                self._handle_context_update(channel_id, clean_text)
+            elif any(phrase in clean_text for phrase in ['create board', 'make board', 'new board']):
+                self._handle_create_board(channel_id, text)
+            elif any(phrase in clean_text for phrase in ['add task', 'create task', 'new task']):
+                self._handle_add_tasks(channel_id, text)
+            elif 'what do you know about' in clean_text:
+                self._handle_context_query(channel_id, clean_text)
+            elif 'show progress' in clean_text or 'show accomplishments' in clean_text:
+                self._handle_show_progress(channel_id)
             else:
-                # Generate response using GPT
-                logger.info("Generating GPT response...")
+                # Use GPT for general responses
                 response = self.gpt.generate_response(user, clean_text)
                 self.send_message(channel_id, response)
                 
         except Exception as e:
             logger.error(f"Error handling message: {str(e)}")
             if channel_id:
-                self.send_message(channel_id, f"❌ Error processing command: {str(e)}")
+                self.send_message(channel_id, f"❌ Error: {str(e)}")
+
+    def _handle_context_update(self, channel_id: str, message: str):
+        """Handle updating business context in a more natural way"""
+        from .business_context import BusinessContextModule
+        context_module = BusinessContextModule()
+        
+        # Extract the actual context (everything after the command words)
+        for phrase in ['remember this:', 'save this:', 'update context:', 'remember this', 'save this', 'update context']:
+            if phrase in message:
+                context_text = message.split(phrase, 1)[1].strip()
+                break
+        else:
+            context_text = message
+        
+        if not context_text:
+            self.send_message(channel_id, "What would you like me to remember about the business?")
+            return
+            
+        result = context_module.execute({
+            'operation': 'import_context',
+            'text': context_text
+        })
+        
+        if 'error' in result:
+            self.send_message(channel_id, f"❌ I had trouble understanding that. Could you rephrase it?")
+        else:
+            self.send_message(channel_id, "✅ I've updated my understanding of your business! I'll keep this in mind when helping you.")
+            
+    def _handle_context_query(self, channel_id: str, message: str):
+        """Handle queries about stored business context"""
+        from .business_context import BusinessContextModule
+        context_module = BusinessContextModule()
+        
+        # Extract what they want to know about
+        topic = message.replace('what do you know about', '').strip()
+        
+        result = context_module.execute({
+            'operation': 'get_context',
+            'section': topic if topic else None
+        })
+        
+        if result and 'context' in result:
+            context = result['context']
+            response = self.gpt.generate_response('system', 
+                f"Summarize this business information in a friendly, conversational way: {json.dumps(context)}")
+            self.send_message(channel_id, response)
+        else:
+            self.send_message(channel_id, "I don't have any information about that yet. Feel free to tell me more!")
+            
+    def _handle_show_progress(self, channel_id: str):
+        """Show business progress and accomplishments"""
+        from .business_context import BusinessContextModule
+        context_module = BusinessContextModule()
+        
+        result = context_module.execute({
+            'operation': 'get_context',
+            'section': None  # Get all context
+        })
+        
+        if result and 'context' in result:
+            context = result['context']
+            prompt = """Create a progress report based on this business context. Include:
+1. Recent accomplishments
+2. Current phase/status
+3. Next steps/goals
+4. Any notable challenges or learnings
+
+Make it encouraging and constructive!"""
+            
+            response = self.gpt.generate_response('system', 
+                f"{prompt}\n\nContext: {json.dumps(context)}")
+            self.send_message(channel_id, response)
+        else:
+            self.send_message(channel_id, "I don't have enough information yet. Tell me about your progress!")
 
     def send_help_message(self, channel_id):
         """Send help information"""
         bot_info = self.client.auth_test()
         bot_id = f"<@{bot_info['user_id']}>"
-        help_text = f"""*Available Commands:*
-• `{bot_id} help` - Show this help message
-• `{bot_id} status` - Check my current status
-• `{bot_id} clear` - Clear conversation history
-• `{bot_id} stop` - Stop the listener
+        help_text = f"""Hi! 👋 I'm your AI business assistant. Here's how I can help:
 
-You can also chat with me naturally! Just mention me and ask anything. 💬
+*Remembering Your Business Context:*
+• "Remember this: [your business info]" - I'll remember details about your business
+• "What do you know about [topic]?" - I'll tell you what I remember
+• "Show progress" - I'll summarize your business progress
+
+*Project Management:*
+• "Create a board for [project name]" - I'll set up a Trello board
+• "Add tasks about [topic]" - I'll create relevant tasks
+• "Show my tasks" - I'll show your current tasks
+
+*Basic Commands:*
+• `{bot_id} help` - Show this message
+• `{bot_id} status` - Check if I'm working
+• `{bot_id} clear` - Clear our conversation history
+
+You can also just chat with me naturally about your business! 💬
 Examples:
-• `{bot_id} What can you help me with?`
-• `{bot_id} How do I organize my tasks?`
-• `{bot_id} Can you help me draft an email?`
+• "Can you help me plan the next phase?"
+• "What should I focus on next?"
+• "How should I organize this project?"
 
 I'll use AI to provide helpful responses! 🤖✨"""
         self.send_message(channel_id, help_text)
