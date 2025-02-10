@@ -13,7 +13,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -31,8 +30,10 @@ wheels/
 *.egg
 
 # Virtual Environment
+.env
+.venv
+env/
 venv/
-.venv/
 ENV/
 
 # IDE
@@ -43,4 +44,12 @@ ENV/
 
 # Logs
 *.log
-logs/ 
+front_desk.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local development
+.DS_Store 
