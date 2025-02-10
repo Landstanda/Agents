@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import logging
 import asyncio
 from slack_sdk.web.async_client import AsyncWebClient
@@ -12,6 +12,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 from ..executive.ceo import CEO
 from .nlp_processor import NLPProcessor
+from ..cookbook.cookbook_manager import CookbookManager
+from ..task.task_manager import TaskManager
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
@@ -20,11 +22,22 @@ class FrontDesk:
     """
     The Front Desk handles all Slack communication, acting as the office's voice.
     It maintains a professional and helpful tone while facilitating communication
-    between users and the CEO.
+    between users and other components. For known tasks, it handles them directly
+    through the task manager. For unknown tasks, it consults the CEO.
     """
     
-    def __init__(self):
-        """Initialize the Front Desk with Slack credentials and CEO connection."""
+    def __init__(
+        self,
+        web_client: AsyncWebClient = None,
+        socket_client: SocketModeClient = None,
+        openai_client: AsyncOpenAI = None,
+        nlp: NLPProcessor = None,
+        cookbook: CookbookManager = None,
+        task_manager: TaskManager = None,
+        ceo: CEO = None,
+        bot_id: str = None
+    ):
+        """Initialize the Front Desk with all necessary components."""
         load_dotenv()
         
         # Initialize Slack credentials
@@ -38,23 +51,25 @@ class FrontDesk:
             raise ValueError("Missing OpenAI API key in environment variables")
             
         # Initialize components
-        self.web_client = AsyncWebClient(token=self.slack_bot_token)
-        self.socket_client = None  # Will be initialized in start()
-        self.openai_client = AsyncOpenAI(api_key=self.openai_api_key)
-        self.ceo = CEO()
-        self.nlp = NLPProcessor()
+        self.web_client = web_client or AsyncWebClient(token=self.slack_bot_token)
+        self.socket_client = socket_client  # Will be initialized in start() if not provided
+        self.openai_client = openai_client or AsyncOpenAI(api_key=self.openai_api_key)
+        self.ceo = ceo or CEO()
+        self.nlp = nlp or NLPProcessor()
+        self.cookbook = cookbook or CookbookManager()
+        self.task_manager = task_manager or TaskManager()
+        self.bot_id = bot_id
+        self.bot_mention = f"<@{self.bot_id}>" if self.bot_id else None
         
         # Set up personality
         self.name = "Sarah"
         self.title = "Front Desk Manager"
         self.running = False
         self.start_time = None
-        self.bot_id = None
-        self.bot_mention = None
         
         # Initialize message deduplication set
         self._processed_messages = set()
-        self._error_messages = set()  # Track error messages to prevent duplicates
+        self._error_messages = set()
         
         logger.info(f"{self.name} ({self.title}) initialization complete")
     
@@ -110,29 +125,85 @@ class FrontDesk:
             logger.exception(e)
     
     async def get_gpt_response(self, prompt: str) -> str:
-        """Get a quick response from GPT-3.5-turbo."""
+        """
+        Get a response from GPT-3.5-turbo with error handling and fallbacks.
+        
+        Args:
+            prompt: The prompt to send to GPT
+            
+        Returns:
+            str: The generated response or a fallback message if GPT fails
+        """
+        if not prompt:
+            return None
+            
         try:
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "You are Sarah, a helpful and professional front desk manager. Keep responses concise, friendly, and under 50 words. For simple greetings or casual conversation, respond naturally without overthinking."},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=100,
-                temperature=0.7
-            )
-            return response.choices[0].message.content.strip()
+            # Add retry logic for transient errors
+            max_retries = 2
+            retry_count = 0
+            
+            while retry_count <= max_retries:
+                try:
+                    response = await self.openai_client.chat.completions.create(
+                        model="gpt-3.5-turbo",
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": (
+                                    "You are Sarah, a helpful and professional front desk manager. "
+                                    "Keep responses concise, friendly, and under 50 words. "
+                                    "Focus on being clear and helpful while maintaining a natural, conversational tone. "
+                                    "If asking for information, be specific about what you need."
+                                )
+                            },
+                            {"role": "user", "content": prompt}
+                        ],
+                        max_tokens=100,
+                        temperature=0.7,
+                        presence_penalty=0.6  # Encourage varied responses
+                    )
+                    
+                    if response and response.choices:
+                        return response.choices[0].message.content.strip()
+                        
+                    logger.warning("Empty response from GPT")
+                    break
+                    
+                except Exception as e:
+                    retry_count += 1
+                    if retry_count <= max_retries:
+                        logger.warning(f"GPT request failed, attempt {retry_count}/{max_retries}: {str(e)}")
+                        await asyncio.sleep(1)  # Wait before retrying
+                    else:
+                        raise  # Re-raise if out of retries
+            
+            # If we get here, we either got an empty response or used all retries
+            return self._get_fallback_response(prompt)
+            
         except Exception as e:
             logger.error(f"Error getting GPT response: {str(e)}")
-            return None
+            return self._get_fallback_response(prompt)
+    
+    def _get_fallback_response(self, prompt: str) -> str:
+        """Generate a fallback response when GPT is unavailable."""
+        # Extract key terms for basic response
+        terms = prompt.lower()
+        
+        if "schedule" in terms and "meeting" in terms:
+            return "I understand you want to schedule a meeting. Let me help you with that."
+        elif "check" in terms and ("email" in terms or "emails" in terms):
+            return "I understand you want to check your emails. I'll help you with that."
+        elif "hi" in terms or "hello" in terms or "there" in terms:
+            return "Hello! How can I help you today?"
+        else:
+            return "I understand your request and I'll help you with that. Let me process this for you."
     
     async def handle_message(self, message: Dict[str, Any]) -> None:
-        """Handle incoming Slack messages."""
+        """Handle incoming Slack messages with intelligent routing."""
         try:
             # Extract message info
             channel_id = message.get("channel")
             user_id = message.get("user")
-            # Only use thread_ts if message is part of a thread
             thread_ts = message.get("thread_ts") if message.get("thread_ts") else None
             text = message.get("text", "").replace(self.bot_mention, "").strip()
             
@@ -143,13 +214,23 @@ class FrontDesk:
                 logger.warning("Missing required fields in message")
                 return
             
-            # Get user info for personalization
+            # Initialize user info with defaults
+            user_info = {
+                "user": {
+                    "real_name": "there",
+                    "id": user_id
+                }
+            }
+            
+            # Try to get user info, but proceed even if it fails
             try:
-                user_info = await self.web_client.users_info(user=user_id)
-                user_name = user_info["user"]["real_name"]
+                user_info_response = await self.web_client.users_info(user=user_id)
+                if user_info_response["ok"]:
+                    user_info = user_info_response
             except Exception as e:
-                logger.error(f"Error getting user info: {str(e)}")
-                user_name = "there"
+                logger.warning(f"Could not fetch user info: {str(e)}")
+            
+            user_name = user_info["user"]["real_name"]
             
             # Handle special commands
             if text.lower() == "help":
@@ -158,36 +239,70 @@ class FrontDesk:
             elif text.lower() == "status":
                 await self._send_status_message(channel_id, thread_ts)
                 return
-            
-            # Process with NLP
+
+            # Process with NLP first
             logger.info(f"Sending to NLP processor: {text}")
-            nlp_result = self.nlp.process_message(text, user_info["user"])
+            nlp_result = await self.nlp.process_message(text, user_info["user"])
             logger.info(f"NLP result: {json.dumps(nlp_result, indent=2)}")
             
-            # Send to CEO
-            logger.info("Sending to CEO for consideration")
-            response = await self.ceo.consider_request(
-                message=text,
-                context={
-                    "nlp_analysis": nlp_result,
-                    "channel_id": channel_id,
-                    "thread_ts": thread_ts
-                }
-            )
-            logger.info(f"CEO response: {json.dumps(response, indent=2)}")
+            # Check if this is a conversational intent
+            if nlp_result["intent"] in ["greeting", "farewell", "gratitude", "pleasantry"]:
+                response = await self.get_gpt_response(text)
+                if response:
+                    await self._send_message(channel_id, response, thread_ts)
+                return
             
-            # Format and send response
-            slack_response = self._format_response(response, nlp_result, user_name)
-            await self.web_client.chat_postMessage(
-                channel=channel_id,
-                text=slack_response,
-                thread_ts=thread_ts
-            )
+            # Get recipe for the intent
+            recipe = self.cookbook.get_recipe(nlp_result["intent"])
+            
+            # Create context for task execution
+            context = {
+                "nlp_result": nlp_result,
+                "user_info": user_info,
+                "channel_id": channel_id,
+                "thread_ts": thread_ts
+            }
+            
+            # If no recipe found or invalid intent, create an error task
+            if not recipe or "invalid" in nlp_result.get("all_intents", []):
+                error_message = f"Sorry {user_name}, I couldn't understand the task: {text}"
+                await self._send_message(channel_id, error_message, thread_ts)
+                error_recipe = {
+                    "name": "Error Handling",
+                    "description": "Handle invalid or unsupported task",
+                    "steps": [
+                        {
+                            "type": "notification",
+                            "message": error_message
+                        }
+                    ]
+                }
+                await self.task_manager.execute_recipe(error_recipe, context)
+                return
+            
+            # Execute the recipe
+            logger.info(f"Executing recipe: {recipe['name']}")
+            result = await self.task_manager.execute_recipe(recipe, context)
+            
+            if result["status"] == "error":
+                logger.error(f"Error executing recipe: {result['error']}")
+                error_message = f"Sorry {user_name}, I encountered an error while processing your request: {result['error']}"
+                await self._send_message(channel_id, error_message, thread_ts)
+            else:
+                success_message = f"I've completed your request, {user_name}! {result.get('details', '')}"
+                await self._send_message(channel_id, success_message, thread_ts)
             
         except Exception as e:
             logger.error(f"Error handling message: {str(e)}")
-            error_key = f"{channel_id}:{thread_ts if thread_ts else message.get('ts')}"
-            await self._send_error_message(channel_id, thread_ts, error_key)
+            logger.exception(e)
+            error_message = f"Sorry {user_name}, I encountered an unexpected error while processing your request."
+            await self._send_message(channel_id, error_message, thread_ts)
+    
+    def _check_missing_entities(self, recipe: Dict[str, Any], entities: Dict[str, Any]) -> List[str]:
+        """Check which required entities are missing from the user's message."""
+        required = set(recipe.get("required_entities", []))
+        provided = set(entities.keys())
+        return list(required - provided)
     
     async def _send_help_message(self, channel_id: str, thread_ts: Optional[str] = None) -> None:
         """Send help information."""
@@ -258,64 +373,39 @@ I'll analyze your request and coordinate with our CEO to help you! 🤖✨"""
         except Exception as e:
             logger.error(f"Error sending error message: {str(e)}")
     
-    def _format_response(
-        self,
-        ceo_response: Dict[str, Any],
-        nlp_result: Dict[str, Any],
-        user_name: str
-    ) -> str:
-        """Format CEO's response for Slack, incorporating NLP insights."""
-        if ceo_response["status"] == "error":
-            return (
-                f"I apologize, {user_name}, but I encountered an error while processing "
-                f"your request. {ceo_response['notes']}"
-            )
+    def _format_task_response(self, execution_result: Dict[str, Any], recipe: Dict[str, Any], user_name: str) -> str:
+        """Format response for tasks handled directly by the task manager."""
+        response_parts = [f"Hi {user_name}!"]
         
-        # Start with a greeting that reflects urgency
-        if nlp_result["urgency"] > 0.7:
-            response_parts = [f"Hi {user_name}! I'll help you with this urgent matter right away."]
+        if execution_result["status"] == "success":
+            response_parts.append(f"I've completed your request using our {recipe['name']} process.")
+            if execution_result.get("details"):
+                response_parts.append(execution_result["details"])
         else:
-            response_parts = [f"Hi {user_name}!"]
-        
-        # Add main response
-        response_parts.append(ceo_response["decision"])
-        
-        # Add timing information if present
-        temporal = nlp_result.get("temporal_context", {})
-        if temporal.get("has_deadline"):
-            if temporal.get("specific_day"):
-                response_parts.append(f"\n_I've noted that this needs to be done by {temporal['specific_day']}._")
-            elif temporal.get("timeframe"):
-                timeframe_text = {
-                    "urgent": "as soon as possible",
-                    "today": "today",
-                    "tomorrow": "tomorrow",
-                    "next_week": "next week"
-                }.get(temporal["timeframe"], "")
-                if timeframe_text:
-                    response_parts.append(f"\n_I've noted that this needs to be done {timeframe_text}._")
-        
-        # If consultation is needed, add a note
-        if ceo_response["requires_consultation"]:
             response_parts.append(
-                "\n_Note: This request may require additional consultation. "
-                "I'll coordinate with the relevant departments and keep you updated._"
+                f"I encountered an issue while handling your request: {execution_result.get('error', 'Unknown error')}"
             )
         
-        # If we have matched recipes, add what we're using
-        if ceo_response.get("matched_recipes"):
-            recipes = [r["name"] for r in ceo_response["matched_recipes"]]
+        return "\n\n".join(response_parts)
+    
+    def _format_ceo_response(self, ceo_response: Dict[str, Any], nlp_result: Dict[str, Any], user_name: str) -> str:
+        """Format response for tasks handled by the CEO."""
+        response_parts = [f"Hi {user_name}!"]
+        
+        if ceo_response["status"] == "success":
+            response_parts.append(ceo_response["decision"])
+            
+            if ceo_response.get("new_recipe"):
+                response_parts.append(
+                    "_I've created a new process for handling this type of request, "
+                    "so I'll be able to help you even faster next time!_"
+                )
+        else:
             response_parts.append(
-                f"\n_I'll be using our {' and '.join(recipes)} procedures to help with this._"
+                f"I apologize, but I encountered an issue while processing your request: {ceo_response.get('notes', 'Unknown error')}"
             )
         
-        # Add any additional notes
-        if ceo_response.get("notes"):
-            response_parts.append(f"\n_{ceo_response['notes']}_")
-        
-        response = "\n\n".join(response_parts)
-        logger.info(f"Formatted response: {response}")
-        return response
+        return "\n\n".join(response_parts)
     
     async def start(self) -> None:
         """Start the Front Desk service."""
@@ -372,4 +462,15 @@ I'll analyze your request and coordinate with our CEO to help you! 🤖✨"""
         self.running = False
         if self.socket_client:
             await self.socket_client.close()
-        logger.info(f"{self.name} is now offline.") 
+        logger.info(f"{self.name} is now offline.")
+    
+    async def _send_message(self, channel_id: str, text: str, thread_ts: Optional[str] = None) -> None:
+        """Send a message to Slack."""
+        try:
+            await self.web_client.chat_postMessage(
+                channel=channel_id,
+                text=text,
+                thread_ts=thread_ts
+            )
+        except Exception as e:
+            logger.error(f"Error sending message: {str(e)}") 

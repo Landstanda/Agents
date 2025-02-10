@@ -3,26 +3,309 @@ import yaml
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 from difflib import SequenceMatcher
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 class CookbookManager:
-    """Manages recipes and ingredients for the office."""
+    """
+    Manages the storage and retrieval of task recipes.
+    A recipe defines how to accomplish a specific type of task,
+    including the steps, required parameters, and success criteria.
+    """
     
     def __init__(self):
         """Initialize the cookbook manager."""
-        self.cookbook_path = os.path.join(os.path.dirname(__file__), "recipes.yaml")
-        self.cookbook = self._load_cookbook()
-        
-    def _load_cookbook(self) -> Dict[str, Any]:
-        """Load the cookbook from YAML file."""
+        self.recipes_file = Path("src/office/cookbook/recipes.yaml")
+        self.recipes = self._load_recipes()
+        if not self.recipes:
+            self._initialize_default_recipes()
+        logger.info(f"Loaded {len(self.recipes)} recipes from cookbook")
+    
+    def _initialize_default_recipes(self):
+        """Initialize the cookbook with some default recipes."""
+        default_recipes = {
+            "Document Management": {
+                "name": "Document Management",
+                "intent": "document",
+                "description": "Create and manage documents",
+                "steps": [
+                    {"action": "create_document", "params": {"type": "{doc_type}"}},
+                    {"action": "add_content", "params": {"content": "{content}"}}
+                ],
+                "required_entities": ["doc_type"],
+                "keywords": ["document", "create", "write", "record"],
+                "common_triggers": ["create a document", "write documentation"],
+                "success_criteria": ["Document created", "Content added"]
+            },
+            "Research Report": {
+                "name": "Research Report",
+                "intent": "research",
+                "description": "Research a topic and create a detailed report",
+                "steps": [
+                    {"action": "search_info", "params": {"topic": "{topic}"}},
+                    {"action": "analyze_results", "params": {"depth": "detailed"}},
+                    {"action": "create_summary", "params": {"format": "report"}}
+                ],
+                "required_entities": ["topic"],
+                "keywords": ["research", "analyze", "report", "investigate"],
+                "common_triggers": ["research about", "analyze topic"],
+                "success_criteria": ["Research completed", "Report created"]
+            },
+            "Meeting Scheduler": {
+                "name": "Meeting Scheduler",
+                "intent": "schedule_meeting",
+                "description": "Schedule a meeting with participants",
+                "steps": [
+                    {"action": "check_availability", "params": {"time": "{time}", "participants": "{participants}"}},
+                    {"action": "create_meeting", "params": {"time": "{time}", "participants": "{participants}"}}
+                ],
+                "required_entities": ["time", "participants"],
+                "keywords": ["schedule", "meeting", "calendar", "invite"],
+                "common_triggers": ["schedule a meeting", "set up a meeting"],
+                "success_criteria": ["Meeting scheduled", "Invites sent"]
+            }
+        }
+        self.recipes = default_recipes
+        self._save_recipes()
+    
+    def _save_recipes(self):
+        """Save recipes to the YAML file."""
         try:
-            with open(self.cookbook_path, 'r') as f:
-                return yaml.safe_load(f)
+            self.recipes_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.recipes_file, 'w') as f:
+                yaml.safe_dump(self.recipes, f)
         except Exception as e:
-            logger.error(f"Error loading cookbook: {str(e)}")
-            return {"ingredients": {}, "recipes": {}}
+            logger.error(f"Error saving recipes: {str(e)}")
+    
+    def _load_recipes(self) -> Dict[str, Any]:
+        """Load recipes from the YAML file."""
+        try:
+            if not self.recipes_file.exists():
+                logger.warning(f"Recipes file not found at {self.recipes_file}, will create with defaults")
+                return {}
             
+            with open(self.recipes_file, 'r') as f:
+                recipes = yaml.safe_load(f) or {}
+                
+            # Validate loaded recipes
+            valid_recipes = {}
+            for name, recipe in recipes.items():
+                if isinstance(recipe, dict) and all(field in recipe for field in [
+                    "name", "intent", "description", "steps",
+                    "required_entities", "keywords", "common_triggers",
+                    "success_criteria"
+                ]):
+                    valid_recipes[name] = recipe
+                else:
+                    logger.warning(f"Skipping invalid recipe: {name}")
+            
+            return valid_recipes
+        except Exception as e:
+            logger.error(f"Error loading recipes: {str(e)}")
+            return {}
+    
+    def _calculate_similarity(self, str1: str, str2: str) -> float:
+        """Calculate string similarity using SequenceMatcher."""
+        return SequenceMatcher(None, str1.lower(), str2.lower()).ratio()
+    
+    async def find_matching_recipe(self, nlp_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Find a recipe that matches the NLP result.
+        
+        Args:
+            nlp_result: The processed NLP result containing intent and entities
+            
+        Returns:
+            Matching recipe if found, None otherwise
+        """
+        try:
+            intent = nlp_result.get("intent")
+            all_intents = nlp_result.get("all_intents", [])
+            if intent:
+                all_intents = [intent] + [i for i in all_intents if i != intent]
+            
+            if not all_intents:
+                return None
+            
+            matches = []
+            keywords = set(nlp_result.get("keywords", []))
+            
+            # Try exact and fuzzy intent matching
+            for recipe_name, recipe in self.recipes.items():
+                recipe_intent = recipe.get("intent", "")
+                
+                # Skip invalid recipes
+                if not recipe_intent or not isinstance(recipe, dict):
+                    continue
+                
+                # Calculate intent match score
+                intent_scores = []
+                for user_intent in all_intents:
+                    # Exact match gets highest score
+                    if user_intent == recipe_intent:
+                        intent_scores.append(1.0)
+                    # Partial string match
+                    elif user_intent in recipe_intent or recipe_intent in user_intent:
+                        intent_scores.append(0.8)
+                    # Fuzzy match
+                    else:
+                        intent_scores.append(self._calculate_similarity(recipe_intent, user_intent))
+                
+                best_intent_score = max(intent_scores) if intent_scores else 0
+                
+                # Calculate keyword match
+                recipe_keywords = set(recipe.get("keywords", []))
+                if recipe_keywords:
+                    matching_keywords = keywords & recipe_keywords
+                    keyword_match = len(matching_keywords) / len(recipe_keywords)
+                    
+                    # Boost score if important keywords match
+                    if any(kw in matching_keywords for kw in ["research", "report", "document"]):
+                        keyword_match = min(1.0, keyword_match + 0.2)
+                else:
+                    keyword_match = 0
+                
+                # Calculate trigger match
+                triggers = recipe.get("common_triggers", [])
+                trigger_scores = []
+                for trigger in triggers:
+                    words = set(trigger.lower().split())
+                    if words & keywords:
+                        trigger_scores.append(len(words & keywords) / len(words))
+                trigger_match = max(trigger_scores) if trigger_scores else 0
+                
+                # Calculate entity match
+                required_entities = set(recipe.get("required_entities", []))
+                provided_entities = set(nlp_result.get("entities", {}).keys())
+                if required_entities:
+                    entity_match = len(required_entities & provided_entities) / len(required_entities)
+                else:
+                    entity_match = 1.0
+                
+                # Combine scores with weights
+                match_score = (
+                    0.4 * best_intent_score +  # Intent is important
+                    0.2 * keyword_match +      # Keywords help disambiguate
+                    0.2 * trigger_match +      # Triggers provide context
+                    0.2 * entity_match        # Entities indicate completeness
+                )
+                
+                # Add to matches if score is good enough
+                if match_score >= 0.4:  # Lower threshold since we consider entities
+                    matches.append((recipe, match_score))
+            
+            if not matches:
+                return None
+            
+            # Sort by score
+            matches.sort(key=lambda x: x[1], reverse=True)
+            
+            # Return best match if it's a strong match
+            best_recipe, best_score = matches[0]
+            if best_score >= 0.8:
+                return best_recipe
+            
+            # For exact intent matches, be more lenient with missing entities
+            for recipe, score in matches:
+                if recipe.get("intent") == intent:
+                    return recipe
+            
+            # For weaker matches, prefer recipes with fewer missing entities
+            best_missing = float('inf')
+            best_match = None
+            
+            for recipe, score in matches:
+                if score < 0.5:  # Only consider reasonably good matches
+                    continue
+                    
+                required_entities = set(recipe.get("required_entities", []))
+                missing = len(required_entities - provided_entities)
+                
+                if missing < best_missing or (missing == best_missing and score > 0.6):
+                    best_missing = missing
+                    best_match = recipe
+            
+            return best_match
+            
+        except Exception as e:
+            logger.error(f"Error finding matching recipe: {str(e)}")
+            return None
+    
+    async def add_recipe(self, recipe: Dict[str, Any]) -> bool:
+        """
+        Add a new recipe to the cookbook.
+        
+        Args:
+            recipe: The recipe to add, must contain:
+                - name: str
+                - intent: str
+                - description: str
+                - steps: List[Dict]
+                - required_entities: List[str]
+                - keywords: List[str]
+                - common_triggers: List[str]
+                - success_criteria: List[str]
+                
+        Returns:
+            bool: True if added successfully, False otherwise
+        """
+        try:
+            # Validate recipe
+            required_fields = {
+                "name", "intent", "description", "steps",
+                "required_entities", "keywords", "common_triggers",
+                "success_criteria"
+            }
+            if not all(field in recipe for field in required_fields):
+                logger.error(f"Recipe missing required fields: {required_fields - set(recipe.keys())}")
+                return False
+            
+            # Add recipe to cookbook
+            self.recipes[recipe["name"]] = recipe
+            
+            # Save to file
+            self._save_recipes()
+            
+            logger.info(f"Added new recipe: {recipe['name']}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error adding recipe: {str(e)}")
+            return False
+    
+    def get_recipe(self, intent: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a recipe by intent (synchronous version).
+        
+        Args:
+            intent: The intent to find a recipe for
+            
+        Returns:
+            Matching recipe if found, None otherwise
+        """
+        try:
+            # First try exact match
+            for recipe in self.recipes.values():
+                if recipe.get("intent") == intent:
+                    return recipe
+                
+            # Then try partial match
+            for recipe in self.recipes.values():
+                recipe_intent = recipe.get("intent", "")
+                if recipe_intent and (intent in recipe_intent or recipe_intent in intent):
+                    return recipe
+                
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting recipe: {str(e)}")
+            return None
+    
+    def list_recipes(self) -> List[str]:
+        """Get a list of all recipe names."""
+        return list(self.recipes.keys())
+    
     def find_matching_recipes(self, request: str) -> List[Tuple[str, float]]:
         """
         Find recipes that match the given request.
@@ -54,7 +337,7 @@ class CookbookManager:
             # Check if this sub-request contains any action verbs
             contains_action = any(verb in sub_request_words for verb in action_verbs)
             
-            for recipe_id, recipe in self.cookbook["recipes"].items():
+            for recipe_id, recipe in self.recipes.items():
                 match_score = 0.0
                 
                 # Check for exact trigger matches
@@ -128,7 +411,7 @@ class CookbookManager:
         all_criteria = set()
         
         for recipe_id, score in top_matches:
-            recipe = self.cookbook["recipes"][recipe_id]
+            recipe = self.recipes[recipe_id]
             matched_recipes.append({
                 "name": recipe["name"],
                 "match_score": score,
@@ -148,7 +431,7 @@ class CookbookManager:
     
     def get_ingredient_details(self, ingredient_name: str) -> Optional[Dict[str, Any]]:
         """Get details about a specific ingredient."""
-        for category in self.cookbook["ingredients"].values():
+        for category in self.recipes["ingredients"].values():
             for ingredient in category:
                 if ingredient["name"] == ingredient_name:
                     return ingredient
@@ -158,9 +441,9 @@ class CookbookManager:
         """Get a list of all available ingredients by category."""
         return {
             category: [i["name"] for i in ingredients]
-            for category, ingredients in self.cookbook["ingredients"].items()
+            for category, ingredients in self.recipes["ingredients"].items()
         }
     
     def get_recipe_details(self, recipe_id: str) -> Optional[Dict[str, Any]]:
         """Get full details about a specific recipe."""
-        return self.cookbook["recipes"].get(recipe_id) 
+        return self.recipes.get(recipe_id) 

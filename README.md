@@ -5,34 +5,50 @@ A smart office assistant that processes requests through Slack and manages vario
 ## Components
 
 ### Core Components
-- **CEO**: Makes high-level decisions about how to handle requests
-- **CookbookManager**: Matches requests to appropriate recipes/actions
-- **FrontDesk**: Handles Slack communication and message formatting
-- **NLPProcessor**: Performs quick, rule-based natural language processing
+- **Front Desk**: Handles Slack communication, message formatting, and direct execution of known tasks
+- **NLPProcessor**: Performs quick, rule-based natural language processing and task classification
+- **CEO**: Creates new recipes for unknown tasks and handles complex decision making
+- **CookbookManager**: Stores and manages task recipes/actions
+- **TaskManager**: Executes recipes and manages task state with priority-based processing
 - **GPTClient**: Handles AI-powered decision making with fallback capabilities
 
 ### Component Interactions
 ```
-User (Slack) -> Front Desk -> NLP Processor -> CEO -> Cookbook Manager
-                     ^                            |
-                     |                           v
+User (Slack) -> Front Desk -> NLP Processor -> [Recipe Exists?]
+                     ^            |
+                     |           v
+                     |     [Yes] TaskManager (Priority Queue)
+                     |           |
+                     |           v
+                     ------- Response --------
+                     |
+                     |     [No] -> CEO -> [Create New Recipe]
+                     |                          |
+                     |                          v
+                     |                    CookbookManager
+                     |                          |
+                     |                          v
                      -------- Response ----------
 ```
 
 ## Features
 
-- **Socket Mode Integration**:
-  - Real-time event processing
-  - Automatic reconnection handling
-  - Thread support
-  - Message deduplication
+- **Intelligent Task Routing**:
+  - Automatic recognition of known vs unknown tasks
+  - Direct execution path for existing recipes
+  - Complex task handling through CEO
+  - Recipe creation and storage for future use
+  - Priority-based task execution with urgency levels
+  - FIFO ordering for equal-priority tasks
 
 - **Natural Language Processing**:
   - Intent detection (email, scheduling, research, etc.)
   - Entity extraction (emails, dates, numbers)
-  - Urgency detection
+  - Task complexity assessment
+  - Recipe matching
   - Temporal context understanding
   - User context tracking
+  - Urgency detection and prioritization
 
 - **Slack Integration**:
   - Real-time message processing via Socket Mode
@@ -40,12 +56,16 @@ User (Slack) -> Front Desk -> NLP Processor -> CEO -> Cookbook Manager
   - Thread support
   - Comprehensive error handling
   - Channel management
+  - Error recovery and graceful degradation
 
 - **Task Management**:
   - Recipe-based task matching
   - Multi-step task handling
   - Priority-based processing
   - Consultation detection
+  - Error task handling and recovery
+  - Task history tracking
+  - Concurrent task processing
 
 ## Setup
 
@@ -104,7 +124,20 @@ python -m pytest tests/test_front_desk.py
 
 # Test CEO responses
 python -m pytest tests/test_ceo_responses.py
+
+# Test integration flows
+python -m pytest tests/test_integration_flows.py
 ```
+
+### Test Coverage
+
+The test suite includes:
+- Unit tests for all components
+- Integration tests for component interactions
+- Flow tests for end-to-end scenarios
+- Error handling and recovery tests
+- Priority queue and task ordering tests
+- Concurrency and race condition tests
 
 ## Architecture
 
@@ -114,12 +147,14 @@ python -m pytest tests/test_ceo_responses.py
 - Routes messages through NLP
 - Formats responses for users
 - Handles message deduplication
+- Manages error recovery and retries
 
 ### NLP Processor
 - Quick, rule-based text analysis
 - Intent and entity extraction
 - Urgency detection
 - Temporal context analysis
+- Priority assessment
 
 ### CEO
 - High-level decision making with GPT integration
@@ -128,11 +163,20 @@ python -m pytest tests/test_ceo_responses.py
 - Consultation management
 - Fallback handling when GPT is unavailable
 
+### Task Manager
+- Priority-based task queue
+- FIFO ordering for equal priorities
+- Concurrent task processing
+- Error handling and recovery
+- Task history tracking
+- Resource management
+
 ### Cookbook Manager
 - Recipe matching
 - Task decomposition
 - Capability tracking
 - Success criteria management
+- Recipe validation
 
 ## Logging
 
@@ -155,5 +199,8 @@ Logs are written to:
 - [x] Response formatting
 - [x] Error recovery
 - [x] Thread support
+- [x] Priority-based task processing
+- [x] Task history tracking
+- [x] Error task handling
 - [ ] Analytics dashboard
 - [ ] Voice command support 

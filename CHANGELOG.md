@@ -2,61 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.1] - 2024-01-21
+## [0.2.0] - 2024-03-20
 
 ### Added
-- Socket Mode implementation replacing polling system
-- GPT client availability checking
-- Message deduplication using timestamps
-- Enhanced error handling and user feedback
+- Priority-based task queue implementation in TaskManager
+- FIFO ordering for tasks with equal priority
+- Enhanced error handling and recovery mechanisms
+- Task history tracking with detailed execution results
+- Comprehensive test suite for integration flows
+- Urgency detection in NLP processor
+- Error task handling with proper status tracking
+- Concurrent task processing capabilities
 
 ### Changed
-- Improved CEO response handling with better fallbacks
-- Enhanced thread handling in Front Desk
-- Better logging for events and responses
-- Updated error messages to be more user-friendly
+- Improved recipe validation in CookbookManager
+- Enhanced message handling in FrontDesk
+- Updated task execution flow to support priorities
+- Expanded test coverage for all components
+- Refined error recovery strategies
 
 ### Fixed
-- Double message responses issue
-- GPT client initialization errors
-- Socket Mode connection stability
-- Message processing in threads
+- Task queue overflow handling
+- Error propagation in task execution
+- Recipe matching with missing entities
+- Message deduplication logic
+- Concurrent task processing issues
 
-## [0.2.0] - 2024-01-20
-
-### Added
-- NLP Processor for quick text analysis
-  - Intent detection
-  - Entity extraction
-  - Urgency detection
-  - Temporal context analysis
-  - User context tracking
-- Enhanced Front Desk capabilities
-  - Integration with NLP Processor
-  - Improved response formatting
-  - Better error handling
-  - Socket mode support
-- Comprehensive test suite
-  - NLP processor tests
-  - Front Desk integration tests
-  - Socket mode request tests
-
-### Changed
-- Updated Front Desk to use NLP processing before CEO consultation
-- Improved message handling architecture
-- Enhanced documentation with architecture details
-- Updated README with new components and features
-
-### Fixed
-- Urgency detection accuracy
-- Socket mode request handling
-- Response formatting consistency
-
-## [0.1.0] - 2024-01-19
+## [0.1.0] - 2024-03-15
 
 ### Added
-- Initial CEO implementation
-- Basic Cookbook Manager
-- Recipe matching functionality
-- Simple Slack integration
-- Basic test coverage 
+- Initial implementation of Office Assistant
+- Slack integration via Socket Mode
+- Basic NLP processing
+- Recipe-based task execution
+- CEO decision making
+- Basic error handling 

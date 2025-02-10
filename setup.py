@@ -1,11 +1,12 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="agents",
+    name="office-agent",
     version="0.1",
     packages=find_packages(),
     install_requires=[
-        'aiohttp>=3.8.0',
-        'beautifulsoup4>=4.9.3',
+        "pytest",
+        "pytest-asyncio",
+        "aiohttp",  # For async HTTP calls
     ],
 ) 

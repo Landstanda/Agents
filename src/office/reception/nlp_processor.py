@@ -13,6 +13,26 @@ class NLPProcessor:
     
     def __init__(self):
         """Initialize the NLP processor."""
+        # Add conversational patterns
+        self.conversational_patterns = {
+            "greeting": [
+                r"\b(hi|hello|hey|good morning|good afternoon|good evening)\b",
+                r"\bhow are you\b",
+                r"\bnice to meet you\b"
+            ],
+            "farewell": [
+                r"\b(goodbye|bye|see you|talk to you later)\b"
+            ],
+            "gratitude": [
+                r"\b(thank you|thanks|appreciate it)\b"
+            ],
+            "pleasantry": [
+                r"\bhow('s| is) it going\b",
+                r"\bhow are you\b",
+                r"\bhope you('re| are) well\b"
+            ]
+        }
+        
         # Common time-related phrases
         self.time_patterns = {
             "urgent": r"\b(urgent|asap|emergency|right away)\b",
@@ -40,7 +60,7 @@ class NLPProcessor:
             "count": r"\b(how many|number of)\b"
         }
         
-    def process_message(self, message: str, user_info: Dict[str, Any]) -> Dict[str, Any]:
+    async def process_message(self, message: str, user_info: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process a message and extract structured information.
         
@@ -51,13 +71,25 @@ class NLPProcessor:
         Returns:
             Dict containing:
                 - raw_text: Original message
-                - intents: List of detected intents
+                - intent: Primary intent
+                - all_intents: List of all detected intents
                 - entities: Dict of extracted entities
                 - urgency: Urgency level (0-1)
                 - temporal_context: Time-related information
                 - user_context: User-related context
         """
         try:
+            if not message or not user_info:
+                return {
+                    "status": "error",
+                    "error": "Missing required input",
+                    "raw_text": message or "",
+                    "intent": None,
+                    "all_intents": [],
+                    "entities": {},
+                    "urgency": 0.0
+                }
+            
             # Convert to lowercase for processing
             text = message.lower()
             
@@ -77,15 +109,19 @@ class NLPProcessor:
             user_context = {
                 "user_id": user_info.get("id"),
                 "user_name": user_info.get("real_name"),
-                "timestamp": datetime.now().isoformat(),
-                "is_dm": user_info.get("is_dm", False)
+                "is_dm": user_info.get("is_dm", False),
+                "timestamp": datetime.now().isoformat()
             }
+            
+            # For conversational intents, don't include empty entity lists
+            if intents and intents[0] in ["greeting", "farewell", "gratitude", "pleasantry"]:
+                entities = {}
             
             return {
                 "status": "success",
                 "raw_text": message,
-                "processed_text": text,
-                "intents": intents,
+                "intent": intents[0] if intents else None,
+                "all_intents": intents,
                 "entities": entities,
                 "urgency": urgency,
                 "temporal_context": temporal,
@@ -97,27 +133,38 @@ class NLPProcessor:
             return {
                 "status": "error",
                 "error": str(e),
-                "raw_text": message
+                "raw_text": message or "",
+                "intent": None,
+                "all_intents": [],
+                "entities": {},
+                "urgency": 0.0
             }
     
     def _extract_intents(self, text: str) -> List[str]:
         """Extract intents based on action verbs and patterns."""
         found_intents = []
         
-        # First check for exact phrase matches
+        # First check for conversational intents
+        for intent_type, patterns in self.conversational_patterns.items():
+            if any(re.search(pattern, text.lower()) for pattern in patterns):
+                found_intents.append(intent_type)
+                return found_intents  # Return early for conversational intents
+        
+        # If not conversational, check for task-based intents
         for category, verbs in self.action_verbs.items():
-            if any(verb in text for verb in verbs):
+            if any(verb in text.lower() for verb in verbs):
                 found_intents.append(category)
-                
-        # Then check for email-specific patterns
-        if any(pattern in text for pattern in ["email", "mail", "inbox"]):
-            # Determine if it's a read or send operation
-            if any(re.search(pattern, text) for pattern in self.email_patterns.values()):
-                found_intents.append("email_read")
-            elif "send" in text or "write" in text:
+        
+        # Handle email intents with more precise detection
+        if any(word in text.lower() for word in ["email", "mail", "inbox"]):
+            # Check for send-related words first
+            if any(word in text.lower() for word in ["send", "write", "compose", "draft"]):
                 found_intents.append("email_send")
-            else:
-                # Default to read if unclear
+            # Then check for read-related patterns
+            elif any(word in text.lower() for word in ["read", "check", "view", "show", "get"]):
+                found_intents.append("email_read")
+            # If no specific action is mentioned but we have email-related attributes, assume read
+            elif any(re.search(pattern, text) for pattern in self.email_patterns.values()):
                 found_intents.append("email_read")
         
         return found_intents
