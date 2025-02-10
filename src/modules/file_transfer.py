@@ -15,7 +15,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 from ..core.module_interface import BaseModule
 from ..utils.logging import get_logger
-from .doc_management import DocumentManagementModule
+from .doc_management import DocManagementModule
 
 logger = get_logger(__name__)
 
@@ -23,7 +23,7 @@ class FileTransferModule(BaseModule):
     """Module for transferring files between local storage and cloud services"""
     
     def __init__(self):
-        self.doc_manager = DocumentManagementModule()
+        self.doc_manager = DocManagementModule()
         self.transfer_directory = "file_transfers"
         self._ensure_directory_exists()
         

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import os
 import json
 import yaml
@@ -11,12 +11,19 @@ from ..utils.logging import get_logger
 
 logger = get_logger(__name__)
 
-class DocumentManagementModule(BaseModule):
-    """Module for managing business documents in various formats"""
+class DocManagementModule(BaseModule):
+    """Module for handling document management operations"""
     
     def __init__(self):
         self.docs_directory = "business_docs"
-        self.supported_formats = ['json', 'yaml', 'md', 'txt']
+        self.supported_formats = {
+            'doc': True,
+            'docx': True,
+            'pdf': True,
+            'txt': True,
+            'md': True
+        }
+        self.default_encoding = 'utf-8'
         self._ensure_directory_exists()
         
     def _ensure_directory_exists(self):
@@ -55,12 +62,12 @@ class DocumentManagementModule(BaseModule):
         """Save a document in specified format"""
         name = params.get('name')
         content = params.get('content')
-        format = params.get('format', 'json').lower()
+        format = params.get('format', 'txt').lower()
         
         if not name or not content:
             raise ValueError("Document name and content required")
             
-        if format not in self.supported_formats:
+        if not self.supported_formats.get(format):
             raise ValueError(f"Unsupported format: {format}")
             
         filename = f"{name}.{format}"
@@ -92,7 +99,7 @@ class DocumentManagementModule(BaseModule):
     def _load_document(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Load a document"""
         name = params.get('name')
-        format = params.get('format', 'json').lower()
+        format = params.get('format', 'txt').lower()
         version = params.get('version')
         
         if not name:
@@ -148,7 +155,7 @@ class DocumentManagementModule(BaseModule):
     def _convert_format(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Convert document to different format"""
         name = params.get('name')
-        from_format = params.get('from_format', 'json').lower()
+        from_format = params.get('from_format', 'txt').lower()
         to_format = params.get('to_format', 'yaml').lower()
         
         if not name:
@@ -177,7 +184,7 @@ class DocumentManagementModule(BaseModule):
     def _create_version(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new version of a document"""
         name = params.get('name')
-        format = params.get('format', 'json').lower()
+        format = params.get('format', 'txt').lower()
         
         if not name:
             raise ValueError("Document name required")
@@ -211,7 +218,7 @@ class DocumentManagementModule(BaseModule):
     def _get_versions(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Get all versions of a document"""
         name = params.get('name')
-        format = params.get('format', 'json').lower()
+        format = params.get('format', 'txt').lower()
         
         if not name:
             raise ValueError("Document name required")
@@ -264,4 +271,115 @@ class DocumentManagementModule(BaseModule):
             'format_conversion',
             'version_control',
             'document_storage'
-        ] 
+        ]
+
+    async def create_document(self, title: str, content: str, 
+                            format: str = 'txt', **kwargs) -> Dict[str, Any]:
+        """Create a new document"""
+        try:
+            logger.info(f"Creating document: {title} in format {format}")
+            
+            if not self.supported_formats.get(format.lower()):
+                raise ValueError(f"Unsupported document format: {format}")
+            
+            # Implementation would handle actual document creation
+            # This is a placeholder for the actual implementation
+            doc_info = {
+                "title": title,
+                "format": format,
+                "size": len(content),
+                "created": True
+            }
+            
+            return {
+                "status": "success",
+                "document": doc_info
+            }
+            
+        except Exception as e:
+            logger.error(f"Error creating document: {str(e)}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+    
+    async def read_document(self, path: str, 
+                          encoding: Optional[str] = None) -> Dict[str, Any]:
+        """Read a document's contents"""
+        try:
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Document not found: {path}")
+            
+            encoding = encoding or self.default_encoding
+            format = path.split('.')[-1].lower()
+            
+            if not self.supported_formats.get(format):
+                raise ValueError(f"Unsupported document format: {format}")
+            
+            # Implementation would handle actual document reading
+            # This is a placeholder for the actual implementation
+            return {
+                "status": "success",
+                "content": "Document content would go here",
+                "format": format,
+                "encoding": encoding
+            }
+            
+        except Exception as e:
+            logger.error(f"Error reading document: {str(e)}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+    
+    async def update_document(self, path: str, content: str, 
+                            **kwargs) -> Dict[str, Any]:
+        """Update an existing document"""
+        try:
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Document not found: {path}")
+            
+            format = path.split('.')[-1].lower()
+            
+            if not self.supported_formats.get(format):
+                raise ValueError(f"Unsupported document format: {format}")
+            
+            # Implementation would handle actual document updating
+            # This is a placeholder for the actual implementation
+            return {
+                "status": "success",
+                "updated": True,
+                "size": len(content)
+            }
+            
+        except Exception as e:
+            logger.error(f"Error updating document: {str(e)}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+    
+    async def delete_document(self, path: str) -> Dict[str, Any]:
+        """Delete a document"""
+        try:
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"Document not found: {path}")
+            
+            # Implementation would handle actual document deletion
+            # This is a placeholder for the actual implementation
+            return {
+                "status": "success",
+                "deleted": True
+            }
+            
+        except Exception as e:
+            logger.error(f"Error deleting document: {str(e)}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+    
+    def get_supported_formats(self) -> List[str]:
+        """Get list of supported document formats"""
+        return [fmt for fmt, supported in self.supported_formats.items() 
+                if supported] 

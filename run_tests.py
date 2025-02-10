@@ -1,25 +1,19 @@
 #!/usr/bin/env python3
-import unittest
+
+import pytest
 import sys
-import os
+from src.office.utils.logging_config import setup_logging
 
-def run_tests():
-    """Run all tests in the tests directory"""
-    # Add the project root to the Python path
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, project_root)
+def main():
+    """Run the test suite with proper logging configuration."""
+    # Setup logging
+    setup_logging()
+    
+    # Run pytest with command line arguments
+    args = sys.argv[1:] if len(sys.argv) > 1 else ['tests/']
+    exit_code = pytest.main(args)
+    
+    return exit_code
 
-    # Discover and run tests
-    loader = unittest.TestLoader()
-    start_dir = os.path.join(project_root, 'tests')
-    suite = loader.discover(start_dir, pattern='test_*.py')
-
-    # Run tests with verbosity
-    runner = unittest.TextTestRunner(verbosity=2)
-    result = runner.run(suite)
-
-    # Return 0 if tests passed, 1 if any failed
-    return 0 if result.wasSuccessful() else 1
-
-if __name__ == '__main__':
-    sys.exit(run_tests()) 
+if __name__ == "__main__":
+    sys.exit(main()) 

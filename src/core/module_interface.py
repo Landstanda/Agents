@@ -4,6 +4,10 @@ from typing import Any, Dict, List
 class BaseModule(ABC):
     """Base interface for all task modules"""
     
+    def __init__(self):
+        """Initialize base module"""
+        pass
+    
     @abstractmethod
     def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the module's primary function"""

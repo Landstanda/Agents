@@ -47,7 +47,27 @@ class GoogleAuthModule(BaseModule):
                         self.credential_manager.get_credentials_path(),
                         self.SCOPES
                     )
-                    self.creds = flow.run_local_server(port=0)
+                    try:
+                        # Try specific ports in case some are blocked
+                        for port in [8080, 8090, 8888, 9000]:
+                            try:
+                                logger.info(f"Attempting to start local server on port {port}...")
+                                self.creds = flow.run_local_server(
+                                    port=port,
+                                    success_message="Authentication successful! You can close this window.",
+                                    authorization_prompt_message="Please visit this URL to authorize this application:"
+                                )
+                                break
+                            except OSError as e:
+                                logger.warning(f"Port {port} failed: {str(e)}")
+                                continue
+                        else:
+                            # If no ports worked, try random port as last resort
+                            logger.info("Trying random port...")
+                            self.creds = flow.run_local_server(port=0)
+                    except Exception as e:
+                        logger.error(f"Failed to start local server: {str(e)}")
+                        raise
 
                 # Save the credentials securely
                 token_data = pickle.dumps(self.creds)

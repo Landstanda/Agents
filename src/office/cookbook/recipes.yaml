@@ -1,0 +1,105 @@
+# Office Cookbook
+# Contains recipes (chains) and ingredients (module functions) for the AI office
+
+metadata:
+  version: "1.0"
+  last_updated: "2024-01-20"
+
+# Available ingredients (module functions) grouped by category
+ingredients:
+  email:
+    - name: "read_emails"
+      description: "Read and filter emails from specified sources"
+      capabilities: ["email reading", "filtering", "urgency detection"]
+    - name: "send_email"
+      description: "Compose and send emails to specified recipients"
+      capabilities: ["email composition", "attachment handling"]
+    
+  calendar:
+    - name: "schedule_meeting"
+      description: "Schedule meetings with specified participants"
+      capabilities: ["availability check", "invitation sending"]
+    - name: "check_availability"
+      description: "Check participant availability for given time slots"
+      capabilities: ["calendar reading", "time slot analysis"]
+    
+  documents:
+    - name: "create_document"
+      description: "Create new documents from templates or scratch"
+      capabilities: ["document creation", "template usage"]
+    - name: "summarize_document"
+      description: "Generate summaries of existing documents"
+      capabilities: ["text analysis", "summary generation"]
+
+  research:
+    - name: "web_search"
+      description: "Perform web searches on specified topics"
+      capabilities: ["web crawling", "content extraction"]
+    - name: "analyze_data"
+      description: "Analyze and summarize collected data"
+      capabilities: ["data analysis", "trend detection"]
+
+# Recipes (chains) for common tasks
+recipes:
+  email_processing:
+    name: "Email Processing"
+    description: "Handle email-related tasks including reading, filtering, and responding"
+    common_triggers:
+      - "check my emails"
+      - "any urgent messages"
+      - "respond to email"
+    required_ingredients:
+      - "read_emails"
+      - "send_email"
+    success_criteria:
+      - "Emails are properly categorized"
+      - "Urgent messages are identified"
+      - "Appropriate responses are drafted"
+
+  meeting_scheduler:
+    name: "Meeting Scheduler"
+    description: "Schedule and coordinate meetings between participants"
+    common_triggers:
+      - "schedule a meeting"
+      - "set up a call"
+      - "find time for discussion"
+    required_ingredients:
+      - "check_availability"
+      - "schedule_meeting"
+      - "send_email"
+    success_criteria:
+      - "Suitable time slot identified"
+      - "All participants notified"
+      - "Calendar events created"
+
+  research_report:
+    name: "Research Report"
+    description: "Conduct research and compile findings into a report"
+    common_triggers:
+      - "research trends"
+      - "analyze market"
+      - "compile report"
+    required_ingredients:
+      - "web_search"
+      - "analyze_data"
+      - "create_document"
+      - "summarize_document"
+    success_criteria:
+      - "Relevant information gathered"
+      - "Data analyzed and summarized"
+      - "Report generated and shared"
+
+  document_management:
+    name: "Document Management"
+    description: "Create, edit, and manage various types of documents"
+    common_triggers:
+      - "create document"
+      - "prepare report"
+      - "summarize document"
+    required_ingredients:
+      - "create_document"
+      - "summarize_document"
+    success_criteria:
+      - "Document created/modified as requested"
+      - "Content properly formatted"
+      - "Document shared with stakeholders" 

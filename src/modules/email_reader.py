@@ -17,149 +17,182 @@ class EmailReaderModule(BaseModule):
     """Module for reading and processing emails from Gmail"""
     
     def __init__(self):
+        super().__init__()
         self.service = None
         
-    def _initialize_service(self):
+    async def _initialize_service(self):
         """Initialize Gmail API service"""
         if not self.service:
             from .google_auth import GoogleAuthModule
             auth_module = GoogleAuthModule()
-            auth_result = auth_module.execute({})
+            auth_result = await auth_module.execute({})
             credentials = auth_result['credentials']
             self.service = build('gmail', 'v1', credentials=credentials)
             
-    def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute email reading operations"""
         try:
-            self._initialize_service()
+            await self._initialize_service()
             
-            operation = params.get('operation')
-            if not operation:
-                raise ValueError("No operation specified")
-                
+            operation = params.get('operation', 'get_recent_emails')  # Default operation
+            
             if operation == 'get_recent_emails':
-                return self._get_recent_emails(params)
+                return await self._get_recent_emails(params)
             elif operation == 'get_email_content':
-                return self._get_email_content(params)
+                return await self._get_email_content(params)
             elif operation == 'mark_as_read':
-                return self._mark_as_read(params)
+                return await self._mark_as_read(params)
             else:
                 raise ValueError(f"Unknown operation: {operation}")
                 
         except Exception as e:
             logger.error(f"Email reader error: {str(e)}")
-            raise
+            return {
+                'success': False,
+                'error': str(e)
+            }
             
-    def _get_recent_emails(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Get recent unread emails"""
-        max_results = params.get('max_results', 10)
-        hours_ago = params.get('hours_ago', 24)
-        
-        # Calculate time range
-        after_time = datetime.utcnow() - timedelta(hours=hours_ago)
-        after_timestamp = int(after_time.timestamp())
-        
-        # Create query
-        query = f'is:unread after:{after_timestamp}'
-        if params.get('only_important'):
-            query += ' is:important'
+    async def _get_recent_emails(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Get recent emails from Gmail"""
+        try:
+            max_results = params.get('max_emails', 10)
+            query = 'is:unread' if params.get('unread_only', True) else ''
             
-        # Get messages
-        results = self.service.users().messages().list(
-            userId='me',
-            q=query,
-            maxResults=max_results
-        ).execute()
-        
-        messages = results.get('messages', [])
-        emails = []
-        
-        for msg in messages:
-            email_data = self._get_email_content({'message_id': msg['id']})
-            if email_data:
-                emails.append(email_data)
-                
-        return {
-            'emails': emails,
-            'count': len(emails)
-        }
-        
-    def _get_email_content(self, params: Dict[str, Any]) -> Dict[str, Any]:
+            # Get messages
+            messages = []
+            request = self.service.users().messages().list(
+                userId='me',
+                maxResults=max_results,
+                q=query
+            )
+            response = request.execute()
+            
+            if 'messages' in response:
+                for msg in response['messages']:
+                    email_data = await self._get_email_content({'message_id': msg['id']})
+                    if email_data.get('success'):
+                        messages.append(email_data['email'])
+            
+            return {
+                'success': True,
+                'emails': messages,
+                'timestamp': datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get recent emails: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+            
+    async def _get_email_content(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Get content of a specific email"""
-        message_id = params.get('message_id')
-        if not message_id:
-            raise ValueError("Message ID required")
+        try:
+            message_id = params.get('message_id')
+            if not message_id:
+                raise ValueError("Message ID required")
+                
+            # Get the email data
+            message = self.service.users().messages().get(
+                userId='me',
+                id=message_id,
+                format='full'
+            ).execute()
             
-        # Get the email data
-        message = self.service.users().messages().get(
-            userId='me',
-            id=message_id,
-            format='full'
-        ).execute()
-        
-        # Extract headers
-        headers = message['payload']['headers']
-        subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), '')
-        from_email = next((h['value'] for h in headers if h['name'].lower() == 'from'), '')
-        to_email = next((h['value'] for h in headers if h['name'].lower() == 'to'), '')
-        date = next((h['value'] for h in headers if h['name'].lower() == 'date'), '')
-        
-        # Extract body
-        body = ''
-        if 'parts' in message['payload']:
-            for part in message['payload']['parts']:
-                if part['mimeType'] == 'text/plain':
-                    body = base64.urlsafe_b64decode(
-                        part['body']['data'].encode('UTF-8')
-                    ).decode('utf-8')
-                    break
-        elif 'body' in message['payload']:
-            body = base64.urlsafe_b64decode(
-                message['payload']['body']['data'].encode('UTF-8')
-            ).decode('utf-8')
+            # Parse headers
+            headers = {}
+            for header in message['payload']['headers']:
+                headers[header['name'].lower()] = header['value']
+                
+            # Get body content
+            parts = message['payload'].get('parts', [])
+            body = ''
             
-        return {
-            'message_id': message_id,
-            'subject': subject,
-            'from': from_email,
-            'to': to_email,
-            'date': date,
-            'body': body,
-            'labels': message['labelIds']
-        }
-        
-    def _mark_as_read(self, params: Dict[str, Any]) -> Dict[str, Any]:
+            if parts:
+                for part in parts:
+                    if part['mimeType'] == 'text/plain':
+                        body = base64.urlsafe_b64decode(
+                            part['body']['data']
+                        ).decode('utf-8')
+                        break
+            else:
+                # Handle messages with no parts
+                data = message['payload']['body'].get('data', '')
+                if data:
+                    body = base64.urlsafe_b64decode(data).decode('utf-8')
+                    
+            # Prepare email data
+            email_data = {
+                'id': message_id,
+                'thread_id': message['threadId'],
+                'subject': headers.get('subject', ''),
+                'from': headers.get('from', ''),
+                'to': headers.get('to', ''),
+                'date': headers.get('date', ''),
+                'body': body,
+                'labels': message['labelIds']
+            }
+            
+            return {
+                'success': True,
+                'email': email_data
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get email content: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+            
+    async def _mark_as_read(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Mark an email as read"""
-        message_id = params.get('message_id')
-        if not message_id:
-            raise ValueError("Message ID required")
+        try:
+            message_id = params.get('message_id')
+            if not message_id:
+                raise ValueError("Message ID required")
+                
+            self.service.users().messages().modify(
+                userId='me',
+                id=message_id,
+                body={'removeLabelIds': ['UNREAD']}
+            ).execute()
             
-        self.service.users().messages().modify(
-            userId='me',
-            id=message_id,
-            body={'removeLabelIds': ['UNREAD']}
-        ).execute()
-        
-        return {'message_id': message_id, 'status': 'read'}
-
+            return {
+                'success': True,
+                'message_id': message_id
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to mark email as read: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+            
     def validate_params(self, params: Dict[str, Any]) -> bool:
         """Validate input parameters"""
         if not isinstance(params, dict):
             return False
             
-        operation = params.get('operation')
-        if not operation:
-            return False
-            
+        operation = params.get('operation', 'get_recent_emails')
+        
         if operation == 'get_recent_emails':
-            return True
+            return True  # No required params
         elif operation == 'get_email_content':
             return bool(params.get('message_id'))
         elif operation == 'mark_as_read':
             return bool(params.get('message_id'))
             
         return False
-
+        
     @property
     def capabilities(self) -> List[str]:
-        return ['email_reading', 'gmail_integration', 'message_processing'] 
+        """Return module capabilities"""
+        return [
+            'read_emails',
+            'get_email_content',
+            'mark_as_read',
+            'gmail_integration'
+        ] 

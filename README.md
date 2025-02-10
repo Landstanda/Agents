@@ -1,77 +1,135 @@
-# Agents - Modular AI Task System
+# Office Assistant
 
-A modular AI system that combines specialized task modules with different decision-making perspectives to accomplish complex goals through natural language instructions.
+A smart office assistant that processes requests through Slack and manages various office tasks.
 
-## System Architecture
+## Components
 
 ### Core Components
+- **CEO**: Makes high-level decisions about how to handle requests
+- **CookbookManager**: Matches requests to appropriate recipes/actions
+- **FrontDesk**: Handles Slack communication and message formatting
+- **NLPProcessor**: Performs quick, rule-based natural language processing
 
-1. **Task Modules** - Individual specialized modules for atomic tasks
-2. **Function Chains** - Predefined combinations of task modules for common complex operations
-3. **Decision Engine ("The Brain")** - Multi-perspective AI system for task planning and execution
-4. **User Interface** - Natural language instruction interface
+### Component Interactions
+```
+User (Slack) -> Front Desk -> NLP Processor -> CEO -> Cookbook Manager
+                     ^                                      |
+                     |                                      v
+                     -------- Formatted Response -----------
+```
 
-### Decision Perspectives
-- Creative Thinker
-- Ethical Evaluator
-- Feasibility Analyzer 
-- Sales/Marketing Expert
-- Efficiency Manager
+## Features
 
-## Module Categories
+- **Natural Language Processing**:
+  - Intent detection (email, scheduling, research, etc.)
+  - Entity extraction (emails, dates, numbers)
+  - Urgency detection
+  - Temporal context understanding
+  - User context tracking
 
-### Communication Modules
-- Email operations
-- Social media interactions
-- Calendar management
-- Message/chat platform integration
+- **Slack Integration**:
+  - Real-time message processing
+  - Smart response formatting
+  - Thread support
+  - Error handling
 
-### Data Collection Modules
-- Web scraping
-- Social media data collection
-- Document parsing
-- Image/video analysis
+- **Task Management**:
+  - Recipe-based task matching
+  - Multi-step task handling
+  - Priority-based processing
+  - Consultation detection
 
-### Task Automation Modules
-- File management
-- Data entry/extraction
-- Scheduling
-- Report generation
+## Setup
 
-### Integration Modules
-- API connections
-- Database operations
-- Authentication handling
-- Data transformation
+1. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-## Project Implementation Plan
+2. Set up environment variables in `.env`:
+```
+SLACK_BOT_TOKEN=xoxb-your-token
+SLACK_APP_TOKEN=xapp-your-token
+OPENAI_API_KEY=your-openai-key
+```
 
-1. Phase 1: Foundation
-   - Set up project structure
-   - Create core module interface
-   - Implement basic task modules
-   - Develop module testing framework
+3. Configure your Slack app:
+   - Enable Socket Mode
+   - Add necessary bot scopes:
+     - chat:write
+     - im:history
+     - im:read
+     - im:write
+     - app_mentions:read
 
-2. Phase 2: Function Chains
-   - Design function chain architecture
-   - Create chain composition system
-   - Implement basic chains
-   - Build chain testing system
+## Running the Service
 
-3. Phase 3: Decision Engine
-   - Develop perspective framework
-   - Implement individual AI perspectives
-   - Create decision-making pipeline
-   - Build conflict resolution system
+Start the Front Desk service:
+```bash
+python run_front_desk.py
+```
 
-4. Phase 4: User Interface
-   - Create command interface
-   - Implement natural language processing
-   - Build response formatting
-   - Add progress tracking
+## Testing
 
-5. Phase 5: Integration & Testing
-   - Full system integration
-   - End-to-end testing
-   - Performance optimization
-   - Documentation 
+Run the test suite:
+```bash
+python -m pytest tests/
+```
+
+Run specific test modules:
+```bash
+# Test NLP processor
+python -m pytest tests/test_nlp_processor.py
+
+# Test Front Desk
+python -m pytest tests/test_front_desk.py
+```
+
+## Architecture
+
+### Front Desk
+- Handles all Slack communication
+- Maintains professional tone
+- Routes messages through NLP
+- Formats responses for users
+
+### NLP Processor
+- Quick, rule-based text analysis
+- Intent and entity extraction
+- Urgency detection
+- Temporal context analysis
+
+### CEO
+- High-level decision making
+- Task prioritization
+- Resource allocation
+- Consultation management
+
+### Cookbook Manager
+- Recipe matching
+- Task decomposition
+- Capability tracking
+- Success criteria management
+
+## Logging
+
+Logs are written to:
+- Console (INFO level)
+- front_desk.log (DEBUG level)
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
+
+## Development Status
+
+- [x] Basic Slack integration
+- [x] NLP processing
+- [x] CEO decision making
+- [x] Recipe matching
+- [x] Response formatting
+- [ ] Advanced error recovery
+- [ ] Multi-channel support
+- [ ] Analytics dashboard 

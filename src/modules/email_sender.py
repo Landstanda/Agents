@@ -1,25 +1,38 @@
 #!/usr/bin/env python3
 
 from typing import Dict, Any, List
-import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
+import base64
 from ..core.module_interface import BaseModule
 from ..utils.logging import get_logger
+from googleapiclient.discovery import build
 
 logger = get_logger(__name__)
 
 class EmailSenderModule(BaseModule):
-    """Module for sending emails and managing follow-ups"""
+    """Module for sending emails and managing follow-ups using Gmail API"""
     
-    def __init__(self, smtp_config: Dict[str, Any] = None):
-        self.smtp_config = smtp_config or {}
-        self._validate_smtp_config()
+    def __init__(self, brain=None):
+        super().__init__()
+        self.brain = brain
+        self.service = None
         
+    def _initialize_service(self):
+        """Initialize Gmail API service"""
+        if not self.service:
+            from .google_auth import GoogleAuthModule
+            auth_module = GoogleAuthModule()
+            auth_result = auth_module.execute({})
+            credentials = auth_result['credentials']
+            self.service = build('gmail', 'v1', credentials=credentials)
+            
     def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute email sending operations"""
         try:
+            self._initialize_service()
+            
             operation = params.get('operation')
             if not operation:
                 raise ValueError("No operation specified")
@@ -36,7 +49,7 @@ class EmailSenderModule(BaseModule):
             raise
             
     def _send_email(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Send an email using SMTP"""
+        """Send an email using Gmail API"""
         to_address = params.get('to_address')
         response_data = params.get('response_data')
         
@@ -45,33 +58,32 @@ class EmailSenderModule(BaseModule):
             
         try:
             # Create message
-            msg = MIMEMultipart()
-            msg['From'] = self.smtp_config.get('from_address')
-            msg['To'] = to_address
-            msg['Subject'] = response_data.get('subject')
+            message = MIMEMultipart()
+            message['to'] = to_address
+            message['subject'] = response_data.get('subject')
             
             # Add body
             body = response_data.get('body')
-            msg.attach(MIMEText(body, 'plain'))
+            message.attach(MIMEText(body, 'plain'))
             
-            # Connect to SMTP server
-            with smtplib.SMTP(self.smtp_config.get('smtp_server'), 
-                            self.smtp_config.get('smtp_port')) as server:
-                if self.smtp_config.get('use_tls'):
-                    server.starttls()
-                
-                server.login(self.smtp_config.get('username'),
-                           self.smtp_config.get('password'))
-                
-                # Send email
-                server.send_message(msg)
-                
+            # Encode the message
+            raw_message = base64.urlsafe_b64encode(
+                message.as_bytes()
+            ).decode('utf-8')
+            
+            # Send via Gmail API
+            sent_message = self.service.users().messages().send(
+                userId='me',
+                body={'raw': raw_message}
+            ).execute()
+            
             logger.info(f"Email sent successfully to {to_address}")
             
             # Prepare result
             result = {
                 'success': True,
-                'message_id': msg.get('Message-ID'),
+                'message_id': sent_message['id'],
+                'thread_id': sent_message['threadId'],
                 'timestamp': datetime.now().isoformat(),
                 'to_address': to_address,
                 'subject': response_data.get('subject')
@@ -110,8 +122,30 @@ class EmailSenderModule(BaseModule):
             # Convert string date to datetime
             follow_up_datetime = datetime.fromisoformat(follow_up_date)
             
-            # Store follow-up in database or task system
-            # This is a placeholder - implement according to your system
+            # Add a label for follow-up
+            label_name = 'Follow-up'
+            
+            # Create label if it doesn't exist
+            try:
+                labels = self.service.users().labels().list(userId='me').execute()
+                label_id = next(
+                    (label['id'] for label in labels['labels'] 
+                     if label['name'] == label_name),
+                    None
+                )
+                
+                if not label_id:
+                    label = self.service.users().labels().create(
+                        userId='me',
+                        body={'name': label_name}
+                    ).execute()
+                    label_id = label['id']
+                    
+            except Exception as e:
+                logger.error(f"Failed to create/find label: {str(e)}")
+                label_id = None
+                
+            # Store follow-up data
             follow_up_data = {
                 'email_id': email_id,
                 'follow_up_date': follow_up_datetime.isoformat(),
@@ -119,6 +153,15 @@ class EmailSenderModule(BaseModule):
                 'status': 'scheduled'
             }
             
+            # Add label to the email if we got one
+            if label_id:
+                self.service.users().messages().modify(
+                    userId='me',
+                    id=email_id,
+                    body={'addLabelIds': [label_id]}
+                ).execute()
+                follow_up_data['label_id'] = label_id
+                
             logger.info(f"Follow-up scheduled for {follow_up_date}")
             return follow_up_data
             
@@ -129,28 +172,6 @@ class EmailSenderModule(BaseModule):
                 'error': str(e),
                 'email_id': email_id
             }
-            
-    def _validate_smtp_config(self):
-        """Validate SMTP configuration"""
-        required_fields = [
-            'smtp_server',
-            'smtp_port',
-            'username',
-            'password',
-            'from_address'
-        ]
-        
-        for field in required_fields:
-            if field not in self.smtp_config:
-                raise ValueError(f"Missing required SMTP config field: {field}")
-                
-        # Validate port number
-        try:
-            port = int(self.smtp_config['smtp_port'])
-            if port < 1 or port > 65535:
-                raise ValueError("Invalid SMTP port number")
-        except ValueError as e:
-            raise ValueError(f"Invalid SMTP port: {str(e)}")
 
     def validate_params(self, params: Dict[str, Any]) -> bool:
         """Validate input parameters"""
@@ -170,4 +191,4 @@ class EmailSenderModule(BaseModule):
 
     @property
     def capabilities(self) -> List[str]:
-        return ['email_sending', 'followup_scheduling'] 
+        return ['email_sending', 'followup_scheduling', 'gmail_integration'] 
