@@ -1,261 +1,165 @@
 from typing import Dict, Any, Optional
 import logging
-import json
-import re
-from .gpt_client import GPTClient
-from ..cookbook.cookbook_manager import CookbookManager
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
 class CEO:
     """
-    The CEO is responsible for high-level decision making and strategy.
-    It receives input, analyzes it, and determines the appropriate course of action.
+    A simplified CEO that works directly with Front Desk to process requests.
+    Focuses on making decisions about user requests and providing structured responses.
     """
     
     def __init__(self):
         """Initialize the CEO with basic configuration."""
         self.name = "Michael"
         self.title = "CEO"
-        self.gpt = GPTClient()
-        self.cookbook = CookbookManager()
-        
-        # Check if GPT is available
-        if not self.gpt.is_available():
-            logger.warning("GPT client is not available. CEO will operate in limited capacity.")
-            
         logger.info(f"{self.name} ({self.title}) is now online")
-        
-    def _extract_json_from_response(self, response: str) -> Dict[str, Any]:
-        """Extract JSON from a potentially markdown-formatted response."""
-        # Try to find JSON block in markdown
-        json_match = re.search(r"```(?:json)?\n(.*?)\n```", response, re.DOTALL)
-        if json_match:
-            try:
-                return json.loads(json_match.group(1))
-            except json.JSONDecodeError:
-                pass
-        
-        # Try to find any JSON-like structure
-        try:
-            # Find the first { and last }
-            start = response.find('{')
-            end = response.rfind('}')
-            if start != -1 and end != -1:
-                json_str = response[start:end+1]
-                return json.loads(json_str)
-        except json.JSONDecodeError:
-            pass
-            
-        # If all else fails, create a basic structure from the raw text
-        return {
-            "plan": response,
-            "confidence": 0.5,
-            "requires_consultation": False,
-            "notes": "Generated from raw response"
-        }
-        
-    async def consider_request(self, message: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    
+    async def consider_request(
+        self,
+        message: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
-        Consider a request and provide initial thoughts/direction.
+        Consider a request and provide a structured response.
         
         Args:
-            message (str): The incoming message/request
-            context (Optional[Dict]): Any relevant context for decision making
+            message: The user's request message
+            context: Additional context including NLP analysis
             
         Returns:
             Dict containing:
-                - decision: str - The high-level decision/direction
-                - confidence: float - How confident the CEO is in this direction (0-1)
-                - requires_consultation: bool - Whether other departments should be consulted
-                - notes: str - Any additional thoughts/context
+                - status: "success" or "error"
+                - decision: What to do about the request
+                - confidence: How confident we are (0-1)
+                - requires_consultation: Whether we need more input
+                - matched_recipes: List of relevant action types
+                - notes: Additional information
         """
         try:
             if not message:
-                raise ValueError("Empty or invalid message received")
+                raise ValueError("Empty message received")
             
-            # First, check if GPT is available
-            if not self.gpt.is_available():
-                return {
+            # Extract NLP analysis if available
+            nlp_analysis = context.get("nlp_analysis", {}) if context else {}
+            intents = nlp_analysis.get("intents", [])
+            urgency = nlp_analysis.get("urgency", 0.5)
+            
+            # Map intents to recipes
+            recipes = []
+            if "email_read" in intents:
+                recipes.append({
+                    "name": "email_processing",
+                    "type": "read",
+                    "confidence": 0.8
+                })
+            if "email_send" in intents:
+                recipes.append({
+                    "name": "email_processing",
+                    "type": "send",
+                    "confidence": 0.8
+                })
+            if "scheduling" in intents or "meeting_scheduler" in intents:
+                recipes.append({
+                    "name": "meeting_scheduler",
+                    "confidence": 0.9
+                })
+            if "research" in intents:
+                recipes.append({
+                    "name": "research_report",
+                    "confidence": 0.7
+                })
+            if "document" in intents:
+                recipes.append({
+                    "name": "document_management",
+                    "confidence": 0.7
+                })
+            
+            # Determine confidence and consultation needs
+            if not recipes:
+                response = {
                     "status": "success",
                     "decision": (
-                        "I apologize, but I'm currently operating with limited capabilities "
-                        "as the GPT service is not available. I can still help with basic "
-                        "tasks and provide information about our available services."
+                        "I apologize, but I'm not sure how to help with this request. "
+                        "Could you please rephrase it or let me know more specifically what you need?"
                     ),
-                    "confidence": 0.3,
+                    "confidence": 0.1,
                     "requires_consultation": True,
-                    "notes": "Operating without GPT assistance",
                     "matched_recipes": [],
-                    "required_ingredients": []
+                    "notes": "No matching capabilities found"
                 }
-                
-            # Check the cookbook for matching recipes
-            try:
-                cookbook_analysis = self.cookbook.analyze_request(message)
-                matched_recipes = cookbook_analysis.get("matched_recipes", [])
-                logger.info(f"Cookbook analysis: {json.dumps(cookbook_analysis, indent=2)}")
-            except Exception as e:
-                logger.error(f"Error in cookbook analysis: {str(e)}")
-                cookbook_analysis = {"matched_recipes": [], "notes": "Error in recipe matching"}
-                matched_recipes = []
+                logger.info(f"CEO Response: {response['decision']}")
+                return response
             
-            # Prepare the system prompt with cookbook context
-            system_prompt = self._prepare_system_prompt(cookbook_analysis)
+            # Handle multi-recipe scenarios
+            if len(recipes) > 1:
+                response = {
+                    "status": "success",
+                    "decision": (
+                        "I understand your request involves multiple steps. "
+                        "I'll help coordinate these activities to ensure everything is handled properly."
+                    ),
+                    "confidence": sum(r["confidence"] for r in recipes) / len(recipes),
+                    "requires_consultation": True,
+                    "matched_recipes": recipes,
+                    "notes": "Multiple steps identified"
+                }
+                logger.info(f"CEO Response: {response['decision']}")
+                return response
             
-            # Get GPT's analysis
-            try:
-                gpt_response = await self.gpt.get_completion(
-                    prompt=message,
-                    system_prompt=system_prompt,
-                    temperature=0.7
+            # Handle single recipe scenarios
+            recipe = recipes[0]
+            if recipe["name"] == "email_processing":
+                action_type = recipe.get("type", "read")
+                decision = (
+                    "I'll help you process your emails. "
+                    f"I understand you want to {action_type} emails."
                 )
-                logger.info(f"GPT response: {json.dumps(gpt_response, indent=2)}")
-                
-                if gpt_response["status"] == "error":
-                    if "API key" in gpt_response.get("error", ""):
-                        return {
-                            "status": "success",
-                            "decision": (
-                                "I apologize, but I'm currently operating with limited capabilities "
-                                "as the GPT service is not properly configured. I can still help with "
-                                "basic tasks and provide information about our available services."
-                            ),
-                            "confidence": 0.3,
-                            "requires_consultation": True,
-                            "notes": "GPT service configuration issue",
-                            "matched_recipes": matched_recipes,
-                            "required_ingredients": cookbook_analysis.get("required_ingredients", [])
-                        }
-                    else:
-                        raise Exception(f"GPT error: {gpt_response['error']}")
-                
-                # Parse GPT's response
-                decision_data = self._extract_json_from_response(gpt_response["content"])
-                logger.info(f"Parsed decision data: {json.dumps(decision_data, indent=2)}")
-            except Exception as e:
-                logger.error(f"Error in GPT processing: {str(e)}")
-                # Provide a fallback response based on cookbook analysis
-                if matched_recipes:
-                    return {
-                        "status": "success",
-                        "decision": (
-                            "I understand your request and it seems to match some of our capabilities. "
-                            "However, I need a moment to process it properly. Could you please provide "
-                            "more details about what you'd like to achieve?"
-                        ),
-                        "confidence": 0.5,
-                        "requires_consultation": True,
-                        "notes": "Fallback response with matched recipes",
-                        "matched_recipes": matched_recipes,
-                        "required_ingredients": cookbook_analysis.get("required_ingredients", [])
-                    }
-                else:
-                    return {
-                        "status": "success",
-                        "decision": (
-                            "I'm having trouble understanding your request fully. Could you please "
-                            "rephrase it or provide more context about what you're trying to achieve?"
-                        ),
-                        "confidence": 0.3,
-                        "requires_consultation": True,
-                        "notes": "Fallback response without matched recipes",
-                        "matched_recipes": [],
-                        "required_ingredients": []
-                    }
-            
-            # Apply decision-making rules
-            if len(matched_recipes) == 0:
-                # No matching recipes - enforce low confidence
-                confidence = min(0.4, decision_data.get("confidence", 0.1))
-                requires_consultation = True
-            elif len(matched_recipes) > 1:
-                # Multiple recipes - always require consultation
-                confidence = decision_data.get("confidence", 0.5)
-                requires_consultation = True
+            elif recipe["name"] == "meeting_scheduler":
+                decision = (
+                    "I'll help you schedule the meeting. "
+                    "I'll make sure to coordinate with all participants."
+                )
+            elif recipe["name"] == "research_report":
+                decision = (
+                    "I'll help you research this topic and prepare a report. "
+                    "I'll make sure to include relevant data and insights."
+                )
+            elif recipe["name"] == "document_management":
+                decision = (
+                    "I'll help you with the document. "
+                    "I'll ensure it meets our quality standards."
+                )
             else:
-                # Single recipe - use GPT's confidence but ensure it's reasonable
-                confidence = max(0.7, min(1.0, decision_data.get("confidence", 0.7)))
-                requires_consultation = decision_data.get("requires_consultation", False)
+                decision = "I'll help you with this request."
             
-            # Combine cookbook analysis with GPT's decision and our rules
-            return {
+            response = {
                 "status": "success",
-                "decision": decision_data["plan"],
-                "confidence": confidence,
-                "requires_consultation": requires_consultation,
-                "notes": decision_data.get("notes", cookbook_analysis["notes"]),
-                "matched_recipes": matched_recipes,
-                "required_ingredients": cookbook_analysis.get("required_ingredients", [])
+                "decision": decision,
+                "confidence": recipe["confidence"],
+                "requires_consultation": False,
+                "matched_recipes": recipes,
+                "notes": f"Using {recipe['name']} capability"
             }
+            logger.info(f"CEO Response: {response['decision']}")
+            return response
             
         except Exception as e:
-            logger.error(f"Error in CEO consideration: {str(e)}")
-            logger.exception(e)
-            # Provide a more helpful error response
-            return {
-                "status": "success",
-                "decision": (
-                    "I apologize, but I'm having trouble processing your request at the moment. "
-                    "Could you please try rephrasing it in a simpler way?"
-                ),
-                "confidence": 0.3,
+            logger.error(f"Error processing request: {str(e)}")
+            response = {
+                "status": "error",
+                "decision": None,
+                "confidence": 0.0,
                 "requires_consultation": True,
-                "notes": "Error in request processing",
                 "matched_recipes": [],
-                "required_ingredients": []
+                "notes": str(e)
             }
-    
-    def _prepare_system_prompt(self, cookbook_analysis: Dict[str, Any]) -> str:
-        """Prepare a system prompt with cookbook context."""
-        matched_recipes = cookbook_analysis.get("matched_recipes", [])
-        ingredients = cookbook_analysis.get("required_ingredients", [])
-        
-        prompt = f"""You are {self.name}, the CEO of an AI-powered office.
-        
-        Based on our cookbook analysis, the request matches these recipes:
-        {json.dumps(matched_recipes, indent=2)}
-        
-        These recipes require the following ingredients (capabilities):
-        {json.dumps(ingredients, indent=2)}
-        
-        Your role is to make high-level decisions about how to handle requests.
-        
-        Important guidelines:
-        1. For requests matching multiple recipes (2 or more):
-           - Always set requires_consultation to true
-           - Consider interdependencies between recipes
-           - Note potential conflicts or timing issues
-        
-        2. For requests with no matching recipes:
-           - Set confidence to 0.1 if completely outside our capabilities
-           - Set confidence to 0.3-0.4 if we might adapt existing recipes
-           - Always explain limitations clearly
-        
-        3. For single recipe matches:
-           - Set confidence based on how well the recipe fits (0.7-1.0)
-           - Consider if customization is needed
-        
-        Respond with a JSON object containing:
-        {{
-            "plan": "Clear description of how to proceed",
-            "confidence": 0.0-1.0,
-            "requires_consultation": true/false,
-            "notes": "Any additional thoughts or concerns"
-        }}
-        
-        Remember: It's better to acknowledge limitations than to attempt tasks beyond our capabilities.
-        """
-        
-        return prompt
+            logger.error(f"CEO Error Response: {response['notes']}")
+            return response
     
     def get_status(self) -> Dict[str, Any]:
-        """
-        Get the current status of the CEO.
-        
-        Returns:
-            Dict containing basic status information
-        """
+        """Get the current status of the CEO."""
         return {
             "name": self.name,
             "title": self.title,

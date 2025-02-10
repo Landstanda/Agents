@@ -24,11 +24,20 @@ class NLPProcessor:
         
         # Common action verbs that indicate intent
         self.action_verbs = {
-            "communication": ["email", "send", "message", "contact", "write"],
+            "email_read": ["check email", "read email", "view email", "show email", "get email"],
+            "email_send": ["send email", "write email", "compose email", "reply to email"],
             "scheduling": ["schedule", "book", "arrange", "plan", "set up"],
             "research": ["research", "find", "look up", "investigate", "analyze"],
             "document": ["create", "prepare", "draft", "write", "make"],
             "review": ["review", "check", "examine", "look at", "verify"]
+        }
+        
+        # Email-specific patterns
+        self.email_patterns = {
+            "subject": r"\b(subject|title|about)\b",
+            "sender": r"\b(from|sent by|sender)\b",
+            "recent": r"\b(last|latest|recent|newest)\b",
+            "count": r"\b(how many|number of)\b"
         }
         
     def process_message(self, message: str, user_info: Dict[str, Any]) -> Dict[str, Any]:
@@ -95,10 +104,21 @@ class NLPProcessor:
         """Extract intents based on action verbs and patterns."""
         found_intents = []
         
-        # Check each intent category
+        # First check for exact phrase matches
         for category, verbs in self.action_verbs.items():
             if any(verb in text for verb in verbs):
                 found_intents.append(category)
+                
+        # Then check for email-specific patterns
+        if any(pattern in text for pattern in ["email", "mail", "inbox"]):
+            # Determine if it's a read or send operation
+            if any(re.search(pattern, text) for pattern in self.email_patterns.values()):
+                found_intents.append("email_read")
+            elif "send" in text or "write" in text:
+                found_intents.append("email_send")
+            else:
+                # Default to read if unclear
+                found_intents.append("email_read")
         
         return found_intents
     
@@ -108,12 +128,18 @@ class NLPProcessor:
             "people": [],
             "dates": [],
             "numbers": [],
-            "emails": []
+            "emails": [],
+            "email_attributes": []  # New: track what email attributes are being requested
         }
         
         # Extract emails
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         entities["emails"] = re.findall(email_pattern, text)
+        
+        # Extract email attributes being requested
+        for attr_type, pattern in self.email_patterns.items():
+            if re.search(pattern, text):
+                entities["email_attributes"].append(attr_type)
         
         # Extract numbers
         number_pattern = r'\b\d+\b'

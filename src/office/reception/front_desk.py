@@ -12,6 +12,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from ..executive.ceo import CEO
 from .nlp_processor import NLPProcessor
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +30,17 @@ class FrontDesk:
         # Initialize Slack credentials
         self.slack_bot_token = os.getenv("SLACK_BOT_TOKEN")
         self.slack_app_token = os.getenv("SLACK_APP_TOKEN")
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
         
         if not self.slack_bot_token or not self.slack_app_token:
             raise ValueError("Missing Slack tokens in environment variables")
+        if not self.openai_api_key:
+            raise ValueError("Missing OpenAI API key in environment variables")
             
         # Initialize components
         self.web_client = AsyncWebClient(token=self.slack_bot_token)
         self.socket_client = None  # Will be initialized in start()
+        self.openai_client = AsyncOpenAI(api_key=self.openai_api_key)
         self.ceo = CEO()
         self.nlp = NLPProcessor()
         
@@ -47,6 +52,10 @@ class FrontDesk:
         self.bot_id = None
         self.bot_mention = None
         
+        # Initialize message deduplication set
+        self._processed_messages = set()
+        self._error_messages = set()  # Track error messages to prevent duplicates
+        
         logger.info(f"{self.name} ({self.title}) initialization complete")
     
     async def process_event(self, client: SocketModeClient, req: SocketModeRequest) -> None:
@@ -55,82 +64,92 @@ class FrontDesk:
             # Always acknowledge the request first
             await client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
             
-            # Log the event type
-            logger.info(f"Received event type: {req.type}")
-            logger.debug(f"Event payload: {json.dumps(req.payload, indent=2)}")
+            if req.type != "events_api":
+                return
+                
+            event = req.payload["event"]
+            event_type = event.get("type")
             
-            if req.type == "events_api":
-                event = req.payload["event"]
-                event_type = event.get("type")
+            # Only process messages and app_mentions
+            if event_type not in ["message", "app_mention"]:
+                return
                 
-                # Skip messages from the bot itself
-                if event.get("user") == self.bot_id:
-                    logger.debug("Skipping message from myself")
-                    return
-                    
-                # Skip message subtypes (like message_changed, etc.)
-                if event.get("subtype"):
-                    logger.debug(f"Skipping message subtype: {event.get('subtype')}")
-                    return
+            # Skip messages from the bot itself
+            if event.get("user") == self.bot_id:
+                return
                 
-                # Get the message text
-                text = event.get("text", "")
-                if not text:
-                    logger.debug("Skipping empty message")
-                    return
+            # Skip message subtypes (like message_changed, etc.)
+            if event.get("subtype"):
+                return
+            
+            # Get the message text and check if it mentions the bot
+            text = event.get("text", "").strip()
+            if not text:
+                return
                 
-                # Only process if it's a mention or contains our mention
-                should_process = False
-                if event_type == "app_mention":
-                    should_process = True
-                elif event_type == "message" and self.bot_mention in text:
-                    # Check if this message was already processed as an app_mention
-                    message_ts = event.get("ts")
-                    if not hasattr(self, '_processed_messages'):
-                        self._processed_messages = set()
-                    
-                    if message_ts in self._processed_messages:
-                        logger.debug(f"Skipping already processed message: {message_ts}")
-                        return
-                    
-                    self._processed_messages.add(message_ts)
-                    # Keep set size manageable
-                    if len(self._processed_messages) > 1000:
-                        self._processed_messages = set(list(self._processed_messages)[-500:])
-                    
-                    should_process = True
-                
-                if should_process:
-                    await self.handle_message(event)
+            # Only process if it's a mention or contains our mention
+            if event_type != "app_mention" and self.bot_mention not in text:
+                return
+            
+            # Check for message deduplication
+            message_ts = event.get("ts")
+            if message_ts in self._processed_messages:
+                logger.debug(f"Skipping already processed message: {message_ts}")
+                return
+            
+            # Add to processed messages before handling
+            self._processed_messages.add(message_ts)
+            if len(self._processed_messages) > 1000:
+                self._processed_messages = set(list(self._processed_messages)[-500:])
+            
+            # Handle the message
+            await self.handle_message(event)
     
         except Exception as e:
             logger.error(f"Error processing event: {str(e)}")
             logger.exception(e)
-            # Try to send an error message if we can get the channel
-            try:
-                if req.payload and "event" in req.payload:
-                    channel_id = req.payload["event"].get("channel")
-                    if channel_id:
-                        await self._send_error_message(channel_id)
-            except Exception:
-                logger.error("Could not send error message for socket request")
+    
+    async def get_gpt_response(self, prompt: str) -> str:
+        """Get a quick response from GPT-3.5-turbo."""
+        try:
+            response = await self.openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are Sarah, a helpful and professional front desk manager. Keep responses concise, friendly, and under 50 words. For simple greetings or casual conversation, respond naturally without overthinking."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=100,
+                temperature=0.7
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error(f"Error getting GPT response: {str(e)}")
+            return None
     
     async def handle_message(self, message: Dict[str, Any]) -> None:
         """Handle incoming Slack messages."""
         try:
-            # Extract relevant message information
-            user_id = message.get("user")
+            # Extract message info
             channel_id = message.get("channel")
+            user_id = message.get("user")
+            # Only use thread_ts if message is part of a thread
+            thread_ts = message.get("thread_ts") if message.get("thread_ts") else None
             text = message.get("text", "").replace(self.bot_mention, "").strip()
-            thread_ts = message.get("thread_ts", message.get("ts"))
             
-            # Log the incoming message details
-            logger.info(f"Processing message - Channel: {channel_id}, User: {user_id}, Text: {text}")
+            logger.info(f"Processing message: {text}")
             
-            # Skip if not a user message or missing required fields
+            # Skip if missing required fields
             if not text or not user_id or not channel_id:
-                logger.info("Skipping message due to missing fields")
+                logger.warning("Missing required fields in message")
                 return
+            
+            # Get user info for personalization
+            try:
+                user_info = await self.web_client.users_info(user=user_id)
+                user_name = user_info["user"]["real_name"]
+            except Exception as e:
+                logger.error(f"Error getting user info: {str(e)}")
+                user_name = "there"
             
             # Handle special commands
             if text.lower() == "help":
@@ -140,97 +159,35 @@ class FrontDesk:
                 await self._send_status_message(channel_id, thread_ts)
                 return
             
-            try:
-                # Get user info for personalization
-                user_info = await self.web_client.users_info(user=user_id)
-                user_info = user_info["user"]
-                logger.info(f"Got user info for {user_info['real_name']}")
-            except Exception as e:
-                logger.error(f"Error getting user info: {str(e)}")
-                await self._send_error_message(channel_id, thread_ts)
-                return
+            # Process with NLP
+            logger.info(f"Sending to NLP processor: {text}")
+            nlp_result = self.nlp.process_message(text, user_info["user"])
+            logger.info(f"NLP result: {json.dumps(nlp_result, indent=2)}")
             
-            try:
-                # Process message with NLP
-                logger.info("Processing message with NLP")
-                nlp_result = self.nlp.process_message(text, user_info)
-                logger.info(f"NLP result: {json.dumps(nlp_result, indent=2)}")
-            except Exception as e:
-                logger.error(f"Error in NLP processing: {str(e)}")
-                logger.exception(e)
-                message = (
-                    "I apologize, but I'm having trouble understanding your request. "
-                    "Could you try rephrasing it in a simpler way?"
-                )
-                await self.web_client.chat_postMessage(
-                    channel=channel_id,
-                    text=message,
-                    thread_ts=thread_ts
-                )
-                return
+            # Send to CEO
+            logger.info("Sending to CEO for consideration")
+            response = await self.ceo.consider_request(
+                message=text,
+                context={
+                    "nlp_analysis": nlp_result,
+                    "channel_id": channel_id,
+                    "thread_ts": thread_ts
+                }
+            )
+            logger.info(f"CEO response: {json.dumps(response, indent=2)}")
             
-            if nlp_result["status"] == "error":
-                logger.error(f"NLP processing error: {nlp_result.get('error')}")
-                message = (
-                    "I apologize, but I couldn't quite understand your request. "
-                    "Could you try expressing it differently?"
-                )
-                await self.web_client.chat_postMessage(
-                    channel=channel_id,
-                    text=message,
-                    thread_ts=thread_ts
-                )
-                return
+            # Format and send response
+            slack_response = self._format_response(response, nlp_result, user_name)
+            await self.web_client.chat_postMessage(
+                channel=channel_id,
+                text=slack_response,
+                thread_ts=thread_ts
+            )
             
-            try:
-                # Forward processed request to CEO
-                logger.info(f"Forwarding processed request from {user_info['real_name']} to CEO")
-                response = await self.ceo.consider_request(
-                    message=text,
-                    context={
-                        "nlp_analysis": nlp_result,
-                        "channel_id": channel_id,
-                        "thread_ts": thread_ts
-                    }
-                )
-                logger.info(f"CEO response: {json.dumps(response, indent=2)}")
-                
-                # Format and send response
-                slack_response = self._format_response(response, nlp_result, user_info["real_name"])
-                logger.info(f"Sending response to channel {channel_id}: {slack_response}")
-                await self.web_client.chat_postMessage(
-                    channel=channel_id,
-                    text=slack_response,
-                    thread_ts=thread_ts
-                )
-            except Exception as e:
-                logger.error(f"Error in CEO processing: {str(e)}")
-                logger.exception(e)
-                message = (
-                    "I apologize, but I'm having trouble processing your request at the moment. "
-                    "This might be due to a configuration issue. Please try again in a few minutes."
-                )
-                await self.web_client.chat_postMessage(
-                    channel=channel_id,
-                    text=message,
-                    thread_ts=thread_ts
-                )
-                
         except Exception as e:
             logger.error(f"Error handling message: {str(e)}")
-            logger.exception(e)
-            try:
-                message = (
-                    "I apologize, but something unexpected happened. "
-                    "I've logged the error and will work on fixing it."
-                )
-                await self.web_client.chat_postMessage(
-                    channel=channel_id,
-                    text=message,
-                    thread_ts=thread_ts
-                )
-            except Exception:
-                logger.error("Failed to send error message")
+            error_key = f"{channel_id}:{thread_ts if thread_ts else message.get('ts')}"
+            await self._send_error_message(channel_id, thread_ts, error_key)
     
     async def _send_help_message(self, channel_id: str, thread_ts: Optional[str] = None) -> None:
         """Send help information."""
@@ -272,8 +229,12 @@ I'll analyze your request and coordinate with our CEO to help you! 🤖✨"""
             thread_ts=thread_ts
         )
     
-    async def _send_error_message(self, channel_id: str, thread_ts: Optional[str] = None) -> None:
-        """Send an error message to Slack."""
+    async def _send_error_message(self, channel_id: str, thread_ts: Optional[str] = None, error_key: Optional[str] = None) -> None:
+        """Send an error message to Slack, preventing duplicates."""
+        if error_key and error_key in self._error_messages:
+            logger.debug(f"Skipping duplicate error message for {error_key}")
+            return
+            
         message = (
             "I apologize, but I encountered an error while processing your request. "
             "I've logged the error and will work on improving my handling of this type of request. "
@@ -289,6 +250,11 @@ I'll analyze your request and coordinate with our CEO to help you! 🤖✨"""
                 text=message,
                 thread_ts=thread_ts
             )
+            if error_key:
+                self._error_messages.add(error_key)
+                # Keep set size manageable
+                if len(self._error_messages) > 1000:
+                    self._error_messages = set(list(self._error_messages)[-500:])
         except Exception as e:
             logger.error(f"Error sending error message: {str(e)}")
     
@@ -315,11 +281,11 @@ I'll analyze your request and coordinate with our CEO to help you! 🤖✨"""
         response_parts.append(ceo_response["decision"])
         
         # Add timing information if present
-        temporal = nlp_result["temporal_context"]
-        if temporal["has_deadline"]:
-            if temporal["specific_day"]:
+        temporal = nlp_result.get("temporal_context", {})
+        if temporal.get("has_deadline"):
+            if temporal.get("specific_day"):
                 response_parts.append(f"\n_I've noted that this needs to be done by {temporal['specific_day']}._")
-            elif temporal["timeframe"]:
+            elif temporal.get("timeframe"):
                 timeframe_text = {
                     "urgent": "as soon as possible",
                     "today": "today",
@@ -347,7 +313,9 @@ I'll analyze your request and coordinate with our CEO to help you! 🤖✨"""
         if ceo_response.get("notes"):
             response_parts.append(f"\n_{ceo_response['notes']}_")
         
-        return "\n\n".join(response_parts)
+        response = "\n\n".join(response_parts)
+        logger.info(f"Formatted response: {response}")
+        return response
     
     async def start(self) -> None:
         """Start the Front Desk service."""
