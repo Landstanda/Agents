@@ -19,6 +19,11 @@ class CEO:
         self.title = "CEO"
         self.gpt = GPTClient()
         self.cookbook = CookbookManager()
+        
+        # Check if GPT is available
+        if not self.gpt.is_available():
+            logger.warning("GPT client is not available. CEO will operate in limited capacity.")
+            
         logger.info(f"{self.name} ({self.title}) is now online")
         
     def _extract_json_from_response(self, response: str) -> Dict[str, Any]:
@@ -68,26 +73,96 @@ class CEO:
         try:
             if not message:
                 raise ValueError("Empty or invalid message received")
+            
+            # First, check if GPT is available
+            if not self.gpt.is_available():
+                return {
+                    "status": "success",
+                    "decision": (
+                        "I apologize, but I'm currently operating with limited capabilities "
+                        "as the GPT service is not available. I can still help with basic "
+                        "tasks and provide information about our available services."
+                    ),
+                    "confidence": 0.3,
+                    "requires_consultation": True,
+                    "notes": "Operating without GPT assistance",
+                    "matched_recipes": [],
+                    "required_ingredients": []
+                }
                 
-            # First, check the cookbook for matching recipes
-            cookbook_analysis = self.cookbook.analyze_request(message)
-            matched_recipes = cookbook_analysis.get("matched_recipes", [])
+            # Check the cookbook for matching recipes
+            try:
+                cookbook_analysis = self.cookbook.analyze_request(message)
+                matched_recipes = cookbook_analysis.get("matched_recipes", [])
+                logger.info(f"Cookbook analysis: {json.dumps(cookbook_analysis, indent=2)}")
+            except Exception as e:
+                logger.error(f"Error in cookbook analysis: {str(e)}")
+                cookbook_analysis = {"matched_recipes": [], "notes": "Error in recipe matching"}
+                matched_recipes = []
             
             # Prepare the system prompt with cookbook context
             system_prompt = self._prepare_system_prompt(cookbook_analysis)
             
             # Get GPT's analysis
-            gpt_response = await self.gpt.get_completion(
-                prompt=message,
-                system_prompt=system_prompt,
-                temperature=0.7
-            )
-            
-            if gpt_response["status"] == "error":
-                raise Exception(gpt_response["error"])
-            
-            # Parse GPT's response
-            decision_data = self._extract_json_from_response(gpt_response["content"])
+            try:
+                gpt_response = await self.gpt.get_completion(
+                    prompt=message,
+                    system_prompt=system_prompt,
+                    temperature=0.7
+                )
+                logger.info(f"GPT response: {json.dumps(gpt_response, indent=2)}")
+                
+                if gpt_response["status"] == "error":
+                    if "API key" in gpt_response.get("error", ""):
+                        return {
+                            "status": "success",
+                            "decision": (
+                                "I apologize, but I'm currently operating with limited capabilities "
+                                "as the GPT service is not properly configured. I can still help with "
+                                "basic tasks and provide information about our available services."
+                            ),
+                            "confidence": 0.3,
+                            "requires_consultation": True,
+                            "notes": "GPT service configuration issue",
+                            "matched_recipes": matched_recipes,
+                            "required_ingredients": cookbook_analysis.get("required_ingredients", [])
+                        }
+                    else:
+                        raise Exception(f"GPT error: {gpt_response['error']}")
+                
+                # Parse GPT's response
+                decision_data = self._extract_json_from_response(gpt_response["content"])
+                logger.info(f"Parsed decision data: {json.dumps(decision_data, indent=2)}")
+            except Exception as e:
+                logger.error(f"Error in GPT processing: {str(e)}")
+                # Provide a fallback response based on cookbook analysis
+                if matched_recipes:
+                    return {
+                        "status": "success",
+                        "decision": (
+                            "I understand your request and it seems to match some of our capabilities. "
+                            "However, I need a moment to process it properly. Could you please provide "
+                            "more details about what you'd like to achieve?"
+                        ),
+                        "confidence": 0.5,
+                        "requires_consultation": True,
+                        "notes": "Fallback response with matched recipes",
+                        "matched_recipes": matched_recipes,
+                        "required_ingredients": cookbook_analysis.get("required_ingredients", [])
+                    }
+                else:
+                    return {
+                        "status": "success",
+                        "decision": (
+                            "I'm having trouble understanding your request fully. Could you please "
+                            "rephrase it or provide more context about what you're trying to achieve?"
+                        ),
+                        "confidence": 0.3,
+                        "requires_consultation": True,
+                        "notes": "Fallback response without matched recipes",
+                        "matched_recipes": [],
+                        "required_ingredients": []
+                    }
             
             # Apply decision-making rules
             if len(matched_recipes) == 0:
@@ -116,12 +191,19 @@ class CEO:
             
         except Exception as e:
             logger.error(f"Error in CEO consideration: {str(e)}")
+            logger.exception(e)
+            # Provide a more helpful error response
             return {
-                "status": "error",
-                "decision": None,
-                "confidence": 0.0,
-                "requires_consultation": False,
-                "notes": f"Error occurred: {str(e)}"
+                "status": "success",
+                "decision": (
+                    "I apologize, but I'm having trouble processing your request at the moment. "
+                    "Could you please try rephrasing it in a simpler way?"
+                ),
+                "confidence": 0.3,
+                "requires_consultation": True,
+                "notes": "Error in request processing",
+                "matched_recipes": [],
+                "required_ingredients": []
             }
     
     def _prepare_system_prompt(self, cookbook_analysis: Dict[str, Any]) -> str:

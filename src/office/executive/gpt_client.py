@@ -14,12 +14,23 @@ class GPTClient:
         load_dotenv()
         
         self.api_key = os.getenv("OPENAI_API_KEY")
-        if not self.api_key:
-            raise ValueError("OPENAI_API_KEY not found in environment variables")
-            
-        self.client = AsyncOpenAI(api_key=self.api_key)
+        self.client = None
         self.model = "gpt-4-1106-preview"  # Using the latest GPT-4 model
         
+        if self.api_key:
+            try:
+                self.client = AsyncOpenAI(api_key=self.api_key)
+                logger.info("GPT client initialized successfully")
+            except Exception as e:
+                logger.error(f"Error initializing GPT client: {str(e)}")
+                self.api_key = None
+        else:
+            logger.warning("OPENAI_API_KEY not found in environment variables")
+    
+    def is_available(self) -> bool:
+        """Check if the GPT client is available and properly configured."""
+        return bool(self.api_key and self.client)
+    
     async def get_completion(
         self,
         prompt: str,
@@ -40,6 +51,13 @@ class GPTClient:
                 - content: Optional[str] - The response content
                 - error: Optional[str] - Error message if status is 'error'
         """
+        if not self.is_available():
+            return {
+                "status": "error",
+                "content": None,
+                "error": "GPT client is not available. Please check OPENAI_API_KEY environment variable."
+            }
+            
         try:
             messages = []
             

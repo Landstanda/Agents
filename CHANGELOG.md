@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2024-01-21
+
+### Added
+- Socket Mode implementation replacing polling system
+- GPT client availability checking
+- Message deduplication using timestamps
+- Enhanced error handling and user feedback
+
+### Changed
+- Improved CEO response handling with better fallbacks
+- Enhanced thread handling in Front Desk
+- Better logging for events and responses
+- Updated error messages to be more user-friendly
+
+### Fixed
+- Double message responses issue
+- GPT client initialization errors
+- Socket Mode connection stability
+- Message processing in threads
+
 ## [0.2.0] - 2024-01-20
 
 ### Added
