@@ -148,6 +148,7 @@ class FrontDesk:
             # Add retry logic for transient errors
             max_retries = 2
             retry_count = 0
+            last_error = None
             
             while retry_count <= max_retries:
                 try:
@@ -169,22 +170,25 @@ class FrontDesk:
                         ],
                         max_tokens=100,
                         temperature=0.7,
-                        presence_penalty=0.6  # Encourage varied responses
+                        presence_penalty=0.6,  # Encourage varied responses
+                        n=1  # Ensure we only get one response
                     )
                     
                     if response and response.choices:
                         return response.choices[0].message.content.strip()
-                        
+                    
                     logger.warning("Empty response from GPT")
                     break
                     
                 except Exception as e:
+                    last_error = str(e)
                     retry_count += 1
                     if retry_count <= max_retries:
                         logger.warning(f"GPT request failed, attempt {retry_count}/{max_retries}: {str(e)}")
                         await asyncio.sleep(1)  # Wait before retrying
                     else:
-                        raise  # Re-raise if out of retries
+                        logger.error(f"All GPT retries failed: {str(e)}")
+                        break
             
             # If we get here, we either got an empty response or used all retries
             return self._get_fallback_response(prompt)
@@ -578,10 +582,22 @@ I'll analyze your request and coordinate with our CEO to help you! 🤖✨"""
     async def _send_message(self, channel_id: str, text: str, thread_ts: Optional[str] = None) -> None:
         """Send a message to Slack."""
         try:
+            # Create a unique key for this message
+            message_key = f"{channel_id}:{thread_ts}:{text}"
+            if message_key in self._processed_messages:
+                logger.debug(f"Skipping duplicate message: {message_key}")
+                return
+                
             await self.web_client.chat_postMessage(
                 channel=channel_id,
                 text=text,
                 thread_ts=thread_ts
             )
+            
+            # Add to processed messages
+            self._processed_messages.add(message_key)
+            if len(self._processed_messages) > 1000:
+                self._processed_messages = set(list(self._processed_messages)[-500:])
+                
         except Exception as e:
             logger.error(f"Error sending message: {str(e)}") 

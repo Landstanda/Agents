@@ -67,44 +67,6 @@ document_task:
   success_criteria:
   - Document created
   - Content added
-email_read:
-  common_triggers:
-  - check email
-  - read email
-  - show email
-  - view email
-  - get email
-  - check my emails
-  - show my emails
-  - any new emails
-  context_handling:
-    context_timeout: 300
-    follow_up_intents:
-    - email_details
-    - email_reply
-    maintain_context: true
-  description: Check and read emails from inbox
-  intent: email_read
-  keywords:
-  - email
-  - mail
-  - inbox
-  - messages
-  - unread
-  - new
-  name: Email Reader
-  required_entities:
-  - email_attributes
-  steps:
-  - action: check_email
-    params:
-      attributes: '{email_attributes}'
-  - action: format_email_summary
-    params:
-      format: readable
-  success_criteria:
-  - Emails retrieved
-  - Summary formatted
 research_topic:
   common_triggers:
   - research about
@@ -133,38 +95,86 @@ research_topic:
   - Research completed
   - Summary created
 schedule_meeting:
+  name: "schedule_meeting"
+  description: "Schedule a meeting with participants"
+  intent: "schedule_meeting"
   common_triggers:
-  - schedule a meeting
-  - set up a meeting
-  - book an appointment
-  - plan a meeting
-  - schedule breakfast
-  - schedule lunch
-  - schedule dinner
+    - "schedule a meeting"
+    - "set up a meeting"
+    - "book an appointment"
+    - "plan a meeting"
+    - "schedule breakfast"
+    - "schedule lunch"
+    - "schedule dinner"
+  keywords:
+    - "schedule"
+    - "meeting"
+    - "calendar"
+    - "invite"
+    - "appointment"
+    - "book"
+    - "plan"
+    - "breakfast"
+    - "lunch"
+    - "dinner"
+  required_entities:
+    - "time"
+    - "participants"
+  steps:
+    - type: "api_call"
+      action: "check_availability"
+      params:
+        time: "{time}"
+        participants: "{participants}"
+    - type: "api_call"
+      action: "create_meeting"
+      params:
+        time: "{time}"
+        participants: "{participants}"
+  success_criteria:
+    - "Meeting scheduled"
+    - "Participants notified"
   context_handling:
+    maintain_context: true
     context_timeout: 300
     follow_up_intents:
-    - provide_time
-    maintain_context: true
-  description: Schedule a meeting with participants
-  intent: schedule_meeting
+      - "provide_time"
+      - "provide_participants"
+email_read:
+  name: "Email Reader"
+  description: "Check and read emails from inbox"
+  intent: "email_read"
+  common_triggers:
+    - "check email"
+    - "read email"
+    - "show email"
+    - "view email"
+    - "get email"
+    - "check my emails"
+    - "show my emails"
+    - "any new emails"
   keywords:
-  - schedule
-  - meeting
-  - calendar
-  - invite
-  - appointment
-  - book
-  - plan
-  - breakfast
-  - lunch
-  - dinner
-  name: schedule_meeting
+    - "email"
+    - "mail"
+    - "inbox"
+    - "messages"
+    - "unread"
+    - "new"
   required_entities:
-  - time
+    - "email_attributes"  # Optional - for specific attributes like sender, subject, count
   steps:
-  - action: create_meeting
-    params:
-      time: '{time}'
+    - action: "check_email"
+      params:
+        attributes: "{email_attributes}"
+    - action: "format_email_summary"
+      params:
+        format: "readable"
   success_criteria:
-  - Meeting scheduled
+    - "Emails retrieved"
+    - "Summary formatted"
+  context_handling:
+    maintain_context: true
+    context_timeout: 300
+    follow_up_intents:
+      - "email_details"
+      - "email_reply"
