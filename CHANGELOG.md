@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2024-03-21
+
+### Added
+- Comprehensive time entity validation in test suite
+- Flexible time format handling in NLP processor
+- Enhanced test cases for time entity flow
+- Improved validation in cookbook manager for time entities
+
+### Changed
+- Updated time entity extraction to support both relative and absolute formats
+- Refined test assertions to be more robust and descriptive
+- Improved error messages in time validation tests
+- Enhanced cookbook validation to properly handle time entities
+
+### Fixed
+- Time entity validation in cookbook manager
+- Time format mismatch between NLP and cookbook
+- Test expectations for time formats
+- Entity validation flow in integration tests
+
 ## [0.2.0] - 2024-03-20
 
 ### Added

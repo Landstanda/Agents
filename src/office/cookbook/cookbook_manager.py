@@ -18,6 +18,7 @@ class CookbookManager:
         """Initialize the cookbook manager."""
         self.recipes_file = Path("src/office/cookbook/recipes.yaml")
         self.recipes = self._load_recipes()
+        self.nlp_processors = set()  # Track NLP processors using this cookbook
         if not self.recipes:
             self._initialize_default_recipes()
         logger.info(f"Loaded {len(self.recipes)} recipes from cookbook")
@@ -176,12 +177,8 @@ class CookbookManager:
                 trigger_match = max(trigger_scores) if trigger_scores else 0
                 
                 # Calculate entity match
-                required_entities = set(recipe.get("required_entities", []))
-                provided_entities = set(nlp_result.get("entities", {}).keys())
-                if required_entities:
-                    entity_match = len(required_entities & provided_entities) / len(required_entities)
-                else:
-                    entity_match = 1.0
+                validation = self._validate_recipe_requirements(recipe, nlp_result)
+                entity_match = 1.0 if validation["status"] == "success" else 0.5
                 
                 # Combine scores with weights
                 match_score = (
@@ -219,8 +216,8 @@ class CookbookManager:
                 if score < 0.5:  # Only consider reasonably good matches
                     continue
                     
-                required_entities = set(recipe.get("required_entities", []))
-                missing = len(required_entities - provided_entities)
+                validation = self._validate_recipe_requirements(recipe, nlp_result)
+                missing = len(validation.get("missing_requirements", []))
                 
                 if missing < best_missing or (missing == best_missing and score > 0.6):
                     best_missing = missing
@@ -232,24 +229,16 @@ class CookbookManager:
             logger.error(f"Error finding matching recipe: {str(e)}")
             return None
     
+    def register_nlp_processor(self, nlp_processor):
+        """Register an NLP processor to receive lexicon updates."""
+        self.nlp_processors.add(nlp_processor)
+    
+    def unregister_nlp_processor(self, nlp_processor):
+        """Unregister an NLP processor."""
+        self.nlp_processors.discard(nlp_processor)
+    
     async def add_recipe(self, recipe: Dict[str, Any]) -> bool:
-        """
-        Add a new recipe to the cookbook.
-        
-        Args:
-            recipe: The recipe to add, must contain:
-                - name: str
-                - intent: str
-                - description: str
-                - steps: List[Dict]
-                - required_entities: List[str]
-                - keywords: List[str]
-                - common_triggers: List[str]
-                - success_criteria: List[str]
-                
-        Returns:
-            bool: True if added successfully, False otherwise
-        """
+        """Add a new recipe and update NLP processors."""
         try:
             # Validate recipe
             required_fields = {
@@ -267,6 +256,10 @@ class CookbookManager:
             # Save to file
             self._save_recipes()
             
+            # Notify all registered NLP processors
+            for nlp in self.nlp_processors:
+                nlp.refresh_lexicon()
+            
             logger.info(f"Added new recipe: {recipe['name']}")
             return True
             
@@ -274,33 +267,134 @@ class CookbookManager:
             logger.error(f"Error adding recipe: {str(e)}")
             return False
     
-    def get_recipe(self, intent: str) -> Optional[Dict[str, Any]]:
+    def get_recipe(self, intent: str) -> Dict[str, Any]:
         """
-        Get a recipe by intent (synchronous version).
+        Get a recipe by intent with detailed response about match status.
         
         Args:
             intent: The intent to find a recipe for
             
         Returns:
-            Matching recipe if found, None otherwise
+            Dict containing:
+                - status: "success", "missing_info", "not_found"
+                - recipe: The matching recipe if found
+                - missing_requirements: List of missing information if status is "missing_info"
+                - suggested_next_steps: String describing what should happen next
         """
         try:
+            if not intent:
+                return {
+                    "status": "not_found",
+                    "recipe": None,
+                    "missing_requirements": [],
+                    "suggested_next_steps": "consult_ceo",
+                    "details": "No intent provided"
+                }
+            
             # First try exact match
             for recipe in self.recipes.values():
                 if recipe.get("intent") == intent:
-                    return recipe
+                    return self._validate_recipe_requirements(recipe, intent)
                 
             # Then try partial match
             for recipe in self.recipes.values():
                 recipe_intent = recipe.get("intent", "")
                 if recipe_intent and (intent in recipe_intent or recipe_intent in intent):
-                    return recipe
+                    return self._validate_recipe_requirements(recipe, intent)
                 
-            return None
+            # Special case for scheduling intents
+            if any(term in intent.lower() for term in ["schedule", "meeting", "appointment"]):
+                schedule_recipe = self.recipes.get("schedule_meeting")
+                if schedule_recipe:
+                    return self._validate_recipe_requirements(schedule_recipe, intent)
+            
+            # No recipe found
+            return {
+                "status": "not_found",
+                "recipe": None,
+                "missing_requirements": [],
+                "suggested_next_steps": "consult_ceo",
+                "details": f"No recipe found for intent: {intent}"
+            }
             
         except Exception as e:
             logger.error(f"Error getting recipe: {str(e)}")
-            return None
+            return {
+                "status": "error",
+                "recipe": None,
+                "missing_requirements": [],
+                "suggested_next_steps": "consult_ceo",
+                "details": str(e)
+            }
+    
+    def _validate_recipe_requirements(self, recipe: Dict[str, Any], nlp_result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate that all required entities are present in the NLP result.
+        
+        Args:
+            recipe: The recipe to validate
+            nlp_result: The NLP processing result containing entities
+            
+        Returns:
+            Dict containing validation status and any missing requirements
+        """
+        try:
+            if not recipe or not isinstance(recipe, dict):
+                return {
+                    "status": "error",
+                    "recipe": None,
+                    "missing_requirements": [],
+                    "suggested_next_steps": "consult_ceo",
+                    "details": "Invalid recipe format"
+                }
+
+            required_entities = set(recipe.get("required_entities", []))
+            if not required_entities:
+                return {
+                    "status": "success",
+                    "recipe": recipe,
+                    "missing_requirements": [],
+                    "suggested_next_steps": "execute_recipe",
+                    "details": "Recipe found with no required entities"
+                }
+
+            # Get entities from NLP result
+            provided_entities = nlp_result.get("entities", {})
+            
+            # Check each required entity
+            missing = []
+            for entity in required_entities:
+                if entity not in provided_entities or provided_entities[entity] is None:
+                    missing.append(entity)
+                elif entity == "time" and not provided_entities[entity]:  # Special check for time
+                    missing.append(entity)
+
+            if not missing:
+                return {
+                    "status": "success",
+                    "recipe": recipe,
+                    "missing_requirements": [],
+                    "suggested_next_steps": "execute_recipe",
+                    "details": "Recipe found with no missing requirements"
+                }
+
+            return {
+                "status": "missing_info",
+                "recipe": recipe,
+                "missing_requirements": missing,
+                "suggested_next_steps": "request_info",
+                "details": f"Recipe found for {recipe.get('intent')} but requires additional information"
+            }
+
+        except Exception as e:
+            logger.error(f"Error validating recipe requirements: {str(e)}")
+            return {
+                "status": "error",
+                "recipe": None,
+                "missing_requirements": [],
+                "suggested_next_steps": "consult_ceo",
+                "details": str(e)
+            }
     
     def list_recipes(self) -> List[str]:
         """Get a list of all recipe names."""

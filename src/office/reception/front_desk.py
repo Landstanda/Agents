@@ -151,8 +151,10 @@ class FrontDesk:
                                 "role": "system",
                                 "content": (
                                     "You are Sarah, a helpful and professional front desk manager. "
+                                    "Respond directly in first person as Sarah. "
                                     "Keep responses concise, friendly, and under 50 words. "
-                                    "Focus on being clear and helpful while maintaining a natural, conversational tone. "
+                                    "Focus on being clear and helpful while maintaining a natural tone. "
+                                    "Never use quotes or show instructions in the response. "
                                     "If asking for information, be specific about what you need."
                                 )
                             },
@@ -222,15 +224,15 @@ class FrontDesk:
                 }
             }
             
-            # Try to get user info, but proceed even if it fails
+            # Try to get user info, but proceed with defaults if it fails
             try:
                 user_info_response = await self.web_client.users_info(user=user_id)
                 if user_info_response["ok"]:
                     user_info = user_info_response
             except Exception as e:
-                logger.warning(f"Could not fetch user info: {str(e)}")
+                logger.warning(f"Could not fetch user info, proceeding with defaults: {str(e)}")
             
-            user_name = user_info["user"]["real_name"]
+            user_name = user_info["user"].get("real_name", "there")
             
             # Handle special commands
             if text.lower() == "help":
@@ -242,7 +244,7 @@ class FrontDesk:
 
             # Process with NLP first
             logger.info(f"Sending to NLP processor: {text}")
-            nlp_result = await self.nlp.process_message(text, user_info["user"])
+            nlp_result = await self.nlp.process_message(text, user_info["user"], channel_id)
             logger.info(f"NLP result: {json.dumps(nlp_result, indent=2)}")
             
             # Check if this is a conversational intent
@@ -253,44 +255,79 @@ class FrontDesk:
                 return
             
             # Get recipe for the intent
-            recipe = self.cookbook.get_recipe(nlp_result["intent"])
+            cookbook_response = self.cookbook.get_recipe(nlp_result["intent"])
+            logger.info(f"Cookbook response: {json.dumps(cookbook_response, indent=2)}")
             
-            # Create context for task execution
-            context = {
-                "nlp_result": nlp_result,
-                "user_info": user_info,
-                "channel_id": channel_id,
-                "thread_ts": thread_ts
-            }
-            
-            # If no recipe found or invalid intent, create an error task
-            if not recipe or "invalid" in nlp_result.get("all_intents", []):
-                error_message = f"Sorry {user_name}, I couldn't understand the task: {text}"
-                await self._send_message(channel_id, error_message, thread_ts)
-                error_recipe = {
-                    "name": "Error Handling",
-                    "description": "Handle invalid or unsupported task",
-                    "steps": [
-                        {
-                            "type": "notification",
-                            "message": error_message
-                        }
-                    ]
+            if cookbook_response["status"] == "success":
+                logger.info("Recipe found, preparing to execute task")
+                # Execute the recipe
+                context = {
+                    "nlp_result": nlp_result,
+                    "user_info": user_info,
+                    "channel_id": channel_id,
+                    "thread_ts": thread_ts
                 }
-                await self.task_manager.execute_recipe(error_recipe, context)
-                return
+                logger.info(f"Executing recipe with context: {json.dumps(context, indent=2)}")
+                result = await self.task_manager.execute_recipe(cookbook_response["recipe"], context)
+                logger.info(f"Task execution result: {json.dumps(result, indent=2)}")
+                
+                if result["status"] == "error":
+                    error_prompt = (
+                        f"I need to tell {user_name} that I encountered an error while processing their request "
+                        f"to {cookbook_response['recipe']['name'].lower()}. The error was: {result['error']}. "
+                        f"Please format this as a friendly, professional message."
+                    )
+                    error_message = await self.get_gpt_response(error_prompt)
+                    await self._send_message(channel_id, error_message or "I encountered an error processing your request.", thread_ts)
+                else:
+                    success_prompt = (
+                        f"I need to tell {user_name} that I've completed their request to "
+                        f"{cookbook_response['recipe']['name'].lower()}. Additional details: {result.get('details', '')}. "
+                        f"Please format this as a friendly, professional message."
+                    )
+                    success_message = await self.get_gpt_response(success_prompt)
+                    await self._send_message(channel_id, success_message, thread_ts)
             
-            # Execute the recipe
-            logger.info(f"Executing recipe: {recipe['name']}")
-            result = await self.task_manager.execute_recipe(recipe, context)
+            elif cookbook_response["status"] == "missing_info":
+                logger.info(f"Missing information: {cookbook_response['missing_requirements']}")
+                # Ask for missing information
+                missing_items = cookbook_response["missing_requirements"]
+                info_prompt = (
+                    f"I need to ask {user_name} for some additional information to help with their request. "
+                    f"I need the following details: {', '.join(missing_items)}. "
+                    f"Please format this as a friendly question, explaining why this information is needed."
+                )
+                info_request = await self.get_gpt_response(info_prompt)
+                await self._send_message(channel_id, info_request, thread_ts)
+                
+            elif cookbook_response["status"] == "not_found":
+                # Consult CEO or provide help
+                if self.ceo and cookbook_response["suggested_next_steps"] == "consult_ceo":
+                    ceo_prompt = (
+                        f"I need to tell {user_name} that I'm consulting with the CEO about their request "
+                        f"since it's not something I've handled before. Their request was: {text}"
+                    )
+                    ceo_message = await self.get_gpt_response(ceo_prompt)
+                    await self._send_message(channel_id, ceo_message, thread_ts)
+                    
+                    # TODO: Implement CEO consultation
+                    # ceo_response = await self.ceo.handle_unknown_task(text, nlp_result)
+                else:
+                    help_prompt = (
+                        f"I need to tell {user_name} that I couldn't understand their request "
+                        f"and suggest they try rephrasing it or use the help command to see what I can do."
+                    )
+                    help_message = await self.get_gpt_response(help_prompt)
+                    await self._send_message(channel_id, help_message, thread_ts)
             
-            if result["status"] == "error":
-                logger.error(f"Error executing recipe: {result['error']}")
-                error_message = f"Sorry {user_name}, I encountered an error while processing your request: {result['error']}"
+            else:  # Error case
+                error_prompt = (
+                    f"I need to tell {user_name} that I encountered an unexpected error "
+                    f"while processing their request. The error was: {cookbook_response.get('details', 'Unknown error')}. "
+                    f"Please format this as a friendly, professional message with an apology."
+                )
+                error_message = await self.get_gpt_response(error_prompt)
                 await self._send_message(channel_id, error_message, thread_ts)
-            else:
-                success_message = f"I've completed your request, {user_name}! {result.get('details', '')}"
-                await self._send_message(channel_id, success_message, thread_ts)
             
         except Exception as e:
             logger.error(f"Error handling message: {str(e)}")
@@ -306,7 +343,15 @@ class FrontDesk:
     
     async def _send_help_message(self, channel_id: str, thread_ts: Optional[str] = None) -> None:
         """Send help information."""
-        help_text = f"""*Available Commands:*
+        help_prompt = (
+            "I need to provide a help message that explains what I can do. "
+            "Please include that I can help with scheduling meetings, checking emails, and other tasks. "
+            "Also mention that users can chat with me naturally by mentioning me. "
+            "Format this as a friendly, professional message with emojis."
+        )
+        help_text = await self.get_gpt_response(help_prompt)
+        if not help_text:
+            help_text = f"""*Available Commands:*
 • `{self.bot_mention} help` - Show this help message
 • `{self.bot_mention} status` - Check my current status
 
@@ -330,13 +375,25 @@ I'll analyze your request and coordinate with our CEO to help you! 🤖✨"""
             uptime = datetime.now() - self.start_time
             hours = uptime.seconds // 3600
             minutes = (uptime.seconds % 3600) // 60
-            status_text = f"""*Current Status:*
+            status_prompt = (
+                f"I need to provide a status message. Here are the details:\n"
+                f"- I'm active and listening\n"
+                f"- I've been running for {hours}h {minutes}m\n"
+                f"- I'm part of a team with {self.name} (Front Desk) & Michael (CEO)\n"
+                f"- I'm using Socket Mode for processing\n"
+                f"Please format this as a friendly status update with emojis."
+            )
+            status_text = await self.get_gpt_response(status_prompt)
+            if not status_text:
+                status_text = f"""*Current Status:*
 • 🟢 Active and listening
 • ⏱️ Uptime: {hours}h {minutes}m
 • 👥 Team: {self.name} (Front Desk) & Michael (CEO)
 • 🔄 Processing: Socket Mode"""
         else:
-            status_text = "⚠️ Status information not available"
+            status_text = await self.get_gpt_response("I need to inform the user that status information is not available. Keep it brief.")
+            if not status_text:
+                status_text = "⚠️ Status information not available"
             
         await self.web_client.chat_postMessage(
             channel=channel_id,
@@ -350,15 +407,29 @@ I'll analyze your request and coordinate with our CEO to help you! 🤖✨"""
             logger.debug(f"Skipping duplicate error message for {error_key}")
             return
             
-        message = (
-            "I apologize, but I encountered an error while processing your request. "
-            "I've logged the error and will work on improving my handling of this type of request. "
-            "In the meantime, you could try:\n"
-            "• Rephrasing your request\n"
-            "• Using simpler language\n"
-            "• Breaking it into smaller parts\n"
-            "• Using the `help` command to see examples"
+        error_prompt = (
+            "I need to send an error message to the user. Please include:\n"
+            "- An apology for the error\n"
+            "- That I've logged it and will improve\n"
+            "- Suggestions like:\n"
+            "  • Rephrasing the request\n"
+            "  • Using simpler language\n"
+            "  • Breaking it into smaller parts\n"
+            "  • Using the help command\n"
+            "Format this as a friendly, professional message."
         )
+        message = await self.get_gpt_response(error_prompt)
+        if not message:
+            message = (
+                "I apologize, but I encountered an error while processing your request. "
+                "I've logged the error and will work on improving my handling of this type of request. "
+                "In the meantime, you could try:\n"
+                "• Rephrasing your request\n"
+                "• Using simpler language\n"
+                "• Breaking it into smaller parts\n"
+                "• Using the `help` command to see examples"
+            )
+            
         try:
             await self.web_client.chat_postMessage(
                 channel=channel_id,

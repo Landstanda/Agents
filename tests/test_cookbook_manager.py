@@ -140,4 +140,118 @@ async def test_recipe_validation(cookbook):
         assert "steps" in recipe
         assert "required_entities" in recipe
         assert isinstance(recipe["steps"], list)
-        assert isinstance(recipe["required_entities"], list) 
+        assert isinstance(recipe["required_entities"], list)
+
+@pytest.mark.asyncio
+async def test_recipe_error_handling(cookbook):
+    """Test handling of invalid or malformed recipes."""
+    # Test missing required fields
+    invalid_recipe = {
+        "name": "Invalid Recipe",
+        "intent": "test"
+        # Missing steps, required_entities, etc.
+    }
+    
+    result = await cookbook.add_recipe(invalid_recipe)
+    assert result == False
+    
+    # Test invalid step format
+    invalid_step_recipe = {
+        "name": "Invalid Steps",
+        "intent": "test",
+        "description": "Test recipe",
+        "steps": [
+            {"invalid_key": "value"}  # Missing type and other required fields
+        ],
+        "required_entities": [],
+        "keywords": ["test"],
+        "common_triggers": ["test"],
+        "success_criteria": ["test completed"]
+    }
+    
+    result = await cookbook.add_recipe(invalid_step_recipe)
+    assert result == False
+    
+    # Test duplicate recipe name
+    existing_recipe = cookbook.recipes["Document Management"].copy()
+    result = await cookbook.add_recipe(existing_recipe)
+    assert result == False
+
+@pytest.mark.asyncio
+async def test_recipe_validation_rules(cookbook):
+    """Test specific validation rules for recipes."""
+    # Test circular dependencies
+    circular_recipe = {
+        "name": "Circular Recipe",
+        "intent": "circular",
+        "description": "Test circular dependencies",
+        "steps": [
+            {"type": "api_call", "name": "self_reference", "endpoint": "circular"}
+        ],
+        "required_entities": [],
+        "keywords": ["test"],
+        "common_triggers": ["test circular"],
+        "success_criteria": ["completed"]
+    }
+    
+    result = await cookbook.add_recipe(circular_recipe)
+    assert result == False
+    
+    # Test maximum step limit
+    many_steps_recipe = {
+        "name": "Many Steps",
+        "intent": "many_steps",
+        "description": "Test step limit",
+        "steps": [{"type": "api_call", "name": f"step_{i}", "endpoint": "test"} for i in range(100)],
+        "required_entities": [],
+        "keywords": ["test"],
+        "common_triggers": ["test many steps"],
+        "success_criteria": ["completed"]
+    }
+    
+    result = await cookbook.add_recipe(many_steps_recipe)
+    assert result == False
+    
+    # Test required entity validation
+    invalid_entities_recipe = {
+        "name": "Invalid Entities",
+        "intent": "test_entities",
+        "description": "Test entity validation",
+        "steps": [
+            {"type": "api_call", "name": "test", "endpoint": "test"}
+        ],
+        "required_entities": ["invalid{entity}name"],  # Invalid entity format
+        "keywords": ["test"],
+        "common_triggers": ["test entities"],
+        "success_criteria": ["completed"]
+    }
+    
+    result = await cookbook.add_recipe(invalid_entities_recipe)
+    assert result == False
+
+@pytest.mark.asyncio
+async def test_recipe_update_handling(cookbook):
+    """Test updating existing recipes."""
+    # Get existing recipe
+    recipe = cookbook.recipes["Document Management"].copy()
+    
+    # Update with valid changes
+    recipe["description"] = "Updated description"
+    recipe["steps"].append({
+        "type": "notification",
+        "name": "notify_completion",
+        "message": "Document completed"
+    })
+    
+    result = await cookbook.add_recipe(recipe)
+    assert result == True
+    
+    # Verify updates
+    updated = cookbook.get_recipe("Document Management")
+    assert updated["description"] == "Updated description"
+    assert len(updated["steps"]) == len(recipe["steps"])
+    
+    # Test invalid updates
+    recipe["steps"] = None  # Invalid step format
+    result = await cookbook.add_recipe(recipe)
+    assert result == False 

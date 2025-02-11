@@ -1,3 +1,23 @@
+Task Reminder:
+  common_triggers:
+  - remind me to
+  - set a reminder
+  description: Set a reminder for a task
+  intent: set_reminder
+  keywords:
+  - remind
+  - reminder
+  - remember
+  name: Task Reminder
+  required_entities:
+  - time
+  - task
+  steps:
+  - endpoint: reminders/create
+    name: create_reminder
+    type: api_call
+  success_criteria:
+  - Reminder set
 create_report:
   common_triggers:
   - create a report
@@ -75,29 +95,38 @@ research_topic:
   - Research completed
   - Summary created
 schedule_meeting:
+  name: "schedule_meeting"
+  description: "Schedule a meeting with participants"
+  intent: "schedule_meeting"
   common_triggers:
-  - schedule a meeting
-  - set up a meeting
-  description: Schedule a meeting with participants
-  intent: schedule_meeting
+    - "schedule a meeting"
+    - "set up a meeting"
+    - "book an appointment"
+    - "plan a meeting"
+    - "schedule breakfast"
+    - "schedule lunch"
+    - "schedule dinner"
   keywords:
-  - schedule
-  - meeting
-  - calendar
-  - invite
-  name: schedule_meeting
+    - "schedule"
+    - "meeting"
+    - "calendar"
+    - "invite"
+    - "appointment"
+    - "book"
+    - "plan"
+    - "breakfast"
+    - "lunch"
+    - "dinner"
   required_entities:
-  - time
-  - participants
+    - "time"
   steps:
-  - action: check_availability
-    params:
-      participants: '{participants}'
-      time: '{time}'
-  - action: create_meeting
-    params:
-      participants: '{participants}'
-      time: '{time}'
+    - action: "create_meeting"
+      params:
+        time: "{time}"
   success_criteria:
-  - Meeting scheduled
-  - Invites sent
+    - "Meeting scheduled"
+  context_handling:
+    maintain_context: true
+    context_timeout: 300
+    follow_up_intents:
+      - "provide_time"

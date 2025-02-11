@@ -218,3 +218,47 @@ result = await chain.execute({
 })
 ```
 ```
+
+## scheduling_chain
+
+```python
+# Chain Name: SchedulingChain
+# Status: Implemented & Tested
+# Version: 1.1
+
+Input_Variables:
+- text (required): Natural language request describing the scheduling task
+- time (required): Meeting time (supports both relative and absolute formats)
+  Examples:
+  - Relative: "tomorrow at 9:00 AM", "next week at 2pm"
+  - Absolute: "2024-03-25 14:00", "March 25th at 2:00 PM"
+- participants: List of meeting participants (optional)
+- duration: Meeting duration in minutes (default: 60)
+- location: Meeting location or video link
+- description: Meeting description or agenda
+- notify: Whether to send notifications (default: true)
+
+Success_Criteria:
+- Time is properly extracted and validated
+- Meeting is scheduled at the correct time
+- Participants are properly notified
+- Calendar events are created
+- Meeting details are properly recorded
+
+Module_Sequence:
+- NLPProcessor: Extract and validate time entities
+- CookbookManager: Match and validate scheduling recipe
+- CalendarModule: Create calendar events
+- NotificationModule: Send meeting notifications
+- SlackModule: Send team notifications
+
+Example_Usage:
+```python
+result = await chain.execute({
+    'text': 'Schedule a team meeting for tomorrow at 2pm',
+    'time': 'tomorrow at 2:00 PM',
+    'participants': ['@john', '@mary'],
+    'description': 'Weekly team sync'
+})
+```
+```
