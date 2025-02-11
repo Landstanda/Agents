@@ -13,19 +13,20 @@ from src.office.reception.request_tracker import RequestTracker
 # Configure logging
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(message)s',
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%H:%M:%S',
     stream=sys.stdout
 )
 
 def setup_test_logging():
-    """Configure logging for tests"""
+    """Configure logging for tests with timestamps"""
     root = logging.getLogger()
     if root.handlers:
         for handler in root.handlers:
             root.removeHandler(handler)
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(message)s')
+    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S')
     handler.setFormatter(formatter)
     root.addHandler(handler)
     root.setLevel(logging.DEBUG)
@@ -35,28 +36,24 @@ def setup_logging():
     setup_test_logging()
     yield
 
-def print_flow_step(title, details, show_arrow=True):
-    """Print a single step in the message flow with optional arrow"""
-    print("\n" + "="*80)
-    print(f"📍 {title}")
-    print("-"*80)
-    for key, value in details.items():
-        if isinstance(value, dict):
-            print(f"{key}:")
-            for k, v in value.items():
-                print(f"  - {k}: {v}")
+def print_section(title, content=None, level=1):
+    """Print a section with consistent formatting"""
+    border = "=" if level == 1 else "-" if level == 2 else "."
+    print(f"\n{border * 80}")
+    print(f"{'#' * level} {title}")
+    print(f"{border * 80}")
+    if content:
+        if isinstance(content, dict):
+            for key, value in content.items():
+                if isinstance(value, dict):
+                    print(f"{key}:")
+                    for k, v in value.items():
+                        print(f"  - {k}: {v}")
+                else:
+                    print(f"{key}: {value}")
         else:
-            print(f"{key}: {value}")
-    if show_arrow:
-        print("\n        ⬇️")
-
-def print_office_response(message):
-    """Print a response from the office to the user"""
-    print("\n" + "="*80)
-    print("💬 OFFICE RESPONSE")
-    print("-"*80)
-    print(f"Message: {message}")
-    print("\n        ⬇️")
+            print(content)
+    print(f"\n        ⬇️")
 
 @pytest.fixture
 def office_components():
@@ -86,44 +83,151 @@ def office_components():
 
 @pytest.fixture
 def mock_gpt_responses():
-    """Mock GPT responses for office communications"""
+    """Mock GPT responses for testing"""
     with patch('openai.AsyncOpenAI') as mock_openai:
+        # Mock for existing recipe test
         mock_openai.return_value.chat.completions.create.side_effect = [
-            Mock(choices=[Mock(message=Mock(content="""name: Meeting Scheduler
-description: Schedule a meeting with participants
-intent: schedule_meeting
-steps:
-  - action: check_availability
-    params:
-      time: "{time}"
-      participants: "{participants}"
-  - action: create_meeting
-    params:
-      time: "{time}"
-      participants: "{participants}"
+            # Front desk responses
+            Mock(choices=[Mock(message=Mock(content="I'll help you schedule a meeting. What time works for you?"))]),
+            Mock(choices=[Mock(message=Mock(content="Great! Who would you like to invite?"))]),
+            Mock(choices=[Mock(message=Mock(content="Perfect! I'll schedule that for you right away."))]),
+            
+            # CEO new recipe creation
+            Mock(choices=[Mock(message=Mock(content="""
+name: Research Report
+description: Research a topic and create a detailed report
+intent: research_report
 common_triggers:
-  - "schedule a meeting"
-  - "set up a meeting"
+  - "research about"
+  - "create a report about"
+  - "analyze and report on"
 required_entities:
-  - time
-  - participants
+  - topic
+  - depth
+steps:
+  - action: web_research
+    params:
+      topic: "{topic}"
+      depth: "{depth}"
+  - action: analyze_data
+    params:
+      format: "report"
 success_criteria:
-  - "Meeting scheduled"
-  - "Participants notified"
+  - "Research completed"
+  - "Report generated"
 """))]),
-            Mock(choices=[Mock(message=Mock(content="I see you want to schedule a meeting. What time would you like to schedule it for?"))]),
-            Mock(choices=[Mock(message=Mock(content="Great, I have the time. Who would you like to invite to this meeting?"))]),
-            Mock(choices=[Mock(message=Mock(content="Perfect! I'll schedule the meeting for {time} with {participants}. Is there anything else you need?"))])
         ]
         yield mock_openai
 
+@pytest.mark.asyncio
+async def test_existing_recipe_flow(office_components, mock_gpt_responses):
+    """Test processing a request that matches an existing recipe"""
+    print_section("Testing Existing Recipe Flow", "Testing schedule meeting recipe")
+    
+    message = {
+        "type": "message",
+        "channel": "C123456",
+        "user": "U123456",
+        "text": "Schedule a meeting with John tomorrow at 2pm",
+        "ts": "1234567890.123456"
+    }
+    
+    front_desk = office_components['front_desk']
+    
+    # 1. NLP Processing
+    print_section("NLP Processing", level=2)
+    nlp_result = await front_desk.nlp.process_message(
+        message['text'], 
+        {"real_name": "User"}, 
+        message['channel']
+    )
+    print(f"Intent: {nlp_result.get('intent')}")
+    print("Entities:")
+    for key, value in nlp_result.get('entities', {}).items():
+        if value:
+            print(f"  • {key}: {value}")
+    
+    # 2. Recipe Matching
+    print_section("Recipe Matching", level=2)
+    cookbook_response = front_desk.cookbook.get_recipe(nlp_result.get('intent'))
+    print(f"Recipe Found: {cookbook_response['recipe']['name'] if cookbook_response.get('recipe') else 'None'}")
+    print(f"Status: {cookbook_response['status']}")
+    
+    # 3. Task Creation
+    print_section("Task Manager Processing", level=2)
+    if cookbook_response['status'] == 'success':
+        result = await front_desk.task_manager.execute_recipe(
+            cookbook_response['recipe'],
+            {"nlp_result": nlp_result}
+        )
+        print(f"Execution Status: {result['status']}")
+        print(f"Details: {result.get('details', 'No details')}")
+    
+    assert cookbook_response['status'] == 'success'
+
+@pytest.mark.asyncio
+async def test_ceo_recipe_creation(office_components, mock_gpt_responses):
+    """Test CEO creating a new recipe for an unknown request"""
+    print_section("Testing CEO Recipe Creation", "Testing research report recipe creation")
+    
+    message = {
+        "type": "message",
+        "channel": "C123456",
+        "user": "U123456",
+        "text": "Can you research and create a detailed report about AI trends?",
+        "ts": "1234567890.123456"
+    }
+    
+    front_desk = office_components['front_desk']
+    
+    # 1. NLP Processing
+    print_section("NLP Processing", level=2)
+    nlp_result = await front_desk.nlp.process_message(
+        message['text'], 
+        {"real_name": "User"}, 
+        message['channel']
+    )
+    print(f"Intent: {nlp_result.get('intent')}")
+    print("Entities:")
+    for key, value in nlp_result.get('entities', {}).items():
+        if value:
+            print(f"  • {key}: {value}")
+    
+    # 2. CEO Analysis
+    print_section("CEO Analysis", level=2)
+    ceo_response = await front_desk.ceo.consider_request(
+        message['text'],
+        {"nlp_result": nlp_result}
+    )
+    print(f"Status: {ceo_response['status']}")
+    print(f"Decision: {ceo_response['decision']}")
+    print(f"Confidence: {ceo_response['confidence']}")
+    
+    if ceo_response.get('recipe'):
+        print("\nNew Recipe Created:")
+        print(f"Name: {ceo_response['recipe']['name']}")
+        print(f"Intent: {ceo_response['recipe']['intent']}")
+        print("Steps:")
+        for step in ceo_response['recipe']['steps']:
+            print(f"  - {step['action']}")
+    
+    # 3. Recipe Storage
+    print_section("Recipe Storage", level=2)
+    if ceo_response['status'] == 'success':
+        added = await front_desk.cookbook.add_recipe(ceo_response['recipe'])
+        print(f"Recipe Added: {added}")
+        
+        # Verify recipe was stored
+        stored_recipe = front_desk.cookbook.get_recipe(ceo_response['recipe']['intent'])
+        print(f"Recipe Retrievable: {stored_recipe['status'] == 'success'}")
+    
+    assert ceo_response['status'] == 'success'
+    assert ceo_response.get('recipe') is not None
+
 def print_test_summary(test_name: str, request=None, validation=None, error=None):
     """Print a clean summary of the test results"""
-    print("\n" + "="*80)
-    print("📊 TEST SUMMARY")
-    print("="*80)
+    print_section("Test Summary", level=1)
     print(f"Test: {test_name}")
-    print("-"*40)
     
     if error:
         print("❌ Test Failed:")
@@ -132,239 +236,18 @@ def print_test_summary(test_name: str, request=None, validation=None, error=None
         
     if request:
         print("📝 Final Request State:")
-        print(f"  Status: {request.status}")
-        print("  Collected Information:")
+        print(f"Status: {request.status}")
+        print("Collected Information:")
         for key, value in request.entities.items():
             if value:
-                print(f"    • {key}: {value}")
+                print(f"  • {key}: {value}")
     
     if validation:
         print("\n🔍 Validation Result:")
-        print(f"  Status: {validation['status']}")
-        if validation.get('missing_requirements'):
-            print("  Missing Requirements:")
-            for req in validation['missing_requirements']:
-                print(f"    • {req}")
-    
-    print("\n✅ Test Completed Successfully")
-
-@pytest.mark.asyncio
-async def test_message_flow_through_office(office_components, mock_gpt_responses):
-    """Test how a message flows through the office with detailed logging"""
-    try:
-        print("\n" + "="*80)
-        print("🏢 Office Assistant Flow Test")
-        print("="*80)
-
-        # Simulate incoming message
-        message = {
-            "type": "message",
-            "channel": "C123456",
-            "user": "U123456",
-            "text": "Can you help me schedule a meeting with John tomorrow at 2pm?",
-            "ts": "1234567890.123456"
-        }
-        
-        front_desk = office_components['front_desk']
-        
-        print("\n📨 Incoming Message")
-        print(f"User: {message['text']}")
-        print("\n        ⬇️")
-        
-        # 1. NLP Processing Stage
-        print("\n🧠 NLP Processor")
-        print("-"*40)
-        nlp_result = await front_desk.nlp.process_message(message['text'], {"real_name": "User"}, message['channel'])
-        print("Breaking down the message:")
-        print(f"  Intent: {nlp_result.get('intent')}")
-        print("  Entities found:")
-        for key, value in nlp_result.get('entities', {}).items():
-            if value:  # Only show non-empty entities
-                print(f"    • {key}: {value}")
-        print("\n        ⬇️")
-        
-        # 2. Front Desk Initial Processing
-        print("\n👩‍💼 Front Desk")
-        print("-"*40)
-        print("Creating new request and checking recipe requirements...")
-        await front_desk.handle_message(message)
-        request = front_desk.request_tracker.get_active_request(message['channel'], message['user'])
-        
-        # 3. Request Tracker State
-        print("\n📝 Request Tracker - Initial State")
-        print("-"*40)
-        print(f"Request ID: {request.request_id}")
-        print(f"Status: {request.status}")
-        print("Stored Information:")
-        for key, value in request.entities.items():
-            if value:  # Only show non-empty entities
-                print(f"  • {key}: {value}")
-        if hasattr(request, 'missing_entities') and request.missing_entities:
-            print("Missing Information:")
-            for entity in request.missing_entities:
-                print(f"  • {entity}")
-        print("\n        ⬇️")
-        
-        # 4. Cookbook Validation
-        print("\n📖 Cookbook Manager")
-        print("-"*40)
-        validation = front_desk.cookbook._validate_recipe_requirements(request.recipe, nlp_result)
-        print(f"Recipe: {request.recipe.get('name')}")
         print(f"Status: {validation['status']}")
         if validation.get('missing_requirements'):
             print("Missing Requirements:")
             for req in validation['missing_requirements']:
                 print(f"  • {req}")
-        print("\n        ⬇️")
-        
-        # 5. Front Desk Response
-        print("\n👩‍💼 Front Desk Response")
-        print("-"*40)
-        if validation['status'] == 'success':
-            print("All information collected, proceeding to task manager...")
-        else:
-            print(f"Need to request more information: {', '.join(validation.get('missing_requirements', []))}")
-        print("\n        ⬇️")
-        
-        # 6. Task Manager (if we have all info)
-        if validation['status'] == 'success':
-            print("\n📋 Task Manager")
-            print("-"*40)
-            print("Creating task from recipe...")
-            print(f"Recipe: {request.recipe.get('name')}")
-            print("Steps to execute:")
-            for i, step in enumerate(request.recipe.get('steps', []), 1):
-                print(f"  {i}. {step['action']}")
-                for param, value in step['params'].items():
-                    print(f"     • {param}: {value}")
-        
-        # Add summary at the end
-        print_test_summary(
-            "Single-Step Message Flow",
-            request=request,
-            validation=validation
-        )
-        
-    except Exception as e:
-        print_test_summary("Single-Step Message Flow", error=str(e))
-        raise
-
-@pytest.mark.asyncio
-async def test_multi_step_conversation_flow(office_components, mock_gpt_responses):
-    """Test how the office handles a conversation that requires multiple interactions"""
-    try:
-        # Mock both Slack API calls
-        with patch('slack_sdk.web.async_client.AsyncWebClient.chat_postMessage') as mock_post, \
-             patch('slack_sdk.web.async_client.AsyncWebClient.users_info') as mock_user_info:
-            
-            mock_post.return_value = {"ok": True, "ts": "123.456"}
-            mock_user_info.return_value = {
-                "ok": True,
-                "user": {"real_name": "Test User", "id": "U123456"}
-            }
-            
-            front_desk = office_components['front_desk']
-            
-            print("\n" + "="*80)
-            print("🔄 CONVERSATION FLOW")
-            print("="*80)
-            
-            # Step 1: Initial Request
-            print("\n📝 STEP 1: User wants to schedule a meeting")
-            print("-"*40)
-            initial_message = {
-                "type": "message",
-                "channel": "C123456",
-                "user": "U123456",
-                "text": "I need to set up a team meeting",
-                "ts": "1234567890.123456"
-            }
-            print(f"User: {initial_message['text']}")
-            print("\n⬇️  NLP Processing")
-            
-            nlp_result = await front_desk.nlp.process_message(initial_message['text'], {"real_name": "User"}, initial_message['channel'])
-            print(f"Intent: {nlp_result.get('intent')}")
-            print("Entities: None")
-            
-            await front_desk.handle_message(initial_message)
-            request = front_desk.request_tracker.get_active_request(initial_message['channel'], initial_message['user'])
-            
-            print("\n⬇️  Request Tracker")
-            print(f"Status: {request.status}")
-            print("Missing: time, participants")
-            
-            print("\n⬇️  Front Desk Response")
-            print("Office: I see you want to schedule a meeting. What time would you like to schedule it for?")
-            
-            # Step 2: Time Information
-            print("\n📝 STEP 2: User provides time")
-            print("-"*40)
-            time_message = {
-                "type": "message",
-                "channel": "C123456",
-                "user": "U123456",
-                "text": "Tomorrow at 3pm",
-                "ts": "1234567890.123457"
-            }
-            print(f"User: {time_message['text']}")
-            print("\n⬇️  NLP Processing")
-            
-            nlp_result = await front_desk.nlp.process_message(time_message['text'], {"real_name": "User"}, time_message['channel'])
-            print("Entities found:")
-            print(f"  • time: {nlp_result.get('entities', {}).get('time')}")
-            
-            await front_desk.handle_message(time_message)
-            request = front_desk.request_tracker.get_active_request(time_message['channel'], time_message['user'])
-            
-            print("\n⬇️  Request Tracker")
-            print(f"Status: {request.status}")
-            print(f"Stored: time = {request.entities.get('time')}")
-            print("Missing: participants")
-            
-            print("\n⬇️  Front Desk Response")
-            print("Office: Great, I have the time. Who would you like to invite to this meeting?")
-            
-            # Step 3: Participants Information
-            print("\n📝 STEP 3: User provides participants")
-            print("-"*40)
-            participants_message = {
-                "type": "message",
-                "channel": "C123456",
-                "user": "U123456",
-                "text": "with John and Mary",
-                "ts": "1234567890.123458"
-            }
-            print(f"User: {participants_message['text']}")
-            print("\n⬇️  NLP Processing")
-            
-            nlp_result = await front_desk.nlp.process_message(participants_message['text'], {"real_name": "User"}, participants_message['channel'])
-            print("Entities found:")
-            print(f"  • participants: {nlp_result.get('entities', {}).get('participants')}")
-            
-            await front_desk.handle_message(participants_message)
-            request = front_desk.request_tracker.get_active_request(participants_message['channel'], participants_message['user'])
-            
-            print("\n⬇️  Request Tracker")
-            print(f"Status: {request.status}")
-            print("All Information Collected:")
-            print(f"  • time: {request.entities.get('time')}")
-            print(f"  • participants: {request.entities.get('participants')}")
-            
-            print("\n⬇️  Task Creation")
-            print(f"Recipe: {request.recipe.get('name')}")
-            print("Steps:")
-            for i, step in enumerate(request.recipe.get('steps', []), 1):
-                print(f"  {i}. {step['action']}")
-                for param, value in step['params'].items():
-                    print(f"     • {param}: {value}")
-            
-            print("\n⬇️  Final Response")
-            print(f"Office: Perfect! I'll schedule the meeting for {request.entities.get('time')} with {', '.join(request.entities.get('participants', []))}. Is there anything else you need?")
-            
-            print("\n" + "="*80)
-            print("✅ Conversation Complete")
-            print("="*80)
-            
-    except Exception as e:
-        print(f"\n❌ Test Failed: {str(e)}")
-        raise 
+    
+    print("\n✅ Test Completed Successfully") 

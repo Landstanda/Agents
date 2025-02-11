@@ -34,7 +34,19 @@ class Request:
             if key == "entities" and value:
                 # Merge entities instead of replacing
                 current_entities = self.entities.copy()
-                current_entities.update(value)
+                for entity_type, entity_value in value.items():
+                    if entity_type in current_entities:
+                        if isinstance(entity_value, list):
+                            # For list types (like participants), extend the list
+                            current_entities[entity_type].extend(
+                                [v for v in entity_value if v not in current_entities[entity_type]]
+                            )
+                        else:
+                            # For scalar types (like time), replace if new value is not None
+                            if entity_value is not None:
+                                current_entities[entity_type] = entity_value
+                    else:
+                        current_entities[entity_type] = entity_value
                 self.entities = current_entities
             elif hasattr(self, key):
                 setattr(self, key, value)
@@ -91,17 +103,28 @@ class RequestTracker:
         self.active_requests = {}  # channel_id -> {user_id -> Request}
         self.completed_requests = []
         self.request_timeout = timedelta(minutes=30)
-        
-    def create_request(self, channel_id: str, user_id: str, message: str) -> Request:
+        self.flow_logger = None  # Will be set by front_desk
+    
+    async def create_request(self, channel_id: str, user_id: str, message: str) -> Request:
         """Create a new request or return existing active request."""
         # Check for existing request first
         existing = self.get_active_request(channel_id, user_id)
         if existing and existing.status not in ["completed", "error"]:
             existing.add_message(message)
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "Request Tracker",
+                    "Update Existing Request",
+                    {
+                        "request_id": existing.request_id,
+                        "status": existing.status,
+                        "new_message": message
+                    }
+                )
             return existing
             
         # Clean up old requests only if we're creating a new one
-        self._cleanup_old_requests()
+        await self._cleanup_old_requests()
         
         # Create new request
         request = Request(channel_id, user_id, message)
@@ -110,6 +133,19 @@ class RequestTracker:
         if channel_id not in self.active_requests:
             self.active_requests[channel_id] = {}
         self.active_requests[channel_id][user_id] = request
+        
+        if self.flow_logger:
+            await self.flow_logger.log_event(
+                "Request Tracker",
+                "New Request Created",
+                {
+                    "request_id": request.request_id,
+                    "channel": channel_id,
+                    "user": user_id,
+                    "initial_message": message
+                }
+            )
+        
         return request
     
     def get_active_request(self, channel_id: str, user_id: str) -> Optional[Request]:
@@ -122,15 +158,28 @@ class RequestTracker:
                 return request
         return None
     
-    def update_request(self, request: Request, **kwargs):
+    async def update_request(self, request: Request, **kwargs):
         """Update a request's attributes."""
+        old_status = request.status
         request.update(**kwargs)
+        
+        if self.flow_logger:
+            await self.flow_logger.log_event(
+                "Request Tracker",
+                "Request Updated",
+                {
+                    "request_id": request.request_id,
+                    "old_status": old_status,
+                    "new_status": request.status,
+                    "updates": kwargs
+                }
+            )
         
         # If request is completed, move it to history
         if request.status == "completed":
-            self._archive_request(request)
+            await self._archive_request(request)
     
-    def _archive_request(self, request: Request):
+    async def _archive_request(self, request: Request):
         """Move a request to completed history."""
         if request.channel_id in self.active_requests:
             if request.user_id in self.active_requests[request.channel_id]:
@@ -142,8 +191,20 @@ class RequestTracker:
         # Keep only last 1000 completed requests
         if len(self.completed_requests) > 1000:
             self.completed_requests = self.completed_requests[-500:]
+            
+        if self.flow_logger:
+            await self.flow_logger.log_event(
+                "Request Tracker",
+                "Request Archived",
+                {
+                    "request_id": request.request_id,
+                    "final_status": request.status,
+                    "completion_time": datetime.now().isoformat(),
+                    "conversation_length": len(request.conversation_history)
+                }
+            )
     
-    def _cleanup_old_requests(self):
+    async def _cleanup_old_requests(self):
         """Clean up requests that have timed out."""
         now = datetime.now()
         channels_to_remove = []
@@ -155,6 +216,18 @@ class RequestTracker:
                     users_to_remove.append(user_id)
                     request.status = "timeout"
                     self.completed_requests.append(request)
+                    
+                    if self.flow_logger:
+                        await self.flow_logger.log_event(
+                            "Request Tracker",
+                            "Request Timeout",
+                            {
+                                "request_id": request.request_id,
+                                "channel": channel_id,
+                                "user": user_id,
+                                "last_updated": request.last_updated.isoformat()
+                            }
+                        )
             
             for user_id in users_to_remove:
                 del user_requests[user_id]

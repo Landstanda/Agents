@@ -19,6 +19,7 @@ class CookbookManager:
         self.recipes_file = Path("src/office/cookbook/recipes.yaml")
         self.recipes = self._load_recipes()
         self.nlp_processors = set()  # Track NLP processors using this cookbook
+        self.flow_logger = None  # Will be set by front_desk
         if not self.recipes:
             self._initialize_default_recipes()
         logger.info(f"Loaded {len(self.recipes)} recipes from cookbook")
@@ -255,7 +256,17 @@ class CookbookManager:
                 "success_criteria"
             }
             if not all(field in recipe for field in required_fields):
-                logger.error(f"Recipe missing required fields: {required_fields - set(recipe.keys())}")
+                missing_fields = required_fields - set(recipe.keys())
+                if self.flow_logger:
+                    await self.flow_logger.log_event(
+                        "Cookbook Manager",
+                        "Recipe Validation Failed",
+                        {
+                            "recipe": recipe.get("name", "Unknown"),
+                            "missing_fields": list(missing_fields)
+                        }
+                    )
+                logger.error(f"Recipe missing required fields: {missing_fields}")
                 return False
             
             # Add recipe to cookbook
@@ -268,29 +279,48 @@ class CookbookManager:
             for nlp in self.nlp_processors:
                 nlp.refresh_lexicon()
             
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "Cookbook Manager",
+                    "Recipe Added",
+                    {
+                        "name": recipe["name"],
+                        "intent": recipe["intent"],
+                        "steps": len(recipe["steps"]),
+                        "required_entities": recipe["required_entities"]
+                    }
+                )
+            
             logger.info(f"Added new recipe: {recipe['name']}")
             return True
             
         except Exception as e:
-            logger.error(f"Error adding recipe: {str(e)}")
+            error_msg = f"Error adding recipe: {str(e)}"
+            logger.error(error_msg)
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "Cookbook Manager",
+                    "Recipe Addition Failed",
+                    {
+                        "error": error_msg,
+                        "recipe": recipe.get("name", "Unknown")
+                    }
+                )
             return False
     
-    def get_recipe(self, intent: str) -> Dict[str, Any]:
-        """
-        Get a recipe by intent with detailed response about match status.
-        
-        Args:
-            intent: The intent to find a recipe for
-            
-        Returns:
-            Dict containing:
-                - status: "success", "missing_info", "not_found"
-                - recipe: The matching recipe if found
-                - missing_requirements: List of missing information if status is "missing_info"
-                - suggested_next_steps: String describing what should happen next
-        """
+    async def get_recipe(self, intent: str) -> Dict[str, Any]:
+        """Get a recipe by intent with detailed response about match status."""
         try:
             if not intent:
+                if self.flow_logger:
+                    await self.flow_logger.log_event(
+                        "Cookbook Manager",
+                        "Recipe Lookup Failed",
+                        {
+                            "error": "No intent provided",
+                            "status": "not_found"
+                        }
+                    )
                 return {
                     "status": "not_found",
                     "recipe": None,
@@ -302,21 +332,66 @@ class CookbookManager:
             # First try exact match
             for recipe in self.recipes.values():
                 if recipe.get("intent") == intent:
-                    return self._validate_recipe_requirements(recipe, intent)
+                    result = self._validate_recipe_requirements(recipe, intent)
+                    if self.flow_logger:
+                        await self.flow_logger.log_event(
+                            "Cookbook Manager",
+                            "Recipe Found",
+                            {
+                                "intent": intent,
+                                "recipe": recipe["name"],
+                                "status": result["status"],
+                                "missing_requirements": result.get("missing_requirements", [])
+                            }
+                        )
+                    return result
                 
             # Then try partial match
             for recipe in self.recipes.values():
                 recipe_intent = recipe.get("intent", "")
                 if recipe_intent and (intent in recipe_intent or recipe_intent in intent):
-                    return self._validate_recipe_requirements(recipe, intent)
+                    result = self._validate_recipe_requirements(recipe, intent)
+                    if self.flow_logger:
+                        await self.flow_logger.log_event(
+                            "Cookbook Manager",
+                            "Recipe Found (Partial Match)",
+                            {
+                                "intent": intent,
+                                "recipe": recipe["name"],
+                                "status": result["status"],
+                                "missing_requirements": result.get("missing_requirements", [])
+                            }
+                        )
+                    return result
                 
             # Special case for scheduling intents
             if any(term in intent.lower() for term in ["schedule", "meeting", "appointment"]):
                 schedule_recipe = self.recipes.get("schedule_meeting")
                 if schedule_recipe:
-                    return self._validate_recipe_requirements(schedule_recipe, intent)
+                    result = self._validate_recipe_requirements(schedule_recipe, intent)
+                    if self.flow_logger:
+                        await self.flow_logger.log_event(
+                            "Cookbook Manager",
+                            "Recipe Found (Special Case)",
+                            {
+                                "intent": intent,
+                                "recipe": "schedule_meeting",
+                                "status": result["status"],
+                                "missing_requirements": result.get("missing_requirements", [])
+                            }
+                        )
+                    return result
             
             # No recipe found
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "Cookbook Manager",
+                    "Recipe Not Found",
+                    {
+                        "intent": intent,
+                        "status": "not_found"
+                    }
+                )
             return {
                 "status": "not_found",
                 "recipe": None,
@@ -326,13 +401,23 @@ class CookbookManager:
             }
             
         except Exception as e:
-            logger.error(f"Error getting recipe: {str(e)}")
+            error_msg = f"Error getting recipe: {str(e)}"
+            logger.error(error_msg)
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "Cookbook Manager",
+                    "Recipe Lookup Error",
+                    {
+                        "error": error_msg,
+                        "intent": intent
+                    }
+                )
             return {
                 "status": "error",
                 "recipe": None,
                 "missing_requirements": [],
                 "suggested_next_steps": "consult_ceo",
-                "details": str(e)
+                "details": error_msg
             }
     
     def _validate_recipe_requirements(self, recipe: Dict[str, Any], nlp_result: Dict[str, Any]) -> Dict[str, Any]:

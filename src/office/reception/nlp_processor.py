@@ -18,7 +18,15 @@ class NLPProcessor:
         # Add conversation state tracking
         self.conversation_state = {}  # Format: {channel_id: {last_intent, entities, timestamp}}
         self.state_timeout = 300  # 5 minutes
+        self.cookbook_manager = cookbook_manager
+        self.task_lexicon = self._build_task_lexicon()
+        self.flow_logger = None  # Will be set by front_desk
         
+        # Initialize patterns
+        self._initialize_patterns()
+        
+    def _initialize_patterns(self):
+        """Initialize all the pattern dictionaries."""
         # Add conversational patterns
         self.conversational_patterns = {
             "greeting": [
@@ -36,12 +44,17 @@ class NLPProcessor:
                 r"\bhow('s| is) it going\b",
                 r"\bhow are you\b",
                 r"\bhope you('re| are) well\b"
+            ],
+            "acknowledgment": [
+                r"\b(ok|okay|got it|understood|alright|i see)\b"
+            ],
+            "affirmative": [
+                r"\b(yes|yeah|yep|sure|definitely|absolutely)\b"
+            ],
+            "negative": [
+                r"\b(no|nope|not really|negative)\b"
             ]
         }
-        
-        # Initialize cookbook integration
-        self.cookbook_manager = cookbook_manager
-        self.task_lexicon = self._build_task_lexicon()
         
         # Common time-related phrases
         self.time_patterns = {
@@ -72,7 +85,7 @@ class NLPProcessor:
             "recent": r"\b(last|latest|recent|newest)\b",
             "count": r"\b(how many|number of)\b"
         }
-        
+
     def _build_task_lexicon(self):
         """Build lexicon from cookbook recipes."""
         lexicon = {
@@ -119,36 +132,31 @@ class NLPProcessor:
         self.task_lexicon = self._build_task_lexicon()
 
     async def process_message(self, message: str, user_info: Dict[str, Any], channel_id: str = None) -> Dict[str, Any]:
-        """Process a message with conversation context."""
+        """Process a message with enhanced intent classification."""
         try:
             if not message or not user_info:
-                return self._error_response("Missing required input", message)
+                error_msg = "Missing required input"
+                if self.flow_logger:
+                    await self.flow_logger.log_event(
+                        "NLP Processor",
+                        "Processing Error",
+                        {
+                            "error": error_msg,
+                            "message": message or "None"
+                        }
+                    )
+                return self._error_response(error_msg, message)
 
-            # Check conversation state
+            # Get conversation state
             current_state = self._get_conversation_state(channel_id) if channel_id else None
             
-            # Try to parse complete datetime first
-            try:
-                dt = parser.parse(message, fuzzy=True)
-                parsed_time = dt.strftime("%Y-%m-%d %I:%M %p")
-            except:
-                parsed_time = None
+            # Extract intents with enhanced classification
+            intent_info = self._extract_intents(message, current_state)
             
-            # Extract intents first
-            all_intents = self._extract_intents(message, current_state)
-            
-            # If no new intent but we have a previous intent in state, maintain it
-            if not all_intents and current_state and current_state.get("last_intent"):
-                all_intents = [current_state["last_intent"]]
-            
-            # Extract entities with context
+            # Extract entities
             entities = self._extract_entities(message, current_state)
             
-            # If we parsed a complete datetime, use it
-            if parsed_time:
-                entities["time"] = parsed_time
-            
-            # Determine urgency
+            # Calculate urgency
             urgency = self._calculate_urgency(message)
             
             # Extract temporal context
@@ -162,36 +170,63 @@ class NLPProcessor:
                 "timestamp": datetime.now().isoformat()
             }
 
-            # Update conversation state
-            if channel_id:
+            # Update conversation state if needed
+            if channel_id and intent_info["primary_intent"]:
                 self._update_conversation_state(channel_id, {
-                    "last_intent": all_intents[0] if all_intents else None,
+                    "last_intent": intent_info["primary_intent"],
+                    "intent_type": intent_info["intent_type"],
                     "entities": entities,
                     "timestamp": datetime.now().timestamp(),
                     "user_id": user_info.get("id")
                 })
 
             # Determine if this needs request tracking
-            needs_tracking = True
-            if all_intents and all_intents[0] in ["greeting", "farewell", "gratitude", "pleasantry"]:
-                needs_tracking = False
+            needs_tracking = intent_info["intent_type"] == "task"
 
-            return {
+            result = {
                 "status": "success",
                 "raw_text": message,
-                "intent": all_intents[0] if all_intents else None,
-                "all_intents": all_intents,
+                "intent": intent_info["primary_intent"],
+                "intent_type": intent_info["intent_type"],
+                "all_intents": intent_info["all_intents"],
+                "confidence": intent_info["confidence"],
                 "entities": entities,
                 "urgency": urgency,
                 "temporal_context": temporal,
                 "user_context": user_context,
                 "conversation_state": current_state,
-                "needs_tracking": needs_tracking  # New field indicating if request tracking is needed
+                "needs_tracking": needs_tracking
             }
+
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "NLP Processor",
+                    "Message Analysis",
+                    {
+                        "intent": result["intent"],
+                        "intent_type": result["intent_type"],
+                        "confidence": result["confidence"],
+                        "entities": entities,
+                        "urgency": urgency,
+                        "needs_tracking": needs_tracking,
+                        "message_length": len(message)
+                    }
+                )
+
+            return result
             
         except Exception as e:
-            logger.error(f"Error processing message: {str(e)}")
-            return self._error_response(str(e), message)
+            error_msg = str(e)
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "NLP Processor",
+                    "Processing Error",
+                    {
+                        "error": error_msg,
+                        "message": message
+                    }
+                )
+            return self._error_response(error_msg, message)
 
     def _get_conversation_state(self, channel_id: str) -> Optional[Dict[str, Any]]:
         """Get current conversation state if within timeout."""
@@ -209,75 +244,82 @@ class NLPProcessor:
         """Update conversation state."""
         self.conversation_state[channel_id] = state
 
-    def _extract_intents(self, text: str, current_state: Optional[Dict[str, Any]] = None) -> List[str]:
-        """Extract intents based on action verbs and patterns."""
-        found_intents = []
+    def _extract_intents(self, text: str, current_state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Extract intents with enhanced classification."""
+        intent_info = {
+            "primary_intent": None,
+            "intent_type": None,  # "conversational" or "task"
+            "all_intents": [],
+            "confidence": 0.0
+        }
+
         # Clean and normalize text
         text = text.lower()
-        # Remove punctuation from the end of words but keep internal punctuation
         words = [word.rstrip('.,!?') for word in text.split()]
         text = ' '.join(words)
         
         logger.debug(f"Extracting intents from: {text}")
         
-        # First check for conversational intents as they should take priority
+        # First check for conversational intents
         for intent_type, patterns in self.conversational_patterns.items():
             if any(re.search(pattern, text) for pattern in patterns):
                 logger.debug(f"Found conversational intent: {intent_type}")
-                found_intents.append(intent_type)
-                # For conversational intents, we can return immediately as they take precedence
-                return found_intents
+                intent_info["primary_intent"] = intent_type
+                intent_info["intent_type"] = "conversational"
+                intent_info["all_intents"].append(intent_type)
+                intent_info["confidence"] = 0.9
+                return intent_info
         
-        # If no conversational intent found, check task lexicon for exact matches
+        # Check task lexicon for exact matches
         for phrase, intent in self.task_lexicon["intents"].items():
             if phrase in text:
-                logger.debug(f"Found exact match: {phrase} -> {intent}")
-                found_intents.append(intent)
-                break
+                logger.debug(f"Found exact task match: {phrase} -> {intent}")
+                intent_info["primary_intent"] = intent
+                intent_info["intent_type"] = "task"
+                intent_info["all_intents"].append(intent)
+                intent_info["confidence"] = 0.9
+                return intent_info
         
-        # If no exact matches, check aliases
-        if not found_intents:
-            for alias, intent in self.task_lexicon["aliases"].items():
-                if alias in text:
-                    logger.debug(f"Found alias match: {alias} -> {intent}")
-                    found_intents.append(intent)
-                    break
+        # Check aliases
+        for alias, intent in self.task_lexicon["aliases"].items():
+            if alias in text:
+                logger.debug(f"Found task alias match: {alias} -> {intent}")
+                intent_info["primary_intent"] = intent
+                intent_info["intent_type"] = "task"
+                intent_info["all_intents"].append(intent)
+                intent_info["confidence"] = 0.8
+                return intent_info
         
-        # If still no matches, do more flexible matching
-        if not found_intents:
-            # Create clean word set for matching
-            words = set(words)  # Use the cleaned words from earlier
-            logger.debug(f"Checking flexible matching with words: {words}")
+        # More flexible matching for tasks
+        words = set(words)
+        
+        # Check for email-related terms
+        email_terms = {"email", "emails", "mail", "inbox", "message", "messages"}
+        if email_terms & words:
+            read_terms = {"check", "see", "look", "show", "get", "have", "any", "new"}
+            send_terms = {"send", "write", "compose"}
             
-            # Check for email-related terms
-            email_terms = {"email", "emails", "mail", "inbox", "message", "messages"}
-            email_match = email_terms & words
-            if email_match:
-                logger.debug(f"Found email terms: {email_match}")
-                # Check for read vs send context
-                read_terms = {"check", "see", "look", "show", "get", "have", "any", "new"}
-                send_terms = {"send", "write", "compose"}
-                
-                if read_terms & words:
-                    logger.debug(f"Context suggests email_read (matched terms: {read_terms & words})")
-                    found_intents.append("email_read")
-                elif send_terms & words:
-                    logger.debug("Context suggests email_send")
-                    found_intents.append("email_send")
-                else:
-                    logger.debug("Defaulting to email_read")
-                    found_intents.append("email_read")
-            
-            # Check for meeting/scheduling terms
-            schedule_terms = {"schedule", "meeting", "appointment", "book", "set", "setup"}
-            schedule_match = schedule_terms & words
-            if schedule_match:
-                logger.debug(f"Found scheduling terms: {schedule_match}")
-                found_intents.append("schedule_meeting")
+            if read_terms & words:
+                intent_info["primary_intent"] = "email_read"
+                intent_info["intent_type"] = "task"
+                intent_info["confidence"] = 0.7
+            elif send_terms & words:
+                intent_info["primary_intent"] = "email_send"
+                intent_info["intent_type"] = "task"
+                intent_info["confidence"] = 0.7
         
-        logger.debug(f"Final extracted intents: {found_intents}")
-        return found_intents
-    
+        # Check for meeting/scheduling terms
+        schedule_terms = {"schedule", "meeting", "appointment", "book", "set", "setup"}
+        if schedule_terms & words:
+            intent_info["primary_intent"] = "schedule_meeting"
+            intent_info["intent_type"] = "task"
+            intent_info["confidence"] = 0.7
+        
+        if intent_info["primary_intent"]:
+            intent_info["all_intents"].append(intent_info["primary_intent"])
+        
+        return intent_info
+
     def _extract_entities(self, text: str, current_state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Extract entities with conversation context."""
         entities = {
@@ -324,90 +366,126 @@ class NLPProcessor:
         return entities
 
     def _extract_time_info(self, text: str) -> Optional[str]:
-        """Enhanced time extraction with better validation."""
-        if not text or not isinstance(text, str):
+        """
+        Enhanced time extraction with support for various formats.
+        
+        Handles:
+        - 12/24 hour formats
+        - AM/PM indicators
+        - Natural language time references (morning, afternoon, evening)
+        - Relative time (today, tomorrow)
+        - Contextual time inference
+        
+        Args:
+            text: The message text to process
+            
+        Returns:
+            Optional[str]: Normalized time string or None if no time found
+        """
+        if not text:
             return None
             
         text = text.lower().strip()
         
-        # Try to identify time components
-        time_found = None
-        period = None
-        date_context = None
-        
-        # Check for time patterns
-        time_match = re.search(r"\b(?:1[0-2]|0?[1-9])(?::[0-5][0-9])?\b", text)
+        # Try to extract specific time first
+        time_match = re.search(r"(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.|morning|afternoon|evening)?", text)
         if time_match:
-            time_found = time_match.group()
+            hour = int(time_match.group(1))
+            minutes = time_match.group(2) or "00"
+            period = time_match.group(3)
             
-            # Look for period indicators
-            if any(p in text for p in ["morning", "am", "a.m"]):
-                period = "AM"
-            elif any(p in text for p in ["afternoon", "evening", "pm", "p.m"]):
-                period = "PM"
-            elif int(time_found.split(":")[0]) < 8:  # Assume PM for times like 6:00 without AM/PM
-                period = "PM"
-            elif int(time_found.split(":")[0]) < 12:  # Assume AM for times like 9:00 without AM/PM
-                period = "AM"
+            # Determine AM/PM
+            if period:
+                if any(p in period for p in ["pm", "p.m.", "afternoon", "evening"]):
+                    if hour < 12:
+                        hour += 12
+                elif any(p in period for p in ["am", "a.m.", "morning"]):
+                    if hour == 12:
+                        hour = 0
+            elif hour < 7:  # Assume PM for times like 2:00 without AM/PM
+                hour += 12
             
-            # Add minutes if not present
-            if ":" not in time_found:
-                time_found += ":00"
-
-        # Check for date context
-        if "tomorrow" in text:
-            date_context = "tomorrow"
-        elif "today" in text:
-            date_context = "today"
-        elif "next week" in text:
-            date_context = "next week"
+            time_str = f"{hour:02d}:{minutes}"
+            
+            # Look for date context
+            if "tomorrow" in text:
+                return f"tomorrow at {time_str}"
+            elif "today" in text:
+                return f"today at {time_str}"
+            else:
+                return time_str
         
-        # Combine components
-        if time_found:
-            time_str = f"{time_found} {period if period else ''}"
-            if date_context:
-                return f"{date_context} at {time_str}".strip()
-            return time_str.strip()
-            
-        # If no specific time found, check for general time indicators
+        # Check for general time indicators
         for time_indicator in ["morning", "afternoon", "evening", "noon", "midnight"]:
             if time_indicator in text:
-                if date_context:
-                    return f"{date_context} {time_indicator}"
+                if "tomorrow" in text:
+                    return f"tomorrow {time_indicator}"
+                elif "today" in text:
+                    return f"today {time_indicator}"
                 return time_indicator
-                
+        
+        # Check for just date indicators
+        if "tomorrow" in text:
+            return "tomorrow"
+        elif "today" in text:
+            return "today"
+        
         return None
 
     def _extract_participants(self, text: str) -> List[str]:
-        """Enhanced participant extraction."""
+        """
+        Enhanced participant name extraction from natural language.
+        
+        Strategies:
+        1. Extracts names following "with" or "and"
+        2. Identifies standalone capitalized names
+        3. Filters out common words and false positives
+        4. Handles multi-word names
+        
+        Args:
+            text: The message text to process
+            
+        Returns:
+            List[str]: List of extracted participant names
+        """
         participants = []
         
         # Common words to ignore
-        ignore_words = {"hi", "hey", "hello", "dear", "thanks", "thank"}
+        ignore_words = {"hi", "hey", "hello", "dear", "thanks", "thank", "with", "and"}
         
-        # Match @mentions, "with Name", "and Name" patterns, and standalone names
-        patterns = [
-            r"@\w+",  # @mentions
-            r"(?:with|and)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",  # with/and followed by name
-            r"(?:^|\s)([A-Z][a-z]+)(?=\s|$|\?|\.)",  # Capitalized names, including at end of sentence
-            r"(?:with|and)\s*([A-Z][a-z]+)(?=\s|$|\?|\.)"  # with/and directly followed by name
-        ]
+        # First try to extract from "with X" or "and X" patterns
+        with_pattern = r"(?:with|and)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)"
+        matches = re.finditer(with_pattern, text)
+        for match in matches:
+            name = match.group(1)
+            if name.lower() not in ignore_words:
+                participants.append(name)
         
-        for pattern in patterns:
-            matches = re.finditer(pattern, text)
-            for match in matches:
-                # Get the actual name, removing any prefixes
-                participant = match.group().strip("@ ").strip("with ").strip("and ")
-                if (participant.lower() not in ignore_words and  # Ignore common words
-                    participant.lower() not in ["with", "and"] and
-                    participant not in participants and
-                    len(participant) > 1):  # Avoid single letters
-                    participants.append(participant)
+        # Then look for standalone capitalized names
+        name_pattern = r"(?:^|\s)([A-Z][a-z]+)(?=\s|$|\?|\.)"
+        matches = re.finditer(name_pattern, text)
+        for match in matches:
+            name = match.group(1)
+            if (name.lower() not in ignore_words and 
+                name not in participants):
+                participants.append(name)
         
         return participants
 
     def _calculate_urgency(self, text: str) -> float:
-        """Calculate urgency level based on keywords and patterns."""
+        """
+        Calculate message urgency based on multiple factors.
+        
+        Factors considered:
+        - Urgent keywords and their weights
+        - Exclamation marks
+        - Time pressure words
+        - Text emphasis (ALL CAPS)
+        - Temporal context
+        
+        Returns:
+            float: Urgency score between 0.0 and 1.0
+        """
         urgency_score = 0.0
         
         # Check for urgent keywords with higher weights

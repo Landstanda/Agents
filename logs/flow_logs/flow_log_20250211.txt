@@ -1,0 +1,666 @@
+================================================================================
+Test Run: 10:03 AM Feb 11, 2025
+================================================================================
+
+User Message: "Can you schedule a meeting with John and Sarah tomorrow at 2pm?"
+
+----------------------------------------
+
+Request Tracker
+---------------
+action: create_request
+request_id: 24b34fa4-a119-4bcf-9b9b-715f851e44ef
+status: initialized
+action: complete_request
+status: success
+details: Created new recipe
+
+
+NLP Processor
+-------------
+detected_intent: schedule_meeting
+entities: {'time': '2025-02-12T14:00:00', 'participants': ['john', 'sarah']}
+confidence: 0.9
+
+
+Cookbook Manager
+----------------
+action: recipe_lookup
+status: missing_info
+recipe: schedule_meeting
+missing_requirements: ['time', 'participants']
+
+
+CEO
+---
+action: consider_request
+status: success
+decision: I've created a new way to handle this request.
+confidence: 0.8
+
+
+================================================================================
+Test Run: 10:04 AM Feb 11, 2025
+================================================================================
+
+User Message: "Can you check my emails?"
+
+----------------------------------------
+
+Request Tracker
+---------------
+action: create_request
+request_id: b541791e-b373-4f71-b565-81ded6e730ce
+status: initialized
+action: complete_request
+status: success
+details: Created new recipe
+
+
+NLP Processor
+-------------
+detected_intent: None
+entities: {}
+confidence: 0.0
+
+
+Cookbook Manager
+----------------
+action: recipe_lookup
+status: not_found
+recipe: not_found
+missing_requirements: []
+
+
+CEO
+---
+action: consider_request
+status: success
+decision: I've created a new way to handle this request.
+confidence: 0.8
+
+
+================================================================================
+Test Run: 10:04 AM Feb 11, 2025
+================================================================================
+
+User Message: "Can you analyze the market trends for AI companies?"
+
+----------------------------------------
+
+Request Tracker
+---------------
+action: create_request
+request_id: ff11e17c-df64-48f3-b421-1412b4b5a4d8
+status: initialized
+action: complete_request
+status: success
+details: Created new recipe
+
+
+NLP Processor
+-------------
+detected_intent: None
+entities: {}
+confidence: 0.0
+
+
+Cookbook Manager
+----------------
+action: recipe_lookup
+status: not_found
+recipe: not_found
+missing_requirements: []
+
+
+CEO
+---
+action: consider_request
+status: success
+decision: I've created a new way to handle this request.
+confidence: 0.8
+
+
+
+================================================================================
+Test Run: 10:58 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+Test Component - Test Event
+----------------------------------------
+key: value
+
+
+================================================================================
+Test Run: 10:58 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+User Message - Incoming Request
+----------------------------------------
+text: Schedule a meeting with John tomorrow at 2pm
+channel: C123456
+user: U123456
+
+
+================================================================================
+Test Run: 10:58 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: []
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 02:00 PM
+  - participants: ['Joh', 'Schedule']
+urgency: 0.3
+needs_tracking: True
+message_length: 44
+
+
+================================================================================
+Test Run: 10:58 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+NLP Processor - Message Analysis
+----------------------------------------
+detected_intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: []
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 02:00 PM
+  - participants: ['Joh', 'Schedule']
+confidence: 0.0
+
+
+================================================================================
+Test Run: 11:00 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+Test Component - Test Event
+----------------------------------------
+key: value
+
+
+================================================================================
+Test Run: 11:00 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+User Message - Incoming Request
+----------------------------------------
+text: Schedule a meeting with John tomorrow at 2pm
+channel: C123456
+user: U123456
+
+
+================================================================================
+Test Run: 11:00 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: []
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 02:00 PM
+  - participants: ['Joh', 'Schedule']
+urgency: 0.3
+needs_tracking: True
+message_length: 44
+
+
+================================================================================
+Test Run: 11:00 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+NLP Processor - Message Analysis
+----------------------------------------
+detected_intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: []
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 02:00 PM
+  - participants: ['Joh', 'Schedule']
+confidence: 0.0
+
+
+================================================================================
+Test Run: 11:00 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+Request Tracker - New Request Created
+----------------------------------------
+request_id: 97f1e816-228e-43e3-bb49-60c1ec4b45c0
+channel: C123456
+user: U123456
+initial_message: Schedule a meeting with John tomorrow at 2pm
+
+
+================================================================================
+Test Run: 11:00 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+Request Tracker - Request Updated
+----------------------------------------
+request_id: 97f1e816-228e-43e3-bb49-60c1ec4b45c0
+old_status: new
+new_status: new
+updates:
+  - intent: schedule_meeting
+  - entities: {'people': [], 'dates': [], 'numbers': [], 'emails': [], 'email_attributes': [], 'time': '2025-02-11 02:00 PM', 'participants': ['Joh', 'Schedule']}
+
+
+================================================================================
+Test Run: 11:00 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+Cookbook Manager - Recipe Found
+----------------------------------------
+intent: schedule_meeting
+recipe: schedule_meeting
+status: missing_info
+missing_requirements: ['time', 'participants']
+
+
+================================================================================
+Test Run: 11:00 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+Request Tracker - Request Updated
+----------------------------------------
+request_id: 97f1e816-228e-43e3-bb49-60c1ec4b45c0
+old_status: new
+new_status: waiting_for_info
+updates:
+  - status: waiting_for_info
+
+
+================================================================================
+Test Run: 11:00 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+User Message - Incoming Request
+----------------------------------------
+text: This will cause an error
+channel: C123456
+user: U123456
+
+
+================================================================================
+Test Run: 11:00 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+Front Desk - Error Handling
+----------------------------------------
+error: Test error
+request_id: None
+
+
+================================================================================
+Test Run: 11:00 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+System - Startup
+----------------------------------------
+status: initialized
+components: ['FrontDesk', 'NLPProcessor', 'CookbookManager', 'TaskManager', 'CEO']
+
+
+================================================================================
+Test Run: 11:01 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+User Message - Incoming Request
+----------------------------------------
+text: can you schedule a meeting for me for tomorrow at 11:23 am with Gabi?
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+
+================================================================================
+Test Run: 11:01 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+NLP Processor - Message Analysis
+----------------------------------------
+detected_intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11', '23']
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 11:23 AM
+  - participants: ['Gab']
+confidence: 0.0
+
+
+================================================================================
+Test Run: 11:01 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+User Message - Incoming Request
+----------------------------------------
+text: With gabi and 11 am
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+
+================================================================================
+Test Run: 11:01 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+NLP Processor - Message Analysis
+----------------------------------------
+detected_intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11']
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 11:00 AM
+  - participants: ['Gab']
+confidence: 0.0
+
+
+================================================================================
+Test Run: 11:02 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+User Message - Incoming Request
+----------------------------------------
+text: With gabi at 11 am
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+
+================================================================================
+Test Run: 11:02 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+NLP Processor - Message Analysis
+----------------------------------------
+detected_intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11']
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 11:00 AM
+  - participants: ['Gab']
+confidence: 0.0
+
+
+================================================================================
+Test Run: 11:02 AM Feb 11, 2025
+--------------------------------------------------------------------------------
+
+System - Shutdown
+----------------------------------------
+status: shutting_down
+time: 2025-02-11T11:02:30.774729
+
+
+================================================================================
+[11:05 AM] System - Startup
+----------------------------------------
+status: initialized
+components:
+  - FrontDesk
+  - NLPProcessor
+  - CookbookManager
+  - TaskManager
+  - CEO
+  - RequestTracker
+timestamp: 2025-02-11 11:05:55
+
+================================================================================
+[11:06 AM] User Message - Incoming Request
+----------------------------------------
+text: can you schedule a meeting for me for tomorrow at 11:23 am with Gabi?
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+================================================================================
+[11:06 AM] NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11', '23']
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 11:23 AM
+  - participants: ['Gab']
+urgency: 0.3
+needs_tracking: True
+message_length: 69
+
+================================================================================
+[11:06 AM] NLP Processor - Message Analysis
+----------------------------------------
+detected_intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11', '23']
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 11:23 AM
+  - participants: ['Gab']
+confidence: 0.0
+
+================================================================================
+[11:06 AM] Request Tracker - New Request Created
+----------------------------------------
+request_id: aa9be796-0bc4-4873-96ad-0a66fe75a05a
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+initial_message: can you schedule a meeting for me for tomorrow at 11:23 am with Gabi?
+
+================================================================================
+[11:06 AM] Request Tracker - Request Updated
+----------------------------------------
+request_id: aa9be796-0bc4-4873-96ad-0a66fe75a05a
+old_status: new
+new_status: new
+updates:
+  - intent: schedule_meeting
+  - entities: {'people': [], 'dates': [], 'numbers': ['11', '23'], 'emails': [], 'email_attributes': [], 'time': '2025-02-11 11:23 AM', 'participants': ['Gab']}
+
+================================================================================
+[11:06 AM] Cookbook Manager - Recipe Found
+----------------------------------------
+intent: schedule_meeting
+recipe: schedule_meeting
+status: missing_info
+missing_requirements:
+  - time
+  - participants
+
+================================================================================
+[11:06 AM] Request Tracker - Request Updated
+----------------------------------------
+request_id: aa9be796-0bc4-4873-96ad-0a66fe75a05a
+old_status: new
+new_status: waiting_for_info
+updates:
+  - status: waiting_for_info
+
+================================================================================
+[11:10:13 AM] System - Startup
+----------------------------------------
+status: initialized
+components:
+  - FrontDesk
+  - NLPProcessor
+  - CookbookManager
+  - TaskManager
+  - CEO
+  - RequestTracker
+timestamp: 2025-02-11 11:10:13
+log_directory: /home/jeff/Agents/logs/flow_logs
+
+================================================================================
+[11:10:45 AM] User Message - Incoming Request
+----------------------------------------
+text: schedule a meeting for 9 am tomorrow
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+================================================================================
+[11:10:46 AM] NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['9']
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 09:00 AM
+  - participants: []
+urgency: 0.3
+needs_tracking: True
+message_length: 36
+
+================================================================================
+[11:10:46 AM] NLP Processor - Message Analysis
+----------------------------------------
+detected_intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['9']
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 09:00 AM
+  - participants: []
+confidence: 0.0
+
+================================================================================
+[11:10:46 AM] Request Tracker - New Request Created
+----------------------------------------
+request_id: 410fb5c2-7147-4bdc-862f-72ed33bfa189
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+initial_message: schedule a meeting for 9 am tomorrow
+
+================================================================================
+[11:10:46 AM] Request Tracker - Request Updated
+----------------------------------------
+request_id: 410fb5c2-7147-4bdc-862f-72ed33bfa189
+old_status: new
+new_status: new
+updates:
+  - intent: schedule_meeting
+  - entities: {'people': [], 'dates': [], 'numbers': ['9'], 'emails': [], 'email_attributes': [], 'time': '2025-02-11 09:00 AM', 'participants': []}
+
+================================================================================
+[11:10:46 AM] Cookbook Manager - Recipe Found
+----------------------------------------
+intent: schedule_meeting
+recipe: schedule_meeting
+status: missing_info
+missing_requirements:
+  - participants
+  - time
+
+================================================================================
+[11:10:46 AM] Request Tracker - Request Updated
+----------------------------------------
+request_id: 410fb5c2-7147-4bdc-862f-72ed33bfa189
+old_status: new
+new_status: waiting_for_info
+updates:
+  - status: waiting_for_info
+
+================================================================================
+[11:11:02 AM] User Message - Incoming Request
+----------------------------------------
+text: Gabi and I at 9 am
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+================================================================================
+[11:11:02 AM] NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['9']
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 09:00 AM
+  - participants: ['Gab']
+urgency: 0.1
+needs_tracking: True
+message_length: 18
+
+================================================================================
+[11:11:02 AM] NLP Processor - Message Analysis
+----------------------------------------
+detected_intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['9']
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 09:00 AM
+  - participants: ['Gab']
+confidence: 0.0
+
+================================================================================
+[11:11:02 AM] Request Tracker - Update Existing Request
+----------------------------------------
+request_id: 410fb5c2-7147-4bdc-862f-72ed33bfa189
+status: waiting_for_info
+new_message: Gabi and I at 9 am
+
+================================================================================
+[11:11:02 AM] Request Tracker - Request Updated
+----------------------------------------
+request_id: 410fb5c2-7147-4bdc-862f-72ed33bfa189
+old_status: waiting_for_info
+new_status: waiting_for_info
+updates:
+  - intent: schedule_meeting
+  - entities: {'people': [], 'dates': [], 'numbers': ['9'], 'emails': [], 'email_attributes': [], 'time': '2025-02-11 09:00 AM', 'participants': ['Gab']}
+
+================================================================================
+[11:11:02 AM] Cookbook Manager - Recipe Found
+----------------------------------------
+intent: schedule_meeting
+recipe: schedule_meeting
+status: missing_info
+missing_requirements:
+  - participants
+  - time
+
+================================================================================
+[11:11:02 AM] Request Tracker - Request Updated
+----------------------------------------
+request_id: 410fb5c2-7147-4bdc-862f-72ed33bfa189
+old_status: waiting_for_info
+new_status: waiting_for_info
+updates:
+  - status: waiting_for_info

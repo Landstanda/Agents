@@ -24,6 +24,7 @@ class CEO:
         self.ingredients_file = Path("src/office/cookbook/ingredients.yaml")
         self.ingredients = self._load_ingredients()
         self.openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.flow_logger = None  # Will be set by front_desk
         logger.info(f"{self.name} ({self.title}) is now online")
     
     def _load_ingredients(self) -> Dict[str, Any]:
@@ -53,6 +54,16 @@ class CEO:
             if not message:
                 raise ValueError("Empty message received")
             
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "CEO",
+                    "Consider Request",
+                    {
+                        "message": message,
+                        "context": context or {}
+                    }
+                )
+            
             # Extract context
             nlp_result = context.get("nlp_result", {}) if context else {}
             intent = nlp_result.get("intent")
@@ -61,6 +72,15 @@ class CEO:
             if self.cookbook_manager:
                 cookbook_response = self.cookbook_manager.get_recipe(intent)
                 if cookbook_response["status"] == "success":
+                    if self.flow_logger:
+                        await self.flow_logger.log_event(
+                            "CEO",
+                            "Recipe Found",
+                            {
+                                "recipe": cookbook_response["recipe"]["name"],
+                                "intent": intent
+                            }
+                        )
                     return {
                         "status": "success",
                         "decision": "I'll handle this with an existing recipe.",
@@ -71,8 +91,21 @@ class CEO:
                     }
             
             # If no recipe found, try to create one
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "CEO",
+                    "Creating New Recipe",
+                    {"message": message}
+                )
+            
             new_recipe = await self._create_recipe(message, nlp_result)
             if not new_recipe:
+                if self.flow_logger:
+                    await self.flow_logger.log_event(
+                        "CEO",
+                        "Recipe Creation Failed",
+                        {"error": "Could not create recipe"}
+                    )
                 return {
                     "status": "error",
                     "decision": "I couldn't figure out how to help with this request.",
@@ -86,6 +119,23 @@ class CEO:
                 added = await self.cookbook_manager.add_recipe(new_recipe)
                 if not added:
                     logger.error("Failed to add new recipe to cookbook")
+                    if self.flow_logger:
+                        await self.flow_logger.log_event(
+                            "CEO",
+                            "Recipe Storage Failed",
+                            {"recipe": new_recipe["name"]}
+                        )
+                else:
+                    if self.flow_logger:
+                        await self.flow_logger.log_event(
+                            "CEO",
+                            "Recipe Added",
+                            {
+                                "name": new_recipe["name"],
+                                "intent": new_recipe["intent"],
+                                "steps": [step["action"] for step in new_recipe["steps"]]
+                            }
+                        )
             
             # Update request if provided
             if request:
@@ -103,6 +153,12 @@ class CEO:
             
         except Exception as e:
             logger.error(f"Error processing request: {str(e)}")
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "CEO",
+                    "Error",
+                    {"error": str(e)}
+                )
             return {
                 "status": "error",
                 "decision": None,

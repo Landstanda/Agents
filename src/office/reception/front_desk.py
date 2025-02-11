@@ -78,6 +78,9 @@ class FrontDesk:
         self._processed_messages = set()
         self._error_messages = set()
         
+        # Flow logger will be set by run_front_desk.py
+        self.flow_logger = None
+        
         logger.info(f"{self.name} ({self.title}) initialization complete")
     
     async def process_event(self, client: SocketModeClient, req: SocketModeRequest) -> None:
@@ -212,18 +215,50 @@ class FrontDesk:
             return "I understand your request and I'll help you with that. Let me process this for you."
     
     async def handle_message(self, message: Dict[str, Any]) -> None:
-        """Handle incoming Slack messages with intelligent routing."""
-        request = None
+        """
+        Handle incoming Slack messages with intelligent routing.
+        
+        Flow:
+        1. Extract and validate message metadata
+        2. Process message with NLP
+        3. Check for active requests/follow-ups
+        4. Route based on intent type:
+           - Conversational: Direct response
+           - Task: Create and process request
+           - Follow-up: Update existing request
+        5. Handle any errors gracefully
+        
+        Args:
+            message: Dictionary containing Slack message data
+        """
         try:
             channel_id = message.get("channel")
             user_id = message.get("user")
             thread_ts = message.get("thread_ts") if message.get("thread_ts") else None
             text = message.get("text", "")
+            
+            # Basic validation
+            if not channel_id or not user_id:
+                logger.error("Missing required message fields")
+                return
+                
+            if text is None:
+                await self._send_message(
+                    channel_id,
+                    "I apologize, but I received an invalid message format. Please try again.",
+                    thread_ts
+                )
+                return
+                
             if text and self.bot_mention:
                 text = text.replace(self.bot_mention, "").strip()
-            
-            if not text or not user_id or not channel_id:
-                return
+
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "User Message",
+                    "Incoming Request",
+                    {"text": text, "channel": channel_id, "user": user_id}
+                )
             
             # Get user info
             try:
@@ -236,11 +271,31 @@ class FrontDesk:
                 logger.warning(f"Could not fetch user info: {str(e)}")
                 user_info = {"user": {"real_name": "there", "id": user_id}}
             
-            # Process with NLP
+            # Check for active request first
+            active_request = self.request_tracker.get_active_request(channel_id, user_id)
+            
+            # Process with NLP first
             nlp_result = await self.nlp.process_message(text, user_info["user"], channel_id)
             
-            # For messages that don't need tracking (like greetings), handle directly
-            if not nlp_result.get("needs_tracking", True):
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "NLP Processor",
+                    "Message Analysis",
+                    {
+                        "intent": nlp_result.get("intent"),
+                        "intent_type": nlp_result.get("intent_type"),
+                        "confidence": nlp_result.get("confidence", 0.0),
+                        "entities": nlp_result.get("entities", {})
+                    }
+                )
+            
+            # If there's an active request waiting for info, treat this as a follow-up
+            if active_request and active_request.status == "waiting_for_info":
+                await self.handle_followup_response(active_request, text, nlp_result)
+                return
+            
+            # Handle conversational messages directly
+            if nlp_result.get("intent_type") == "conversational":
                 intent = nlp_result.get("intent")
                 if intent == "help":
                     await self._send_help_message(channel_id, thread_ts)
@@ -256,128 +311,188 @@ class FrontDesk:
                 elif intent == "pleasantry":
                     response = await self.get_gpt_response(f"Generate a friendly response to {user_info['user']['real_name']}'s pleasantry")
                     await self._send_message(channel_id, response, thread_ts)
+                elif intent == "acknowledgment":
+                    response = await self.get_gpt_response(f"Generate a brief acknowledgment response")
+                    await self._send_message(channel_id, response, thread_ts)
+                elif intent in ["affirmative", "negative"]:
+                    response = await self.get_gpt_response(f"Generate a brief response to {user_info['user']['real_name']}'s {intent} response")
+                    await self._send_message(channel_id, response, thread_ts)
                 return
             
-            # Create request for messages that need tracking
-            request = self.request_tracker.create_request(channel_id, user_id, text)
-            request.update(
-                intent=nlp_result.get("intent"),
-                entities={**request.entities, **nlp_result.get("entities", {})}
-            )
-            
-            # Handle task-based requests
-            if request.status == "new":
-                # New request, try to find matching recipe
-                cookbook_response = self.cookbook.get_recipe(request.intent)
-                request.recipe = cookbook_response.get("recipe")
-                request.missing_entities = cookbook_response.get("missing_requirements", [])
+            # For task intents, create a request and process it
+            if nlp_result.get("intent_type") == "task":
+                # Create request for task messages
+                request = await self.request_tracker.create_request(channel_id, user_id, text)
+                await self.request_tracker.update_request(
+                    request,
+                    intent=nlp_result.get("intent"),
+                    entities={**request.entities, **nlp_result.get("entities", {})}
+                )
                 
-                if cookbook_response["status"] == "success":
-                    request.status = "processing"
-                    result = await self.task_manager.execute_recipe(request.recipe, {
+                # Get recipe from cookbook
+                recipe_result = await self.cookbook.get_recipe(nlp_result.get("intent"))
+                
+                if recipe_result["status"] == "not_found":
+                    # No recipe found, consult CEO
+                    await self._send_message(
+                        channel_id,
+                        "I'll need to consult with the CEO about how to handle this request.",
+                        thread_ts
+                    )
+                    ceo_response = await self.ceo.consider_request(text, nlp_result)
+                    if ceo_response["status"] == "success":
+                        await self._send_message(
+                            channel_id,
+                            "I've learned a new way to handle this type of request!",
+                            thread_ts
+                        )
+                        # Try getting recipe again
+                        recipe_result = await self.cookbook.get_recipe(nlp_result.get("intent"))
+                    else:
+                        await self._send_message(
+                            channel_id,
+                            "I apologize, but I'm not sure how to handle this request yet.",
+                            thread_ts
+                        )
+                        return
+                
+                # Execute recipe if found
+                if recipe_result["status"] == "success":
+                    execution_context = {
                         "nlp_result": nlp_result,
-                        "user_info": user_info,
+                        "user_info": user_info["user"],
                         "channel_id": channel_id,
                         "thread_ts": thread_ts,
-                        **nlp_result.get("entities", {})  # Add entities directly to context
-                    })
-                    
-                    if result["status"] == "error":
-                        await self._handle_error(request, result["error"], channel_id, thread_ts)
+                        "request": request,
+                        **nlp_result.get("entities", {})
+                    }
+                    execution_result = await self.task_manager.execute_recipe(
+                        recipe_result["recipe"],
+                        execution_context
+                    )
+                    if execution_result["status"] == "success":
+                        await self._send_message(
+                            channel_id,
+                            execution_result["details"],
+                            thread_ts
+                        )
+                        await self.request_tracker.update_request(request, status="completed")
                     else:
-                        await self._handle_success(request, result, channel_id, thread_ts)
-                    
-                elif cookbook_response["status"] == "missing_info":
-                    request.status = "waiting_for_info"
-                    await self._request_missing_info(request, channel_id, thread_ts)
-                
-                else:  # not_found or error
-                    await self._handle_unknown_request(request, channel_id, thread_ts)
-            
-            elif request.status == "waiting_for_info":
-                # Check if missing info was provided
-                still_missing = []
-                for entity in request.missing_entities:
-                    if not request.entities.get(entity):
-                        still_missing.append(entity)
-                
-                if not still_missing:
-                    # All required info provided, proceed with task
-                    request.status = "processing"
-                    result = await self.task_manager.execute_recipe(request.recipe, {
-                        "nlp_result": {"intent": request.intent, "entities": request.entities},
-                        "user_info": user_info,
-                        "channel_id": channel_id,
-                        "thread_ts": thread_ts,
-                        **request.entities  # Add entities directly to context
-                    })
-                    
-                    if result["status"] == "error":
-                        await self._handle_error(request, result["error"], channel_id, thread_ts)
-                    else:
-                        await self._handle_success(request, result, channel_id, thread_ts)
+                        await self._handle_error(request, execution_result["error"], channel_id, thread_ts)
                 else:
-                    # Still missing info, ask again
-                    request.missing_entities = still_missing
-                    await self._request_missing_info(request, channel_id, thread_ts)
+                    # Missing requirements, ask for more info
+                    missing = recipe_result.get("missing_requirements", [])
+                    if missing:
+                        missing_str = ", ".join(missing)
+                        await self._send_message(
+                            channel_id,
+                            f"I need some additional information to help with that. Could you please provide: {missing_str}?",
+                            thread_ts
+                        )
+                        await self.request_tracker.update_request(request, status="waiting_for_info")
+                    else:
+                        await self._handle_error(request, "Unable to process request", channel_id, thread_ts)
+            else:
+                # Unknown intent type, handle as conversational
+                response = await self.get_gpt_response(f"Generate a helpful response to: {text}")
+                await self._send_message(channel_id, response, thread_ts)
         
         except Exception as e:
             logger.error(f"Error handling message: {str(e)}")
-            logger.exception(e)
-            if request:
-                await self._handle_error(request, str(e), channel_id, thread_ts)
+            logger.error(str(e), exc_info=True)
+            error_msg = "I apologize, but I encountered an error while processing your message. Please try again."
+            await self._send_message(channel_id, error_msg, thread_ts)
 
+    async def handle_followup_response(self, request: 'Request', text: str, nlp_result: Dict[str, Any]):
+        """
+        Handle follow-up responses for requests waiting for more information.
+        
+        Process:
+        1. Extract and merge new entities with existing request
+        2. Check if all required information is now available
+        3. Execute recipe if complete, or request remaining info
+        4. Update request status accordingly
+        
+        Args:
+            request: The active request being updated
+            text: The follow-up message text
+            nlp_result: NLP analysis of the follow-up message
+        """
+        try:
+            # Update request with new information
+            entities = nlp_result.get("entities", {})
+            if entities:
+                await self.request_tracker.update_request(request, entities=entities)
+            
+            # Get recipe and check if we have all required info now
+            recipe_result = await self.cookbook.get_recipe(request.intent)
+            if recipe_result["status"] == "success":
+                missing = recipe_result.get("missing_requirements", [])
+                if not missing:
+                    # We have all required info, execute the recipe
+                    execution_context = {
+                        "nlp_result": nlp_result,
+                        "entities": request.entities,
+                        "channel_id": request.channel_id,
+                        "thread_ts": None,
+                        "request": request
+                    }
+                    execution_result = await self.task_manager.execute_recipe(
+                        recipe_result["recipe"],
+                        execution_context
+                    )
+                    if execution_result["status"] == "success":
+                        await self._send_message(
+                            request.channel_id,
+                            execution_result["details"]
+                        )
+                        await self.request_tracker.update_request(request, status="completed")
+                    else:
+                        await self._handle_error(request, execution_result["error"], request.channel_id, None)
+                else:
+                    # Still missing info, ask for it
+                    missing_str = ", ".join(missing)
+                    await self._send_message(
+                        request.channel_id,
+                        f"I still need some information. Could you please provide: {missing_str}?"
+                    )
+        except Exception as e:
+            logger.error(f"Error handling followup: {str(e)}")
+            await self._handle_error(request, str(e), request.channel_id, None)
+    
     async def _handle_error(self, request: 'Request', error: str, channel_id: str, thread_ts: Optional[str]):
-        """Handle error in request processing."""
-        request.status = "error"
-        error_prompt = (
-            f"I need to tell the user that I encountered an error while processing their "
-            f"{request.intent} request. The error was: {error}. "
-            f"Please format this as a friendly, professional message."
-        )
-        error_message = await self.get_gpt_response(error_prompt)
-        request.add_message(error_message, is_user=False)
+        """
+        Handle error in request processing with user-friendly messages.
+        
+        Actions:
+        1. Update request status if available
+        2. Log error details
+        3. Send appropriate user-facing message
+        4. Preserve error context for debugging
+        
+        Args:
+            request: The request that encountered an error (if any)
+            error: Error message or description
+            channel_id: Slack channel ID for response
+            thread_ts: Thread timestamp for threaded responses
+        """
+        if request:
+            await self.request_tracker.update_request(request, status="error", error=error)
+        
+        error_message = "I apologize, but I encountered an error while processing your request. "
+        error_message += "Please try again or rephrase your request."
+        
+        if self.flow_logger:
+            await self.flow_logger.log_event(
+                "Front Desk",
+                "Error Handling",
+                {
+                    "error": error,
+                    "request_id": request.request_id if request else None
+                }
+            )
+        
         await self._send_message(channel_id, error_message, thread_ts)
-        self.request_tracker.update_request(request)
-
-    async def _handle_success(self, request: 'Request', result: Dict[str, Any], channel_id: str, thread_ts: Optional[str]):
-        """Handle successful request completion."""
-        request.status = "completed"
-        success_prompt = (
-            f"I need to tell the user that I've completed their {request.intent} request. "
-            f"Additional details: {result.get('details', '')}. "
-            f"Please format this as a friendly, professional message."
-        )
-        success_message = await self.get_gpt_response(success_prompt)
-        request.add_message(success_message, is_user=False)
-        await self._send_message(channel_id, success_message, thread_ts)
-        self.request_tracker.update_request(request)
-
-    async def _request_missing_info(self, request: 'Request', channel_id: str, thread_ts: Optional[str]):
-        """Request missing information from user."""
-        missing_items = request.missing_entities
-        info_prompt = (
-            f"I need to ask the user for some additional information to help with their {request.intent} request. "
-            f"I need the following details: {', '.join(missing_items)}. "
-            f"Context from their previous messages: {[msg['message'] for msg in request.conversation_history if msg['is_user']]}. "
-            f"Please format this as a friendly question, explaining why this information is needed."
-        )
-        info_request = await self.get_gpt_response(info_prompt)
-        request.add_message(info_request, is_user=False)
-        await self._send_message(channel_id, info_request, thread_ts)
-        self.request_tracker.update_request(request)
-
-    async def _handle_unknown_request(self, request: 'Request', channel_id: str, thread_ts: Optional[str]):
-        """Handle unknown or invalid requests."""
-        request.status = "error"
-        help_prompt = (
-            f"I need to tell the user that I couldn't understand their request "
-            f"and suggest they try rephrasing it or use the help command to see what I can do."
-        )
-        help_message = await self.get_gpt_response(help_prompt)
-        request.add_message(help_message, is_user=False)
-        await self._send_message(channel_id, help_message, thread_ts)
-        self.request_tracker.update_request(request)
     
     def _check_missing_entities(self, recipe: Dict[str, Any], entities: Dict[str, Any]) -> List[str]:
         """Check which required entities are missing from the user's message."""

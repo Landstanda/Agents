@@ -1,0 +1,74 @@
+
+================================================================================
+[11:17:02 AM] User Message - Incoming Request
+----------------------------------------
+text: can you schedule a meeting for me for tomorrow at 11:23 am with Gabi?
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+================================================================================
+[11:17:03 AM] NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11', '23']
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 11:23 AM
+  - participants: ['Gab']
+urgency: 0.3
+needs_tracking: True
+message_length: 69
+
+================================================================================
+[11:17:03 AM] NLP Processor - Message Analysis
+----------------------------------------
+detected_intent: schedule_meeting
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11', '23']
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 11:23 AM
+  - participants: ['Gab']
+confidence: 0.0
+
+================================================================================
+[11:17:03 AM] Request Tracker - New Request Created
+----------------------------------------
+request_id: 8dba7393-317d-4702-922d-bfa1064e7992
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+initial_message: can you schedule a meeting for me for tomorrow at 11:23 am with Gabi?
+
+================================================================================
+[11:17:03 AM] Request Tracker - Request Updated
+----------------------------------------
+request_id: 8dba7393-317d-4702-922d-bfa1064e7992
+old_status: new
+new_status: new
+updates:
+  - intent: schedule_meeting
+  - entities: {'people': [], 'dates': [], 'numbers': ['11', '23'], 'emails': [], 'email_attributes': [], 'time': '2025-02-11 11:23 AM', 'participants': ['Gab']}
+
+================================================================================
+[11:17:03 AM] Cookbook Manager - Recipe Found
+----------------------------------------
+intent: schedule_meeting
+recipe: schedule_meeting
+status: missing_info
+missing_requirements:
+  - participants
+  - time
+
+================================================================================
+[11:17:03 AM] Request Tracker - Request Updated
+----------------------------------------
+request_id: 8dba7393-317d-4702-922d-bfa1064e7992
+old_status: new
+new_status: waiting_for_info
+updates:
+  - status: waiting_for_info

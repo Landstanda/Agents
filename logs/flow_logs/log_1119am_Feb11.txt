@@ -1,0 +1,79 @@
+
+================================================================================
+[11:19:22 AM] User Message - Incoming Request
+----------------------------------------
+text: Can you check my emails?
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+================================================================================
+[11:19:23 AM] NLP Processor - Message Analysis
+----------------------------------------
+intent: email_read
+entities:
+  - people: []
+  - dates: []
+  - numbers: []
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 11:23 AM
+  - participants: ['Gab']
+urgency: 0.1
+needs_tracking: True
+message_length: 24
+
+================================================================================
+[11:19:23 AM] NLP Processor - Message Analysis
+----------------------------------------
+detected_intent: email_read
+entities:
+  - people: []
+  - dates: []
+  - numbers: []
+  - emails: []
+  - email_attributes: []
+  - time: 2025-02-11 11:23 AM
+  - participants: ['Gab']
+confidence: 0.0
+
+================================================================================
+[11:19:23 AM] Request Tracker - Update Existing Request
+----------------------------------------
+request_id: 8dba7393-317d-4702-922d-bfa1064e7992
+status: waiting_for_info
+new_message: Can you check my emails?
+
+================================================================================
+[11:19:23 AM] Request Tracker - Request Updated
+----------------------------------------
+request_id: 8dba7393-317d-4702-922d-bfa1064e7992
+old_status: waiting_for_info
+new_status: waiting_for_info
+updates:
+  - intent: email_read
+  - entities: {'people': [], 'dates': [], 'numbers': [], 'emails': [], 'email_attributes': [], 'time': '2025-02-11 11:23 AM', 'participants': ['Gab']}
+
+================================================================================
+[11:19:23 AM] Cookbook Manager - Recipe Found
+----------------------------------------
+intent: email_read
+recipe: Email Reader
+status: missing_info
+missing_requirements:
+  - email_attributes
+
+================================================================================
+[11:19:23 AM] Request Tracker - Request Updated
+----------------------------------------
+request_id: 8dba7393-317d-4702-922d-bfa1064e7992
+old_status: waiting_for_info
+new_status: waiting_for_info
+updates:
+  - status: waiting_for_info
+
+================================================================================
+[11:19:59 AM] System - Shutdown
+----------------------------------------
+status: shutting_down
+time: 2025-02-11 11:19:59
+reason: error

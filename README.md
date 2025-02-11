@@ -37,27 +37,91 @@ cp .env.example .env
 - **Front Desk**: Handles Slack communication, message formatting, and direct execution of known tasks
 - **NLPProcessor**: Performs quick, rule-based natural language processing and task classification
 - **CEO**: Creates new recipes for unknown tasks and handles complex decision making
-- **CookbookManager**: Stores and manages task recipes/actions
+- **CookbookManager**: Stores manages recipes/chains, matching requests to recipes, informing Front Desk of missing information or recipe
 - **TaskManager**: Executes recipes and manages task state with priority-based processing
 - **GPTClient**: Handles AI-powered decision making with fallback capabilities
 
 ### Component Interactions
+
+The system processes messages through the following flows:
+
+#### 1. Conversational Message Flow
 ```
-User (Slack) -> Front Desk -> NLP Processor -> [Recipe Exists?]
-                     ^            |
-                     |           v
-                     |     [Yes] TaskManager (Priority Queue)
-                     |           |
-                     |           v
-                     ------- Response --------
-                     |
-                     |     [No] -> CEO -> [Create New Recipe]
-                     |                          |
-                     |                          v
-                     |                    CookbookManager
-                     |                          |
-                     |                          v
-                     -------- Response ----------
+Message -> NLP Processor [intent=conversational]
+           |
+           v
+      Front Desk -> GPT Response -> User
+```
+
+#### 2. Complete Task Request Flow
+```
+Message -> NLP Processor [intent=task]
+           |
+           v
+      Front Desk -> Request Tracker [create]
+           |
+           v
+    CookbookManager [recipe found]
+           |
+           v
+      TaskManager [execute]
+           |
+           v
+         User
+```
+
+#### 3. Incomplete Task Request Flow
+```
+Message -> NLP Processor [intent=task]
+           |
+           v
+      Front Desk -> Request Tracker [create]
+           |
+           v
+    CookbookManager [missing_info]
+           |
+           v
+      Front Desk -> Request Info -> User
+```
+
+#### 4. Unknown Task Request Flow
+```
+Message -> NLP Processor [intent=task]
+           |
+           v
+      Front Desk -> Request Tracker [create]
+           |
+           v
+    CookbookManager [not_found]
+           |
+           v
+         CEO [create_recipe]
+           |
+           v
+    CookbookManager [store]
+           |
+           v
+      TaskManager [execute]
+           |
+           v
+         User
+```
+
+#### 5. Follow-up Response Flow
+```
+Message -> NLP Processor [extract entities]
+           |
+           v
+      Front Desk -> Request Tracker [get_active]
+           |
+           v
+    CookbookManager [validate]
+           |
+           v
+      TaskManager [execute] or Front Desk [request more info]
+           |
+           v
+         User
 ```
 
 ## Features
@@ -192,6 +256,9 @@ python -m pytest tests/
 
 Run specific test modules:
 ```bash
+# Test message flow
+python -m pytest tests/test_message_flow.py -v
+
 # Test NLP processor
 python -m pytest tests/test_nlp_processor.py
 
@@ -203,6 +270,11 @@ python -m pytest tests/test_ceo_responses.py
 
 # Test integration flows
 python -m pytest tests/test_integration_flows.py
+```
+
+For verbose output and debugging:
+```bash
+python -m pytest tests/test_message_flow.py -v --log-cli-level=DEBUG
 ```
 
 ### Test Coverage
@@ -388,4 +460,33 @@ The following credentials are required:
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in your credentials. Never commit the `.env` file to version control. 
+Copy `.env.example` to `.env` and fill in your credentials. Never commit the `.env` file to version control.
+
+## Recent Updates (2024)
+
+### Message Flow Improvements
+- Enhanced NLP processing with prioritized intent classification
+- Improved entity extraction for time and participants
+- Better handling of conversational vs task intents
+- Refined follow-up response handling
+- Added robust error handling and user-friendly messages
+
+### Entity Extraction Enhancements
+- Improved time format recognition (12/24 hour formats, AM/PM)
+- Better participant name extraction from natural language
+- Enhanced context preservation across messages
+- Smarter merging of entities from follow-up messages
+
+### Testing Infrastructure
+- Comprehensive test suite for message flow
+- Mock setup for async Slack client operations
+- Entity extraction validation tests
+- Conversation state management tests
+- Error handling and recovery tests
+
+### NLP Processor Updates
+- Enhanced intent classification with confidence scores
+- Improved conversation state management
+- Better urgency calculation based on multiple factors
+- Refined temporal context extraction
+- Enhanced pattern matching for various message types

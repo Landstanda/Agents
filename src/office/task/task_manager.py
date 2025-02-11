@@ -21,6 +21,7 @@ class TaskManager:
         self._task_lock = asyncio.Lock()  # Lock for task queue operations
         self._processing = False  # Flag to track if we're processing tasks
         self._request_map = {}  # Map task_id to request_id
+        self.flow_logger = None  # Will be set by front_desk
         logger.info("Task Manager initialized")
     
     async def execute_recipe(self, recipe: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
@@ -53,6 +54,18 @@ class TaskManager:
             # Create task entry
             task_id = f"{recipe['name']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "Task Manager",
+                    "Recipe Execution Started",
+                    {
+                        "task_id": task_id,
+                        "recipe": recipe["name"],
+                        "urgency": urgency,
+                        "context": {k: v for k, v in context.items() if k not in ["user_info", "nlp_result"]}
+                    }
+                )
+            
             # Extract entities from context
             entities = {}
             for key, value in context.items():
@@ -81,14 +94,57 @@ class TaskManager:
             
             # Execute steps immediately for now (we can make this async later)
             execution_result = {"status": "success", "details": []}
-            for step in recipe["steps"]:
+            for i, step in enumerate(recipe["steps"], 1):
+                if self.flow_logger:
+                    await self.flow_logger.log_event(
+                        "Task Manager",
+                        f"Executing Step {i}",
+                        {
+                            "task_id": task_id,
+                            "step": step["action"],
+                            "params": step.get("params", {})
+                        }
+                    )
+                
                 step_result = await self._execute_step(step, execution_context)
+                
+                if self.flow_logger:
+                    await self.flow_logger.log_event(
+                        "Task Manager",
+                        f"Step {i} Result",
+                        {
+                            "task_id": task_id,
+                            "status": step_result["status"],
+                            "details": step_result.get("details", "No details")
+                        }
+                    )
+                
                 if step_result["status"] == "error":
+                    if self.flow_logger:
+                        await self.flow_logger.log_event(
+                            "Task Manager",
+                            "Recipe Execution Failed",
+                            {
+                                "task_id": task_id,
+                                "error": step_result["error"]
+                            }
+                        )
                     return {
                         "status": "error",
                         "error": step_result["error"]
                     }
                 execution_result["details"].append(step_result["details"])
+            
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "Task Manager",
+                    "Recipe Execution Completed",
+                    {
+                        "task_id": task_id,
+                        "status": "success",
+                        "details": " ".join(execution_result["details"])
+                    }
+                )
             
             return {
                 "status": "success",
@@ -97,10 +153,20 @@ class TaskManager:
             }
             
         except Exception as e:
-            logger.error(f"Error executing recipe: {str(e)}")
+            error_msg = f"Error executing recipe: {str(e)}"
+            logger.error(error_msg)
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "Task Manager",
+                    "Recipe Execution Error",
+                    {
+                        "error": error_msg,
+                        "recipe": recipe["name"]
+                    }
+                )
             return {
                 "status": "error",
-                "error": f"Failed to execute recipe: {str(e)}"
+                "error": error_msg
             }
     
     async def _process_queue(self):
@@ -218,15 +284,29 @@ class TaskManager:
             elif step_type == "notification":
                 return await self._handle_notification(step, context)
             else:
+                error_msg = f"Unknown step type: {step_type}"
+                if self.flow_logger:
+                    await self.flow_logger.log_event(
+                        "Task Manager",
+                        "Step Execution Error",
+                        {"error": error_msg}
+                    )
                 return {
                     "status": "error",
-                    "error": f"Unknown step type: {step_type}"
+                    "error": error_msg
                 }
                 
         except Exception as e:
+            error_msg = f"Step execution failed: {str(e)}"
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "Task Manager",
+                    "Step Execution Error",
+                    {"error": error_msg}
+                )
             return {
                 "status": "error",
-                "error": f"Step execution failed: {str(e)}"
+                "error": error_msg
             }
     
     async def _handle_api_call(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:

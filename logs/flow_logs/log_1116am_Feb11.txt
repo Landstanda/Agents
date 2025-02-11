@@ -1,0 +1,14 @@
+
+================================================================================
+[11:16:56 AM] System - Initialization
+----------------------------------------
+status: initialized
+components:
+  - FrontDesk
+  - NLPProcessor
+  - CookbookManager
+  - TaskManager
+  - CEO
+  - RequestTracker
+timestamp: 2025-02-11 11:16:56
+log_directory: /home/jeff/Agents/logs/flow_logs
