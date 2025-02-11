@@ -96,6 +96,53 @@ User (Slack) -> Front Desk -> NLP Processor -> [Recipe Exists?]
   - Task history tracking
   - Concurrent task processing
 
+## Recipe Management
+
+### Recipe Creation Process
+1. **CEO Analysis**: When an unknown request is received, the CEO component analyzes it using GPT-4 and available ingredients
+2. **Recipe Generation**: A new recipe is created following the standard YAML format:
+   ```yaml
+   name: <clear name>
+   description: <clear description>
+   intent: <main intent>
+   common_triggers:
+     - <trigger phrase 1>
+     - <trigger phrase 2>
+   required_entities:
+     - <required entity 1>
+     - <required entity 2>
+   steps:
+     - action: <ingredient action>
+       params:
+         param1: value1
+   success_criteria:
+     - <criterion 1>
+     - <criterion 2>
+   ```
+3. **Validation**: The recipe is validated against available ingredients
+4. **Storage**: Valid recipes are stored in `src/office/cookbook/recipes.yaml`
+5. **NLP Update**: NLP processors automatically refresh their lexicons
+6. **Testing**: New recipes should be tested using the test suite in `tests/test_office_flow.py`
+
+### Recipe Testing
+To test a recipe:
+1. Add test cases to `tests/test_office_flow.py`
+2. Include both successful and error scenarios
+3. Test the complete flow:
+   - NLP processing
+   - Recipe matching
+   - Entity collection
+   - Task execution
+4. Monitor the detailed logging output to verify each step
+
+### Recipe Requirements
+When creating new recipes:
+1. Use only actions from `src/office/cookbook/ingredients.yaml`
+2. Ensure all required fields are present
+3. Provide clear success criteria
+4. Include common trigger phrases
+5. List all required entities
+
 ## Setup
 
 1. Install dependencies:
@@ -226,9 +273,58 @@ Response to User
 
 ## Logging
 
-Logs are written to:
-- Console (INFO level)
-- front_desk.log (DEBUG level)
+The system uses a comprehensive logging system with multiple log types:
+
+### Flow Logging
+- **Location**: `logs/flow_logs/`
+- **Format**: `log_HHMMam_MonDD.txt` (e.g., `log_1123am_Feb11.txt`)
+- **Purpose**: Tracks the complete flow of user interactions and system responses
+- **Features**:
+  - One log file per session
+  - Clear session start header
+  - Timestamped events
+  - Structured component logging
+  - Detailed event information
+  - Error tracking
+
+Example flow log format:
+```
+================================================================================
+Session Started: 11:23:55 AM Feb 11, 2025
+================================================================================
+
+================================================================================
+[11:23:55 AM] System - Initialization
+----------------------------------------
+status: initialized
+components:
+  - FrontDesk
+  - NLPProcessor
+  - CookbookManager
+  - TaskManager
+  - CEO
+  - RequestTracker
+```
+
+### System Logging
+- **Debug Log**: `logs/front_desk_debug_YYYYMMDD.log`
+  - Detailed debugging information
+  - Component initialization
+  - State changes
+  - Performance metrics
+
+- **Error Log**: `logs/front_desk_error_YYYYMMDD.log`
+  - Error tracking
+  - Exception details
+  - Stack traces
+  - Recovery attempts
+
+### Console Output
+- Real-time status updates
+- Service initialization
+- Component status
+- Critical errors
+- User interactions
 
 ## Contributing
 
