@@ -31,8 +31,8 @@ class CookbookManager:
                 "intent": "document",
                 "description": "Create and manage documents",
                 "steps": [
-                    {"action": "create_document", "params": {"type": "{doc_type}"}},
-                    {"action": "add_content", "params": {"content": "{content}"}}
+                    {"type": "api_call", "action": "create_document", "params": {"type": "{doc_type}"}},
+                    {"type": "api_call", "action": "add_content", "params": {"content": "{content}"}}
                 ],
                 "required_entities": ["doc_type"],
                 "keywords": ["document", "create", "write", "record"],
@@ -44,9 +44,9 @@ class CookbookManager:
                 "intent": "research",
                 "description": "Research a topic and create a detailed report",
                 "steps": [
-                    {"action": "search_info", "params": {"topic": "{topic}"}},
-                    {"action": "analyze_results", "params": {"depth": "detailed"}},
-                    {"action": "create_summary", "params": {"format": "report"}}
+                    {"type": "api_call", "action": "search_info", "params": {"topic": "{topic}"}},
+                    {"type": "api_call", "action": "analyze_results", "params": {"depth": "detailed"}},
+                    {"type": "api_call", "action": "create_summary", "params": {"format": "report"}}
                 ],
                 "required_entities": ["topic"],
                 "keywords": ["research", "analyze", "report", "investigate"],
@@ -58,8 +58,16 @@ class CookbookManager:
                 "intent": "schedule_meeting",
                 "description": "Schedule a meeting with participants",
                 "steps": [
-                    {"action": "check_availability", "params": {"time": "{time}", "participants": "{participants}"}},
-                    {"action": "create_meeting", "params": {"time": "{time}", "participants": "{participants}"}}
+                    {
+                        "type": "api_call",
+                        "action": "check_availability",
+                        "params": {"time": "{time}", "participants": "{participants}"}
+                    },
+                    {
+                        "type": "api_call",
+                        "action": "create_meeting",
+                        "params": {"time": "{time}", "participants": "{participants}"}
+                    }
                 ],
                 "required_entities": ["time", "participants"],
                 "keywords": ["schedule", "meeting", "calendar", "invite"],
@@ -359,14 +367,32 @@ class CookbookManager:
                 }
 
             # Get entities from NLP result
-            provided_entities = nlp_result.get("entities", {})
+            provided_entities = {}
+            if isinstance(nlp_result, dict):
+                provided_entities = nlp_result.get("entities", {})
+            elif isinstance(nlp_result, str):
+                # Handle case where nlp_result is just the intent string
+                return {
+                    "status": "missing_info",
+                    "recipe": recipe,
+                    "missing_requirements": list(required_entities),
+                    "suggested_next_steps": "request_info",
+                    "details": f"Recipe found for {nlp_result} but requires additional information"
+                }
             
             # Check each required entity
             missing = []
             for entity in required_entities:
-                if entity not in provided_entities or provided_entities[entity] is None:
-                    missing.append(entity)
-                elif entity == "time" and not provided_entities[entity]:  # Special check for time
+                entity_value = provided_entities.get(entity)
+                
+                # Special handling for different entity types
+                if entity == "time":
+                    if not entity_value or not isinstance(entity_value, str):
+                        missing.append(entity)
+                elif entity == "participants":
+                    if not entity_value or not isinstance(entity_value, list) or not entity_value:
+                        missing.append(entity)
+                elif not entity_value:  # General case for missing or None values
                     missing.append(entity)
 
             if not missing:
@@ -375,7 +401,7 @@ class CookbookManager:
                     "recipe": recipe,
                     "missing_requirements": [],
                     "suggested_next_steps": "execute_recipe",
-                    "details": "Recipe found with no missing requirements"
+                    "details": "Recipe found with all required information"
                 }
 
             return {

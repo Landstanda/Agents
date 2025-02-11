@@ -1,11 +1,12 @@
-# Google authentication
+# Credentials and Secrets
+.env
+.env.*
+!.env.example
 credentials.json
 token.pickle
 *.pickle
-
-# Environment variables
-.env
-.env.*
+.auth_tokens/
+.credentials/
 
 # Python
 __pycache__/
@@ -52,4 +53,5 @@ front_desk.log
 htmlcov/
 
 # Local development
-.DS_Store 
+.DS_Store
+Thumbs.db 

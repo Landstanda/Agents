@@ -8,17 +8,19 @@ from src.office.reception.front_desk import FrontDesk
 
 # Global front desk instance for signal handling
 front_desk = None
+logger = None
 
 def handle_shutdown(signum, frame):
     """Handle graceful shutdown on signals."""
-    global front_desk
+    global front_desk, logger
     if front_desk:
-        logger.info("Shutdown signal received, stopping Front Desk...")
+        if logger:
+            logger.info("Shutdown signal received, stopping Front Desk...")
         front_desk.running = False
 
 async def main():
     """Run the Front Desk service."""
-    global front_desk
+    global front_desk, logger
     
     # Set up logging
     logger = setup_logging()

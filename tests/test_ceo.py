@@ -1,5 +1,5 @@
 import pytest
-from src.office.ceo.ceo import CEO
+from src.office.executive.ceo import CEO
 
 @pytest.fixture
 def ceo():

@@ -1,9 +1,5 @@
 """
-The office package contains all core office functionality including:
-- CEO (decision making)
-- Reception (Slack interface)
-- Management (task execution)
-- Boardroom (multi-perspective analysis)
+Office package containing core functionality.
 """
 
 __version__ = "0.1.0" 

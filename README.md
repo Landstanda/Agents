@@ -2,6 +2,35 @@
 
 A smart office assistant that processes requests through Slack and manages various office tasks.
 
+## Security Notice
+
+⚠️ **Important**: This project uses various API keys and tokens. Never commit these directly to the repository. Always use environment variables and keep your `.env` file private.
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/office-assistant.git
+cd office-assistant
+```
+
+2. Create and activate a virtual environment:
+```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Set up environment variables:
+```bash
+cp .env.example .env
+# Edit .env with your actual credentials
+```
+
 ## Components
 
 ### Core Components
@@ -141,6 +170,23 @@ The test suite includes:
 
 ## Architecture
 
+### Request Tracker Flow
+```
+User Message → FrontDesk
+  ↓
+Request Created
+  ↓
+NLP Processing → Updates intent/entities
+  ↓
+Cookbook Matching → Updates recipe/requirements
+  ↓
+[If needed] CEO Consultation → Updates priority/recipe
+  ↓
+Task Manager Execution → Updates status/completion
+  ↓
+Response to User
+```
+
 ### Front Desk
 - Handles all Slack communication via Socket Mode
 - Maintains professional tone
@@ -203,4 +249,47 @@ Logs are written to:
 - [x] Task history tracking
 - [x] Error task handling
 - [ ] Analytics dashboard
-- [ ] Voice command support 
+- [ ] Voice command support
+
+## Security and Credentials
+
+The following credentials are required:
+
+1. **Slack Configuration**
+   - Bot Token (`SLACK_BOT_TOKEN`)
+   - App Token (`SLACK_APP_TOKEN`)
+   - Required scopes:
+     - channels:manage
+     - chat:write
+     - channels:read
+     - channels:join
+     - channels:history
+     - groups:history
+     - im:history
+     - conversations.connect:write
+     - app_mentions:read
+     - im:write
+     - groups:read
+     - mpim:history
+     - mpim:write
+     - users:read
+
+2. **OpenAI Configuration**
+   - API Key (`OPENAI_API_KEY`)
+
+3. **Google Configuration**
+   - Credentials file
+   - Token directory
+   - Required scopes for Gmail, Drive, Calendar, etc.
+
+4. **Trello Configuration**
+   - API Key
+   - Token
+
+5. **Email Configuration**
+   - IMAP settings
+   - App-specific password
+
+## Environment Variables
+
+Copy `.env.example` to `.env` and fill in your credentials. Never commit the `.env` file to version control. 

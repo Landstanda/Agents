@@ -1,162 +1,244 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import logging
+import yaml
+from pathlib import Path
 from openai import AsyncOpenAI
+import os
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 class CEO:
     """
-    A simplified CEO that works directly with Front Desk to process requests.
-    Focuses on making decisions about user requests and providing structured responses.
+    The CEO is responsible for high-level decision making and strategy.
+    It can analyze unknown requests and create new recipes by combining
+    available ingredients (capabilities) in novel ways.
     """
     
-    def __init__(self):
-        """Initialize the CEO with basic configuration."""
+    def __init__(self, cookbook_manager=None, task_manager=None):
+        """Initialize the CEO with required components."""
         self.name = "Michael"
         self.title = "CEO"
+        self.cookbook_manager = cookbook_manager
+        self.task_manager = task_manager
+        self.ingredients_file = Path("src/office/cookbook/ingredients.yaml")
+        self.ingredients = self._load_ingredients()
+        self.openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         logger.info(f"{self.name} ({self.title}) is now online")
+    
+    def _load_ingredients(self) -> Dict[str, Any]:
+        """Load the ingredients file."""
+        try:
+            if not self.ingredients_file.exists():
+                logger.error("Ingredients file not found!")
+                return {}
+            
+            with open(self.ingredients_file, 'r') as f:
+                return yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f"Error loading ingredients: {str(e)}")
+            return {}
     
     async def consider_request(
         self,
         message: str,
-        context: Optional[Dict[str, Any]] = None
+        context: Optional[Dict[str, Any]] = None,
+        request=None
     ) -> Dict[str, Any]:
         """
-        Consider a request and provide a structured response.
-        
-        Args:
-            message: The user's request message
-            context: Additional context including NLP analysis
-            
-        Returns:
-            Dict containing:
-                - status: "success" or "error"
-                - decision: What to do about the request
-                - confidence: How confident we are (0-1)
-                - requires_consultation: Whether we need more input
-                - matched_recipes: List of relevant action types
-                - notes: Additional information
+        Consider a request and determine how to handle it.
+        For unknown requests, attempts to create a new recipe.
         """
         try:
             if not message:
                 raise ValueError("Empty message received")
             
-            # Extract NLP analysis if available
-            nlp_analysis = context.get("nlp_analysis", {}) if context else {}
-            intents = nlp_analysis.get("intents", [])
-            urgency = nlp_analysis.get("urgency", 0.5)
+            # Extract context
+            nlp_result = context.get("nlp_result", {}) if context else {}
+            intent = nlp_result.get("intent")
             
-            # Map intents to recipes
-            recipes = []
-            if "email_read" in intents:
-                recipes.append({
-                    "name": "email_processing",
-                    "type": "read",
-                    "confidence": 0.8
-                })
-            if "email_send" in intents:
-                recipes.append({
-                    "name": "email_processing",
-                    "type": "send",
-                    "confidence": 0.8
-                })
-            if "scheduling" in intents or "meeting_scheduler" in intents:
-                recipes.append({
-                    "name": "meeting_scheduler",
-                    "confidence": 0.9
-                })
-            if "research" in intents:
-                recipes.append({
-                    "name": "research_report",
-                    "confidence": 0.7
-                })
-            if "document" in intents:
-                recipes.append({
-                    "name": "document_management",
-                    "confidence": 0.7
-                })
+            # Try to find existing recipe first
+            if self.cookbook_manager:
+                cookbook_response = self.cookbook_manager.get_recipe(intent)
+                if cookbook_response["status"] == "success":
+                    return {
+                        "status": "success",
+                        "decision": "I'll handle this with an existing recipe.",
+                        "confidence": 0.9,
+                        "requires_consultation": False,
+                        "recipe": cookbook_response["recipe"],
+                        "notes": "Using existing recipe"
+                    }
             
-            # Determine confidence and consultation needs
-            if not recipes:
-                response = {
-                    "status": "success",
-                    "decision": (
-                        "I apologize, but I'm not sure how to help with this request. "
-                        "Could you please rephrase it or let me know more specifically what you need?"
-                    ),
-                    "confidence": 0.1,
+            # If no recipe found, try to create one
+            new_recipe = await self._create_recipe(message, nlp_result)
+            if not new_recipe:
+                return {
+                    "status": "error",
+                    "decision": "I couldn't figure out how to help with this request.",
+                    "confidence": 0.0,
                     "requires_consultation": True,
-                    "matched_recipes": [],
-                    "notes": "No matching capabilities found"
+                    "notes": "Failed to create recipe"
                 }
-                logger.info(f"CEO Response: {response['decision']}")
-                return response
             
-            # Handle multi-recipe scenarios
-            if len(recipes) > 1:
-                response = {
-                    "status": "success",
-                    "decision": (
-                        "I understand your request involves multiple steps. "
-                        "I'll help coordinate these activities to ensure everything is handled properly."
-                    ),
-                    "confidence": sum(r["confidence"] for r in recipes) / len(recipes),
-                    "requires_consultation": True,
-                    "matched_recipes": recipes,
-                    "notes": "Multiple steps identified"
-                }
-                logger.info(f"CEO Response: {response['decision']}")
-                return response
+            # Add new recipe to cookbook
+            if self.cookbook_manager:
+                added = await self.cookbook_manager.add_recipe(new_recipe)
+                if not added:
+                    logger.error("Failed to add new recipe to cookbook")
             
-            # Handle single recipe scenarios
-            recipe = recipes[0]
-            if recipe["name"] == "email_processing":
-                action_type = recipe.get("type", "read")
-                decision = (
-                    "I'll help you process your emails. "
-                    f"I understand you want to {action_type} emails."
-                )
-            elif recipe["name"] == "meeting_scheduler":
-                decision = (
-                    "I'll help you schedule the meeting. "
-                    "I'll make sure to coordinate with all participants."
-                )
-            elif recipe["name"] == "research_report":
-                decision = (
-                    "I'll help you research this topic and prepare a report. "
-                    "I'll make sure to include relevant data and insights."
-                )
-            elif recipe["name"] == "document_management":
-                decision = (
-                    "I'll help you with the document. "
-                    "I'll ensure it meets our quality standards."
-                )
-            else:
-                decision = "I'll help you with this request."
+            # Update request if provided
+            if request:
+                request.recipe = new_recipe
+                request.status = "processing"
             
-            response = {
+            return {
                 "status": "success",
-                "decision": decision,
-                "confidence": recipe["confidence"],
+                "decision": "I've created a new way to handle this request.",
+                "confidence": 0.8,
                 "requires_consultation": False,
-                "matched_recipes": recipes,
-                "notes": f"Using {recipe['name']} capability"
+                "recipe": new_recipe,
+                "notes": "Created new recipe"
             }
-            logger.info(f"CEO Response: {response['decision']}")
-            return response
             
         except Exception as e:
             logger.error(f"Error processing request: {str(e)}")
-            response = {
+            return {
                 "status": "error",
                 "decision": None,
                 "confidence": 0.0,
                 "requires_consultation": True,
-                "matched_recipes": [],
                 "notes": str(e)
             }
-            logger.error(f"CEO Error Response: {response['notes']}")
-            return response
+    
+    async def _create_recipe(self, message: str, nlp_result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Create a new recipe by analyzing the request and available ingredients."""
+        try:
+            # Prepare the system prompt with example
+            system_prompt = f"""You are {self.name}, the CEO of an AI-powered office.
+            Your task is to create a new recipe (workflow) to handle a user request.
+            
+            Available ingredients (capabilities) are:
+            {yaml.dump(self.ingredients, default_flow_style=False)}
+            
+            Create a recipe that combines these ingredients to handle the request.
+            The recipe must follow this exact format:
+
+            name: <clear name>
+            description: <clear description>
+            intent: <main intent>
+            common_triggers:
+              - <trigger phrase 1>
+              - <trigger phrase 2>
+            required_entities:
+              - <required entity 1>
+              - <required entity 2>
+            steps:
+              - action: <ingredient action>
+                params:
+                  param1: value1
+              - action: <ingredient action>
+                params:
+                  param1: value1
+            success_criteria:
+              - <criterion 1>
+              - <criterion 2>
+
+            Rules:
+            1. Use ONLY actions that exist in the ingredients list
+            2. Each step must have an action and params
+            3. All fields are required
+            4. No markdown code block markers
+            5. Valid YAML format
+            6. Intent should be a simple identifier (e.g., create_summary, not "Create Summary")
+            7. Common triggers should be actual phrases a user might say
+            8. Required entities should be information needed from the user
+
+            Analyze the request and create an appropriate recipe following these rules exactly."""
+            
+            # Get GPT's recipe creation
+            response = await self.openai_client.chat.completions.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Create a recipe for this request: {message}\n\nRemember to follow the exact format and rules specified."}
+                ],
+                temperature=0.7
+            )
+            
+            if not response or not response.choices or not response.choices[0].message:
+                logger.error("No response received from OpenAI")
+                return None
+            
+            # Get the content and clean it
+            recipe_yaml = response.choices[0].message.content
+            if not recipe_yaml:
+                logger.error("Empty response content from OpenAI")
+                return None
+            
+            # Remove any markdown code block markers and clean whitespace
+            recipe_yaml = recipe_yaml.replace("```yaml", "").replace("```", "").strip()
+            
+            try:
+                # Parse the YAML response
+                new_recipe = yaml.safe_load(recipe_yaml)
+                
+                if not isinstance(new_recipe, dict):
+                    logger.error("Recipe must be a dictionary")
+                    return None
+                
+                # Validate required fields
+                required_fields = {"name", "description", "intent", "steps", "common_triggers", "required_entities", "success_criteria"}
+                missing_fields = required_fields - set(new_recipe.keys())
+                
+                if missing_fields:
+                    logger.error(f"Recipe missing required fields: {missing_fields}")
+                    return None
+                
+                # Validate steps
+                if not isinstance(new_recipe["steps"], list) or not new_recipe["steps"]:
+                    logger.error("Recipe must have at least one step")
+                    return None
+                
+                for step in new_recipe["steps"]:
+                    if not isinstance(step, dict) or "action" not in step or "params" not in step:
+                        logger.error("Each step must be a dictionary with 'action' and 'params' fields")
+                        return None
+                    
+                    # Validate action exists in ingredients
+                    action_found = False
+                    for category in self.ingredients.values():
+                        for subcategory in category.values():  # Fix: Access values of subcategory dict
+                            for ingredient in subcategory:
+                                if isinstance(ingredient, dict) and ingredient.get("name") == step["action"]:
+                                    action_found = True
+                                    break
+                            if action_found:
+                                break
+                        if action_found:
+                            break
+                    
+                    if not action_found:
+                        logger.error(f"Invalid action in step: {step['action']}")
+                        return None
+                
+                # Add metadata
+                new_recipe["created_at"] = datetime.now().isoformat()
+                new_recipe["created_by"] = "ceo"
+                new_recipe["version"] = "1.0"
+                
+                return new_recipe
+                
+            except yaml.YAMLError as e:
+                logger.error(f"Error parsing recipe YAML: {str(e)}")
+                return None
+            except Exception as e:
+                logger.error(f"Error creating recipe: {str(e)}")
+                return None
+            
+        except Exception as e:
+            logger.error(f"Error creating recipe: {str(e)}")
+            return None
     
     def get_status(self) -> Dict[str, Any]:
         """Get the current status of the CEO."""
@@ -164,5 +246,6 @@ class CEO:
             "name": self.name,
             "title": self.title,
             "status": "online",
-            "ready": True
+            "ready": True,
+            "ingredients_loaded": len(self.ingredients) > 0
         } 

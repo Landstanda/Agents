@@ -171,6 +171,11 @@ class NLPProcessor:
                     "user_id": user_info.get("id")
                 })
 
+            # Determine if this needs request tracking
+            needs_tracking = True
+            if all_intents and all_intents[0] in ["greeting", "farewell", "gratitude", "pleasantry"]:
+                needs_tracking = False
+
             return {
                 "status": "success",
                 "raw_text": message,
@@ -180,7 +185,8 @@ class NLPProcessor:
                 "urgency": urgency,
                 "temporal_context": temporal,
                 "user_context": user_context,
-                "conversation_state": current_state
+                "conversation_state": current_state,
+                "needs_tracking": needs_tracking  # New field indicating if request tracking is needed
             }
             
         except Exception as e:
@@ -214,7 +220,15 @@ class NLPProcessor:
         
         logger.debug(f"Extracting intents from: {text}")
         
-        # First check task lexicon for exact matches
+        # First check for conversational intents as they should take priority
+        for intent_type, patterns in self.conversational_patterns.items():
+            if any(re.search(pattern, text) for pattern in patterns):
+                logger.debug(f"Found conversational intent: {intent_type}")
+                found_intents.append(intent_type)
+                # For conversational intents, we can return immediately as they take precedence
+                return found_intents
+        
+        # If no conversational intent found, check task lexicon for exact matches
         for phrase, intent in self.task_lexicon["intents"].items():
             if phrase in text:
                 logger.debug(f"Found exact match: {phrase} -> {intent}")
@@ -260,14 +274,6 @@ class NLPProcessor:
             if schedule_match:
                 logger.debug(f"Found scheduling terms: {schedule_match}")
                 found_intents.append("schedule_meeting")
-        
-        # Only check conversational intents if no task intents were found
-        if not found_intents:
-            for intent_type, patterns in self.conversational_patterns.items():
-                if any(re.search(pattern, text) for pattern in patterns):
-                    logger.debug(f"Found conversational intent: {intent_type}")
-                    found_intents.append(intent_type)
-                    break
         
         logger.debug(f"Final extracted intents: {found_intents}")
         return found_intents
@@ -318,8 +324,11 @@ class NLPProcessor:
         return entities
 
     def _extract_time_info(self, text: str) -> Optional[str]:
-        """Enhanced time extraction."""
-        text = text.lower()
+        """Enhanced time extraction with better validation."""
+        if not text or not isinstance(text, str):
+            return None
+            
+        text = text.lower().strip()
         
         # Try to identify time components
         time_found = None
@@ -332,9 +341,9 @@ class NLPProcessor:
             time_found = time_match.group()
             
             # Look for period indicators
-            if "morning" in text or "am" in text or "a.m" in text:
+            if any(p in text for p in ["morning", "am", "a.m"]):
                 period = "AM"
-            elif "afternoon" in text or "evening" in text or "pm" in text or "p.m" in text:
+            elif any(p in text for p in ["afternoon", "evening", "pm", "p.m"]):
                 period = "PM"
             elif int(time_found.split(":")[0]) < 8:  # Assume PM for times like 6:00 without AM/PM
                 period = "PM"
@@ -350,18 +359,31 @@ class NLPProcessor:
             date_context = "tomorrow"
         elif "today" in text:
             date_context = "today"
+        elif "next week" in text:
+            date_context = "next week"
         
         # Combine components
         if time_found:
+            time_str = f"{time_found} {period if period else ''}"
             if date_context:
-                return f"{date_context} at {time_found} {period if period else ''}"
-            return f"{time_found} {period if period else ''}"
+                return f"{date_context} at {time_str}".strip()
+            return time_str.strip()
             
+        # If no specific time found, check for general time indicators
+        for time_indicator in ["morning", "afternoon", "evening", "noon", "midnight"]:
+            if time_indicator in text:
+                if date_context:
+                    return f"{date_context} {time_indicator}"
+                return time_indicator
+                
         return None
 
     def _extract_participants(self, text: str) -> List[str]:
         """Enhanced participant extraction."""
         participants = []
+        
+        # Common words to ignore
+        ignore_words = {"hi", "hey", "hello", "dear", "thanks", "thank"}
         
         # Match @mentions, "with Name", "and Name" patterns, and standalone names
         patterns = [
@@ -376,7 +398,8 @@ class NLPProcessor:
             for match in matches:
                 # Get the actual name, removing any prefixes
                 participant = match.group().strip("@ ").strip("with ").strip("and ")
-                if (participant.lower() not in ["with", "and"] and 
+                if (participant.lower() not in ignore_words and  # Ignore common words
+                    participant.lower() not in ["with", "and"] and
                     participant not in participants and
                     len(participant) > 1):  # Avoid single letters
                     participants.append(participant)

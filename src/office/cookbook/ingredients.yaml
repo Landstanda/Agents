@@ -1,0 +1,116 @@
+# Office Assistant Ingredients
+# These are the basic building blocks (capabilities) that can be combined into recipes
+
+communication:
+  email:
+    - name: "read_email"
+      description: "Read and process incoming emails"
+      capabilities:
+        - Filter emails by criteria
+        - Extract information
+        - Process attachments
+    - name: "send_email"
+      description: "Send emails through various services"
+      capabilities:
+        - Template support
+        - Attachment handling
+        - HTML formatting
+  slack:
+    - name: "slack_message"
+      description: "Send and manage Slack messages"
+      capabilities:
+        - Send messages
+        - Manage channels
+        - Share files
+  notification:
+    - name: "notify"
+      description: "Send system notifications"
+      capabilities:
+        - Multi-channel alerts
+        - Priority handling
+        - Custom formatting
+
+document_management:
+  google_docs:
+    - name: "create_doc"
+      description: "Create and manage Google Docs"
+      capabilities:
+        - Document creation
+        - Text formatting
+        - Table operations
+        - Header/footer management
+    - name: "edit_doc"
+      description: "Edit existing Google Docs"
+      capabilities:
+        - Content modification
+        - Style updates
+        - Collaborative editing
+  file_management:
+    - name: "transfer_file"
+      description: "Handle file transfers between services"
+      capabilities:
+        - Upload/download
+        - File organization
+        - Format conversion
+    - name: "organize_files"
+      description: "Organize files based on rules"
+      capabilities:
+        - Rule-based organization
+        - Batch operations
+        - Metadata management
+
+scheduling:
+  calendar:
+    - name: "schedule_event"
+      description: "Create and manage calendar events"
+      capabilities:
+        - Event creation
+        - Attendee management
+        - Reminders setup
+    - name: "check_availability"
+      description: "Check calendar availability"
+      capabilities:
+        - Time slot search
+        - Conflict detection
+        - Free/busy lookup
+
+project_management:
+  trello:
+    - name: "manage_trello"
+      description: "Manage Trello boards and cards"
+      capabilities:
+        - Card creation
+        - List management
+        - Task tracking
+  sync:
+    - name: "sync_project"
+      description: "Sync project information between services"
+      capabilities:
+        - Cross-platform sync
+        - Status updates
+        - Progress tracking
+
+research:
+  web:
+    - name: "web_research"
+      description: "Perform web-based research"
+      capabilities:
+        - Web scraping
+        - Data extraction
+        - Information synthesis
+  analysis:
+    - name: "analyze_data"
+      description: "Analyze collected data"
+      capabilities:
+        - Data cleaning
+        - Pattern recognition
+        - Report generation
+
+voice:
+  input:
+    - name: "voice_input"
+      description: "Handle voice-to-text input"
+      capabilities:
+        - Real-time transcription
+        - Command recognition
+        - Voice processing 
