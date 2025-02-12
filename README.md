@@ -1,492 +1,161 @@
-# Office Assistant
+# AI Office Assistant
 
-A smart office assistant that processes requests through Slack and manages various office tasks.
+An intelligent Slack-based office assistant that handles tasks using natural language processing and a modular tool system.
 
-## Security Notice
+## Architecture Overview
 
-⚠️ **Important**: This project uses various API keys and tokens. Never commit these directly to the repository. Always use environment variables and keep your `.env` file private.
+The system is built around four core components that work together to handle user requests:
 
-## Installation
+1. **NLP Analyzer**: Processes incoming Slack messages to identify intent and extract entities using a local lexicon
+2. **Agent**: Executes services by coordinating and using the appropriate tools
+3. **Message Maker**: Generates and sends user messages via Slack using GPT
+4. **Service Maker**: Creates new services using GPT-4 by analyzing available tools
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/office-assistant.git
-cd office-assistant
+### Key Concepts
+
+- **Tools**: Modular components that provide specific functionality (e.g., calendar management, email handling)
+- **Services**: Step-by-step instructions that use tools to accomplish specific tasks
+- **Single-Task Focus**: The system handles one task at a time, maintaining focus until completion
+
+## System Flow
+
+```mermaid
+graph TD
+    A[User Request] --> B[NLP Analyzer]
+    B -->|Service Matched| C[Agent]
+    B -->|Missing Info| D[Message Maker]
+    B -->|No Match| E[Service Maker]
+    C -->|Success/Failure| D
+    D -->|User Response| B
+    E -->|New Service| C
+    E -->|Cannot Create| D
 ```
 
-2. Create and activate a virtual environment:
-```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-```
+### Detailed Flow Description
 
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Set up environment variables:
-```bash
-cp .env.example .env
-# Edit .env with your actual credentials
-```
-
-## Components
-
-### Core Components
-- **Front Desk**: Handles Slack communication, message formatting, and direct execution of known tasks
-- **NLPProcessor**: Performs quick, rule-based natural language processing and task classification
-- **CEO**: Creates new recipes for unknown tasks and handles complex decision making
-- **CookbookManager**: Stores manages recipes/chains, matching requests to recipes, informing Front Desk of missing information or recipe
-- **TaskManager**: Executes recipes and manages task state with priority-based processing
-- **GPTClient**: Handles AI-powered decision making with fallback capabilities
-
-### Component Interactions
-
-The system processes messages through the following flows:
-
-#### 1. Conversational Message Flow
-```
-Message -> NLP Processor [intent=conversational]
-           |
-           v
-      Front Desk -> GPT Response -> User
-```
-
-#### 2. Complete Task Request Flow
-```
-Message -> NLP Processor [intent=task]
-           |
-           v
-      Front Desk -> Request Tracker [create]
-           |
-           v
-    CookbookManager [recipe found]
-           |
-           v
-      TaskManager [execute]
-           |
-           v
-         User
-```
-
-#### 3. Incomplete Task Request Flow
-```
-Message -> NLP Processor [intent=task]
-           |
-           v
-      Front Desk -> Request Tracker [create]
-           |
-           v
-    CookbookManager [missing_info]
-           |
-           v
-      Front Desk -> Request Info -> User
-```
-
-#### 4. Unknown Task Request Flow
-```
-Message -> NLP Processor [intent=task]
-           |
-           v
-      Front Desk -> Request Tracker [create]
-           |
-           v
-    CookbookManager [not_found]
-           |
-           v
-         CEO [create_recipe]
-           |
-           v
-    CookbookManager [store]
-           |
-           v
-      TaskManager [execute]
-           |
-           v
-         User
-```
-
-#### 5. Follow-up Response Flow
-```
-Message -> NLP Processor [extract entities]
-           |
-           v
-      Front Desk -> Request Tracker [get_active]
-           |
-           v
-    CookbookManager [validate]
-           |
-           v
-      TaskManager [execute] or Front Desk [request more info]
-           |
-           v
-         User
-```
-
-## Features
-
-- **Intelligent Task Routing**:
-  - Automatic recognition of known vs unknown tasks
-  - Direct execution path for existing recipes
-  - Complex task handling through CEO
-  - Recipe creation and storage for future use
-  - Priority-based task execution with urgency levels
-  - FIFO ordering for equal-priority tasks
-
-- **Natural Language Processing**:
-  - Intent detection (email, scheduling, research, etc.)
-  - Entity extraction (emails, dates, numbers)
-  - Task complexity assessment
-  - Recipe matching
-  - Temporal context understanding
-  - User context tracking
-  - Urgency detection and prioritization
-
-- **Slack Integration**:
-  - Real-time message processing via Socket Mode
-  - Smart response formatting
-  - Thread support
-  - Comprehensive error handling
-  - Channel management
-  - Error recovery and graceful degradation
-
-- **Task Management**:
-  - Recipe-based task matching
-  - Multi-step task handling
-  - Priority-based processing
-  - Consultation detection
-  - Error task handling and recovery
-  - Task history tracking
-  - Concurrent task processing
-
-## Recipe Management
-
-### Recipe Creation Process
-1. **CEO Analysis**: When an unknown request is received, the CEO component analyzes it using GPT-4 and available ingredients
-2. **Recipe Generation**: A new recipe is created following the standard YAML format:
-   ```yaml
-   name: <clear name>
-   description: <clear description>
-   intent: <main intent>
-   common_triggers:
-     - <trigger phrase 1>
-     - <trigger phrase 2>
-   required_entities:
-     - <required entity 1>
-     - <required entity 2>
-   steps:
-     - action: <ingredient action>
-       params:
-         param1: value1
-   success_criteria:
-     - <criterion 1>
-     - <criterion 2>
+1. **Known Service Flow**
+   ```mermaid
+   sequenceDiagram
+       User->>NLP: Makes request
+       NLP->>Agent: Service + Variables
+       Agent->>Tools: Execute steps
+       Tools->>Agent: Results
+       Agent->>MessageMaker: Success/Failure
+       MessageMaker->>User: Completion message
    ```
-3. **Validation**: The recipe is validated against available ingredients
-4. **Storage**: Valid recipes are stored in `src/office/cookbook/recipes.yaml`
-5. **NLP Update**: NLP processors automatically refresh their lexicons
-6. **Testing**: New recipes should be tested using the test suite in `tests/test_office_flow.py`
 
-### Recipe Testing
-To test a recipe:
-1. Add test cases to `tests/test_office_flow.py`
-2. Include both successful and error scenarios
-3. Test the complete flow:
-   - NLP processing
-   - Recipe matching
-   - Entity collection
-   - Task execution
-4. Monitor the detailed logging output to verify each step
+2. **Missing Information Flow**
+   ```mermaid
+   sequenceDiagram
+       User->>NLP: Makes request
+       NLP->>MessageMaker: Missing info needed
+       MessageMaker->>User: Request for info
+       User->>NLP: Provides info
+       NLP->>Agent: Complete service + variables
+       Agent->>MessageMaker: Success/Failure
+       MessageMaker->>User: Completion message
+   ```
 
-### Recipe Requirements
-When creating new recipes:
-1. Use only actions from `src/office/cookbook/ingredients.yaml`
-2. Ensure all required fields are present
-3. Provide clear success criteria
-4. Include common trigger phrases
-5. List all required entities
+3. **New Service Creation Flow**
+   ```mermaid
+   sequenceDiagram
+       User->>NLP: Makes request
+       NLP->>ServiceMaker: Unknown intent
+       ServiceMaker->>ServiceMaker: Analyze tools
+       ServiceMaker->>Agent: New service
+       Agent->>Tools: Execute steps
+       Tools->>Agent: Results
+       Agent->>MessageMaker: Success/Failure
+       MessageMaker->>User: Completion message
+   ```
 
-## Setup
+## Component Details
 
-1. Install dependencies:
-```bash
-pip install -r requirements.txt
+### NLP Analyzer
+- Processes incoming Slack messages
+- Uses local lexicon to identify intents
+- Extracts entities and variables
+- Routes requests based on analysis results
+
+### Agent
+- Maintains single-task focus using busy state
+- Executes services step by step
+- Coordinates tool usage
+- Validates success criteria
+- Reports execution results
+
+### Message Maker
+- Generates user-friendly messages using GPT
+- Handles different message types:
+  - Information requests
+  - Success notifications
+  - Error messages
+  - Status updates
+
+### Service Maker
+- Creates new services using GPT-4
+- Analyzes available tools and capabilities
+- Generates step-by-step instructions
+- Validates service structure and requirements
+
+## Tools System
+
+Tools are modular components that provide specific functionality:
+
+```mermaid
+graph TD
+    A[Agent] --> B[Tool Manager]
+    B --> C[Calendar Tool]
+    B --> D[Email Tool]
+    B --> E[Document Tool]
+    B --> F[Custom Tools...]
 ```
 
-2. Set up environment variables in `.env`:
-```
-SLACK_BOT_TOKEN=xoxb-your-token
-SLACK_APP_TOKEN=xapp-your-token
-OPENAI_API_KEY=your-openai-key
-```
+Each tool:
+- Has a clear single responsibility
+- Provides specific actions
+- Returns standardized results
+- Is easily extensible
 
-3. Configure your Slack app:
-   - Enable Socket Mode
-   - Subscribe to these events:
-     - message.channels
-     - message.groups
-     - app_mention
-   - Add necessary bot scopes:
-     - chat:write
-     - channels:history
-     - channels:join
-     - channels:read
-     - groups:history
-     - app_mentions:read
+## Development
 
-## Running the Service
+### Prerequisites
+- Python 3.11+
+- Slack Bot Token
+- OpenAI API Key
 
-Start the Front Desk service:
-```bash
-python run_front_desk.py
-```
+### Setup
+1. Clone the repository
+2. Create a virtual environment:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Linux/Mac
+   # or
+   .venv\Scripts\activate  # Windows
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Set up environment variables:
+   ```bash
+   export SLACK_BOT_TOKEN="your-token"
+   export OPENAI_API_KEY="your-key"
+   ```
 
-For testing Socket Mode specifically:
-```bash
-python test_socket_mode.py
-```
-
-## Testing
-
-Run the test suite:
+### Running Tests
 ```bash
 python -m pytest tests/
 ```
-
-Run specific test modules:
-```bash
-# Test message flow
-python -m pytest tests/test_message_flow.py -v
-
-# Test NLP processor
-python -m pytest tests/test_nlp_processor.py
-
-# Test Front Desk
-python -m pytest tests/test_front_desk.py
-
-# Test CEO responses
-python -m pytest tests/test_ceo_responses.py
-
-# Test integration flows
-python -m pytest tests/test_integration_flows.py
-```
-
-For verbose output and debugging:
-```bash
-python -m pytest tests/test_message_flow.py -v --log-cli-level=DEBUG
-```
-
-### Test Coverage
-
-The test suite includes:
-- Unit tests for all components
-- Integration tests for component interactions
-- Flow tests for end-to-end scenarios
-- Error handling and recovery tests
-- Priority queue and task ordering tests
-- Concurrency and race condition tests
-
-## Architecture
-
-### Request Tracker Flow
-```
-User Message → FrontDesk
-  ↓
-Request Created
-  ↓
-NLP Processing → Updates intent/entities
-  ↓
-Cookbook Matching → Updates recipe/requirements
-  ↓
-[If needed] CEO Consultation → Updates priority/recipe
-  ↓
-Task Manager Execution → Updates status/completion
-  ↓
-Response to User
-```
-
-### Front Desk
-- Handles all Slack communication via Socket Mode
-- Maintains professional tone
-- Routes messages through NLP
-- Formats responses for users
-- Handles message deduplication
-- Manages error recovery and retries
-
-### NLP Processor
-- Quick, rule-based text analysis
-- Intent and entity extraction
-- Urgency detection
-- Temporal context analysis
-- Priority assessment
-
-### CEO
-- High-level decision making with GPT integration
-- Task prioritization
-- Resource allocation
-- Consultation management
-- Fallback handling when GPT is unavailable
-
-### Task Manager
-- Priority-based task queue
-- FIFO ordering for equal priorities
-- Concurrent task processing
-- Error handling and recovery
-- Task history tracking
-- Resource management
-
-### Cookbook Manager
-- Recipe matching
-- Task decomposition
-- Capability tracking
-- Success criteria management
-- Recipe validation
-
-## Logging
-
-The system uses a comprehensive logging system with multiple log types:
-
-### Flow Logging
-- **Location**: `logs/flow_logs/`
-- **Format**: `log_HHMMam_MonDD.txt` (e.g., `log_1123am_Feb11.txt`)
-- **Purpose**: Tracks the complete flow of user interactions and system responses
-- **Features**:
-  - One log file per session
-  - Clear session start header
-  - Timestamped events
-  - Structured component logging
-  - Detailed event information
-  - Error tracking
-
-Example flow log format:
-```
-================================================================================
-Session Started: 11:23:55 AM Feb 11, 2025
-================================================================================
-
-================================================================================
-[11:23:55 AM] System - Initialization
-----------------------------------------
-status: initialized
-components:
-  - FrontDesk
-  - NLPProcessor
-  - CookbookManager
-  - TaskManager
-  - CEO
-  - RequestTracker
-```
-
-### System Logging
-- **Debug Log**: `logs/front_desk_debug_YYYYMMDD.log`
-  - Detailed debugging information
-  - Component initialization
-  - State changes
-  - Performance metrics
-
-- **Error Log**: `logs/front_desk_error_YYYYMMDD.log`
-  - Error tracking
-  - Exception details
-  - Stack traces
-  - Recovery attempts
-
-### Console Output
-- Real-time status updates
-- Service initialization
-- Component status
-- Critical errors
-- User interactions
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Submit a pull request
+3. Make your changes
+4. Run tests
+5. Submit a pull request
 
-## Development Status
+## License
 
-- [x] Socket Mode integration
-- [x] NLP processing
-- [x] CEO decision making
-- [x] Recipe matching
-- [x] Response formatting
-- [x] Error recovery
-- [x] Thread support
-- [x] Priority-based task processing
-- [x] Task history tracking
-- [x] Error task handling
-- [ ] Analytics dashboard
-- [ ] Voice command support
-
-## Security and Credentials
-
-The following credentials are required:
-
-1. **Slack Configuration**
-   - Bot Token (`SLACK_BOT_TOKEN`)
-   - App Token (`SLACK_APP_TOKEN`)
-   - Required scopes:
-     - channels:manage
-     - chat:write
-     - channels:read
-     - channels:join
-     - channels:history
-     - groups:history
-     - im:history
-     - conversations.connect:write
-     - app_mentions:read
-     - im:write
-     - groups:read
-     - mpim:history
-     - mpim:write
-     - users:read
-
-2. **OpenAI Configuration**
-   - API Key (`OPENAI_API_KEY`)
-
-3. **Google Configuration**
-   - Credentials file
-   - Token directory
-   - Required scopes for Gmail, Drive, Calendar, etc.
-
-4. **Trello Configuration**
-   - API Key
-   - Token
-
-5. **Email Configuration**
-   - IMAP settings
-   - App-specific password
-
-## Environment Variables
-
-Copy `.env.example` to `.env` and fill in your credentials. Never commit the `.env` file to version control.
-
-## Recent Updates (2024)
-
-### Message Flow Improvements
-- Enhanced NLP processing with prioritized intent classification
-- Improved entity extraction for time and participants
-- Better handling of conversational vs task intents
-- Refined follow-up response handling
-- Added robust error handling and user-friendly messages
-
-### Entity Extraction Enhancements
-- Improved time format recognition (12/24 hour formats, AM/PM)
-- Better participant name extraction from natural language
-- Enhanced context preservation across messages
-- Smarter merging of entities from follow-up messages
-
-### Testing Infrastructure
-- Comprehensive test suite for message flow
-- Mock setup for async Slack client operations
-- Entity extraction validation tests
-- Conversation state management tests
-- Error handling and recovery tests
-
-### NLP Processor Updates
-- Enhanced intent classification with confidence scores
-- Improved conversation state management
-- Better urgency calculation based on multiple factors
-- Refined temporal context extraction
-- Enhanced pattern matching for various message types
+MIT License - See LICENSE file for details

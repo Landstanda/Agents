@@ -28,7 +28,7 @@ class DictationSystem:
         model_path = self._get_model_path(model_name)
         if not os.path.exists(model_path):
             self._download_model(model_path)
-        
+            
         try:
             print("\nLoading speech recognition model...")
             self.model = vosk.Model(model_path)
@@ -56,14 +56,12 @@ class DictationSystem:
         # Download small model for testing
         import urllib.request
         import zipfile
-        
         url = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
         zip_path = model_path + ".zip"
         
         try:
             print("Downloading...")
             urllib.request.urlretrieve(url, zip_path)
-            
             print("Extracting...")
             with zipfile.ZipFile(zip_path, 'r') as zip_ref:
                 zip_ref.extractall(os.path.dirname(model_path))
@@ -110,7 +108,6 @@ class DictationSystem:
     def toggle_listening(self):
         """Toggle dictation on/off"""
         self.is_listening = not self.is_listening
-        
         if self.is_listening:
             # Start processing thread
             self.process_thread = threading.Thread(target=self.process_audio)
@@ -140,8 +137,8 @@ class DictationSystem:
         print("\nDictation System Ready!")
         print("----------------------")
         print("Controls:")
-        print("  F9:  Start/Stop dictation")
-        print("  ESC: Exit")
+        print(" F9: Start/Stop dictation")
+        print(" ESC: Exit")
         print("----------------------")
         
         try:
@@ -151,11 +148,9 @@ class DictationSystem:
                                  dtype='int16',
                                  channels=1,
                                  callback=self.audio_callback):
-                
                 # Start keyboard listener
                 with keyboard.Listener(on_press=self.on_press) as listener:
                     listener.join()
-        
         except Exception as e:
             print(f"\nError: {str(e)}")
             print("Please check your microphone settings and try again.")
@@ -164,7 +159,7 @@ class DictationSystem:
 def main():
     parser = argparse.ArgumentParser(description="Local Dictation System")
     parser.add_argument("--model", default="vosk-model-small-en-us",
-                      help="Name of the Vosk model to use")
+                       help="Name of the Vosk model to use")
     args = parser.parse_args()
     
     try:

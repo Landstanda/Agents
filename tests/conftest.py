@@ -1,72 +1,98 @@
 import pytest
-import asyncio
+import os
 import yaml
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
-from typing import Dict, Any
+from openai import AsyncOpenAI
+from slack_sdk.web.async_client import AsyncWebClient
 
 @pytest.fixture
-def mock_slack_web_client():
-    """Mock Slack Web Client."""
-    client = AsyncMock()
-    client.auth_test = AsyncMock(return_value={"user_id": "U123", "user": "test-bot"})
-    client.users_info = AsyncMock(return_value={"user": {"real_name": "Test User"}})
-    client.chat_postMessage = AsyncMock()
-    return client
-
-@pytest.fixture
-def mock_slack_socket_client():
-    """Mock Slack Socket Client."""
-    client = AsyncMock()
-    client.connect = AsyncMock()
-    client.close = AsyncMock()
-    return client
-
-@pytest.fixture
-def sample_recipes():
-    """Load sample recipes for testing."""
-    recipes_path = Path("src/office/cookbook/recipes.yaml")
-    with open(recipes_path, 'r') as f:
-        return yaml.safe_load(f)
-
-@pytest.fixture
-def mock_openai_client():
-    """Mock OpenAI client."""
-    client = AsyncMock()
-    client.chat.completions.create = AsyncMock(
-        return_value=MagicMock(
-            choices=[MagicMock(message=MagicMock(content="Test response"))]
+def mock_openai():
+    """Mock OpenAI client with predefined responses."""
+    mock_client = MagicMock()
+    
+    # Mock chat completion response
+    mock_completion = AsyncMock()
+    mock_completion.choices = [
+        MagicMock(
+            message=MagicMock(
+                content="""
+                name: Test Service
+                description: A test service
+                intent: test_intent
+                triggers:
+                  - test this
+                  - run test
+                required_entities:
+                  - test_param
+                steps:
+                  - tool: test_tool
+                    action: test_action
+                    params:
+                      param1: value1
+                success_criteria:
+                  - Test completed
+                """
+            )
         )
-    )
-    return client
+    ]
+    
+    # Set up the chat completions structure
+    mock_client.chat = MagicMock()
+    mock_client.chat.completions = MagicMock()
+    mock_client.chat.completions.create = AsyncMock(return_value=mock_completion)
+    
+    return mock_client
 
 @pytest.fixture
-def event_loop():
-    """Create event loop for async tests."""
-    loop = asyncio.get_event_loop()
-    yield loop
-    loop.close()
+def mock_slack():
+    """Mock Slack client."""
+    mock_client = AsyncMock(spec=AsyncWebClient)
+    mock_client.chat_postMessage = AsyncMock(return_value={"ok": True})
+    return mock_client
 
 @pytest.fixture
-def sample_slack_message():
-    """Create a sample Slack message."""
-    return {
-        "type": "message",
-        "channel": "C123",
-        "user": "U456",
-        "text": "<@U123> schedule a meeting with @john tomorrow at 2pm",
-        "ts": "1234567890.123"
+def test_services_file(tmp_path):
+    """Create a temporary services file for testing."""
+    services = {
+        "Test Service": {
+            "name": "Test Service",
+            "intent": "test_intent",
+            "description": "A test service",
+            "triggers": ["test this", "run test"],
+            "required_entities": ["test_param"],
+            "steps": [
+                {
+                    "tool": "test_tool",
+                    "action": "test_action",
+                    "params": {"param1": "value1"}
+                }
+            ],
+            "success_criteria": ["Test completed"]
+        }
     }
+    
+    services_file = tmp_path / "services.yaml"
+    with open(services_file, "w") as f:
+        yaml.safe_dump(services, f)
+    
+    return services_file
 
 @pytest.fixture
-def sample_nlp_result():
-    """Create a sample NLP processing result."""
-    return {
-        "intent": "schedule_meeting",
-        "entities": {
-            "time": "tomorrow at 2pm",
-            "participants": ["@john"]
-        },
-        "keywords": ["schedule", "meeting"],
-        "urgency": 0.3
-    } 
+def test_tools_dir(tmp_path):
+    """Create a temporary tools directory with test tools."""
+    tools_dir = tmp_path / "tools"
+    tools_dir.mkdir()
+    
+    # Create a test tool file
+    test_tool = tools_dir / "test_tool.py"
+    with open(test_tool, "w") as f:
+        f.write("""
+class TestTool:
+    \"\"\"A test tool for testing.\"\"\"
+    
+    async def test_action(self, param1):
+        return {"status": "success", "result": f"Test action completed with {param1}"}
+""")
+    
+    return tools_dir 

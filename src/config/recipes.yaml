@@ -1,0 +1,81 @@
+Document Management:
+  common_triggers:
+  - create a document
+  - write documentation
+  description: Updated description
+  intent: document
+  keywords:
+  - document
+  - create
+  - write
+  - record
+  name: Document Management
+  required_entities:
+  - doc_type
+  steps:
+  - action: create_document
+    params:
+      type: '{doc_type}'
+  - action: add_content
+    params:
+      content: '{content}'
+  - message: Document completed
+    name: notify_completion
+    type: notification
+  success_criteria:
+  - Document created
+  - Content added
+Meeting Scheduler:
+  common_triggers:
+  - schedule a meeting
+  - set up a meeting
+  description: Schedule a meeting with participants
+  intent: schedule_meeting
+  keywords:
+  - schedule
+  - meeting
+  - calendar
+  - invite
+  name: Meeting Scheduler
+  required_entities:
+  - time
+  - participants
+  steps:
+  - action: check_availability
+    params:
+      participants: '{participants}'
+      time: '{time}'
+  - action: create_meeting
+    params:
+      participants: '{participants}'
+      time: '{time}'
+  success_criteria:
+  - Meeting scheduled
+  - Invites sent
+Research Report:
+  common_triggers:
+  - research about
+  - analyze topic
+  description: Research a topic and create a detailed report
+  intent: research
+  keywords:
+  - research
+  - analyze
+  - report
+  - investigate
+  name: Research Report
+  required_entities:
+  - topic
+  steps:
+  - action: search_info
+    params:
+      topic: '{topic}'
+  - action: analyze_results
+    params:
+      depth: detailed
+  - action: create_summary
+    params:
+      format: report
+  success_criteria:
+  - Research completed
+  - Report created
