@@ -294,41 +294,19 @@ class FrontDesk:
                 await self.handle_followup_response(active_request, text, nlp_result)
                 return
             
-            # Handle conversational messages directly
-            if nlp_result.get("intent_type") == "conversational":
-                intent = nlp_result.get("intent")
-                if intent == "help":
-                    await self._send_help_message(channel_id, thread_ts)
-                elif intent == "greeting":
-                    greeting = await self.get_gpt_response(f"Generate a friendly greeting for {user_info['user']['real_name']}")
-                    await self._send_message(channel_id, greeting, thread_ts)
-                elif intent == "farewell":
-                    farewell = await self.get_gpt_response(f"Generate a friendly goodbye for {user_info['user']['real_name']}")
-                    await self._send_message(channel_id, farewell, thread_ts)
-                elif intent == "gratitude":
-                    response = await self.get_gpt_response(f"Generate a friendly response to {user_info['user']['real_name']}'s thanks")
-                    await self._send_message(channel_id, response, thread_ts)
-                elif intent == "pleasantry":
-                    response = await self.get_gpt_response(f"Generate a friendly response to {user_info['user']['real_name']}'s pleasantry")
-                    await self._send_message(channel_id, response, thread_ts)
-                elif intent == "acknowledgment":
-                    response = await self.get_gpt_response(f"Generate a brief acknowledgment response")
-                    await self._send_message(channel_id, response, thread_ts)
-                elif intent in ["affirmative", "negative"]:
-                    response = await self.get_gpt_response(f"Generate a brief response to {user_info['user']['real_name']}'s {intent} response")
-                    await self._send_message(channel_id, response, thread_ts)
-                return
-            
             # For task intents, create a request and process it
             if nlp_result.get("intent_type") == "task":
                 # Create request for task messages
                 request = await self.request_tracker.create_request(channel_id, user_id, text)
+                
+                # Update request with all information at once
                 await self.request_tracker.update_request(
                     request,
                     intent=nlp_result.get("intent"),
-                    entities={**request.entities, **nlp_result.get("entities", {})}
+                    entities=nlp_result.get("entities", {}),
+                    status="processing"  # Set initial status
                 )
-                
+            
                 # Get recipe from cookbook
                 recipe_result = await self.cookbook.get_recipe(nlp_result.get("intent"))
                 

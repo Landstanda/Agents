@@ -6,49 +6,35 @@ import uuid
 logger = logging.getLogger(__name__)
 
 class Request:
-    """Represents a single user request through its lifecycle."""
+    """Represents a user request being tracked."""
     
-    def __init__(self, channel_id: str, user_id: str, initial_message: str):
-        self.request_id = str(uuid.uuid4())
+    def __init__(self, channel_id: str, user_id: str, text: str):
+        """Initialize a new request."""
+        self.id = str(uuid.uuid4())
         self.channel_id = channel_id
         self.user_id = user_id
-        self.initial_message = initial_message
-        self.created_at = datetime.now()
+        self.text = text
+        self.status = "new"
+        self.created_at = datetime.now().isoformat()
         self.last_updated = datetime.now()
-        self.status = "new"  # new, processing, waiting_for_info, completed, error
-        self.intent = None
         self.entities = {}
-        self.conversation_history = []
-        self.recipe = None
-        self.missing_entities = []
-        # New attributes for office chain
-        self.task_id = None  # ID from task manager
-        self.ceo_consulted = False  # Whether CEO was consulted
-        self.priority = 0.5  # Default priority
-        self.delegated_to = None  # Which component is handling the request
-        self.completion_data = {}  # Data from completed task
+        self.intent = None
+        self.messages = []
+        self.add_message(text, is_user=True)
+        
+    def add_message(self, text: str, is_user: bool = True):
+        """Add a message to the request history."""
+        self.messages.append({
+            "text": text,
+            "is_user": is_user,
+            "timestamp": datetime.now().isoformat()
+        })
+        self.last_updated = datetime.now()
         
     def update(self, **kwargs):
         """Update request attributes."""
         for key, value in kwargs.items():
-            if key == "entities" and value:
-                # Merge entities instead of replacing
-                current_entities = self.entities.copy()
-                for entity_type, entity_value in value.items():
-                    if entity_type in current_entities:
-                        if isinstance(entity_value, list):
-                            # For list types (like participants), extend the list
-                            current_entities[entity_type].extend(
-                                [v for v in entity_value if v not in current_entities[entity_type]]
-                            )
-                        else:
-                            # For scalar types (like time), replace if new value is not None
-                            if entity_value is not None:
-                                current_entities[entity_type] = entity_value
-                    else:
-                        current_entities[entity_type] = entity_value
-                self.entities = current_entities
-            elif hasattr(self, key):
+            if hasattr(self, key):
                 setattr(self, key, value)
         
         self.last_updated = datetime.now()
@@ -58,27 +44,17 @@ class Request:
             if hasattr(self, '_request_tracker'):
                 self._request_tracker._archive_request(self)
         
-    def add_message(self, message: str, is_user: bool = True, source: str = None):
-        """Add a message to the conversation history."""
-        self.conversation_history.append({
-            "timestamp": datetime.now(),
-            "message": message,
-            "is_user": is_user,
-            "source": source or ("user" if is_user else "system")
-        })
-        self.last_updated = datetime.now()
-        
     def get_context_summary(self) -> Dict[str, Any]:
         """Get a summary of the request context for other components."""
         return {
-            "request_id": self.request_id,
+            "request_id": self.id,
             "status": self.status,
             "intent": self.intent,
             "entities": self.entities,
             "priority": self.priority,
-            "created_at": self.created_at.isoformat(),
+            "created_at": self.created_at,
             "last_updated": self.last_updated.isoformat(),
-            "conversation_length": len(self.conversation_history)
+            "conversation_length": len(self.messages)
         }
         
     def mark_delegated(self, component: str):
@@ -105,47 +81,28 @@ class RequestTracker:
         self.request_timeout = timedelta(minutes=30)
         self.flow_logger = None  # Will be set by front_desk
     
-    async def create_request(self, channel_id: str, user_id: str, message: str) -> Request:
-        """Create a new request or return existing active request."""
-        # Check for existing request first
-        existing = self.get_active_request(channel_id, user_id)
-        if existing and existing.status not in ["completed", "error"]:
-            existing.add_message(message)
-            if self.flow_logger:
-                await self.flow_logger.log_event(
-                    "Request Tracker",
-                    "Update Existing Request",
-                    {
-                        "request_id": existing.request_id,
-                        "status": existing.status,
-                        "new_message": message
-                    }
-                )
-            return existing
-            
-        # Clean up old requests only if we're creating a new one
-        await self._cleanup_old_requests()
+    async def create_request(self, channel_id: str, user_id: str, text: str) -> Request:
+        """Create a new request."""
+        request = Request(channel_id, user_id, text)
         
-        # Create new request
-        request = Request(channel_id, user_id, message)
-        request._request_tracker = self  # Link request to tracker
-        request.add_message(message, is_user=True)  # Add initial message to history
+        # Initialize channel dict if not exists
         if channel_id not in self.active_requests:
             self.active_requests[channel_id] = {}
+            
+        # Store request
         self.active_requests[channel_id][user_id] = request
         
         if self.flow_logger:
             await self.flow_logger.log_event(
                 "Request Tracker",
-                "New Request Created",
+                "Request Created",
                 {
-                    "request_id": request.request_id,
-                    "channel": channel_id,
-                    "user": user_id,
-                    "initial_message": message
+                    "request_id": request.id,
+                    "channel_id": channel_id,
+                    "user_id": user_id
                 }
             )
-        
+            
         return request
     
     def get_active_request(self, channel_id: str, user_id: str) -> Optional[Request]:
@@ -158,26 +115,68 @@ class RequestTracker:
                 return request
         return None
     
-    async def update_request(self, request: Request, **kwargs):
-        """Update a request's attributes."""
-        old_status = request.status
-        request.update(**kwargs)
+    async def update_request(self, request: Request, **updates) -> Request:
+        """Update a request with new information"""
+        if not request:
+            return None
+            
+        # Track if any actual changes were made
+        changes_made = False
         
-        if self.flow_logger:
-            await self.flow_logger.log_event(
-                "Request Tracker",
-                "Request Updated",
-                {
-                    "request_id": request.request_id,
-                    "old_status": old_status,
-                    "new_status": request.status,
-                    "updates": kwargs
-                }
-            )
-        
-        # If request is completed, move it to history
-        if request.status == "completed":
-            await self._archive_request(request)
+        # Update fields if they're different from current values
+        for key, value in updates.items():
+            if hasattr(request, key):
+                if key == "entities":
+                    # Always merge entities, creating a new dict if needed
+                    current_entities = request.entities or {}
+                    merged = current_entities.copy()
+                    if value:  # Only update if we have new entities
+                        merged.update(value)
+                        setattr(request, key, merged)
+                        changes_made = True
+                elif getattr(request, key) != value:
+                    setattr(request, key, value)
+                    changes_made = True
+                
+        # Check if we need to update status based on entities
+        if "entities" in updates and request.intent:
+            required_entities = self._get_required_entities(request.intent)
+            missing_entities = [e for e in required_entities if e not in request.entities]
+            
+            if missing_entities:
+                request.status = "waiting_for_info"
+            else:
+                request.status = "processing"
+            changes_made = True
+                
+        if changes_made:
+            # Only log if actual changes were made
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "Request Tracker",
+                    "Request Updated",
+                    {
+                        "request_id": request.id,
+                        "updates": updates
+                    }
+                )
+            
+            # Save changes to active requests
+            if request.channel_id not in self.active_requests:
+                self.active_requests[request.channel_id] = {}
+            self.active_requests[request.channel_id][request.user_id] = request
+            
+        return request
+    
+    def _get_required_entities(self, intent: str) -> List[str]:
+        """Get required entities for an intent."""
+        if intent == "schedule_meeting":
+            return ["time", "participants"]
+        elif intent == "email_send":
+            return ["recipients", "subject"]
+        elif intent == "email_read":
+            return []
+        return []
     
     async def _archive_request(self, request: Request):
         """Move a request to completed history."""
@@ -197,10 +196,10 @@ class RequestTracker:
                 "Request Tracker",
                 "Request Archived",
                 {
-                    "request_id": request.request_id,
+                    "request_id": request.id,
                     "final_status": request.status,
                     "completion_time": datetime.now().isoformat(),
-                    "conversation_length": len(request.conversation_history)
+                    "conversation_length": len(request.messages)
                 }
             )
     
@@ -222,7 +221,7 @@ class RequestTracker:
                             "Request Tracker",
                             "Request Timeout",
                             {
-                                "request_id": request.request_id,
+                                "request_id": request.id,
                                 "channel": channel_id,
                                 "user": user_id,
                                 "last_updated": request.last_updated.isoformat()

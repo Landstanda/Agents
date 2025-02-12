@@ -231,22 +231,26 @@ async def test_entity_extraction(setup_components):
     assert len(result["entities"]["participants"]) == 2
     assert "Bob" in result["entities"]["participants"]
     assert "Alice" in result["entities"]["participants"]
-    assert result["entities"]["time"] is not None
-    assert "tomorrow at 14:00" in result["entities"]["time"]
+    assert "time" in result["entities"]
+    assert result["entities"]["time"] == "14:00"  # Check machine-processable time
+    assert "display_time" in result["entities"]
+    assert "tomorrow at 2" in result["entities"]["display_time"]  # Check display time contains the core time
+    assert "pm" in result["entities"]["display_time"].lower()  # Check it has PM indicator
     
     # Test different time formats
     time_tests = [
-        ("schedule meeting at 3pm", "15:00"),
-        ("meeting tomorrow morning", "tomorrow morning"),
-        ("meet at 11am", "11:00"),
-        ("schedule for 2:30pm", "14:30"),
-        ("meeting today afternoon", "today afternoon")
+        ("schedule meeting at 3pm", "15:00", "3:00pm"),
+        ("schedule meeting tomorrow morning", "morning", "morning"),
+        ("schedule meeting at 11am", "11:00", "11:00am"),
+        ("schedule meeting for 2:30pm", "14:30", "2:30pm"),
+        ("schedule meeting today afternoon", "afternoon", "afternoon")
     ]
     
-    for test_text, expected_time in time_tests:
+    for test_text, expected_time, expected_display in time_tests:
         result = await nlp.process_message(test_text, {"id": "U123", "real_name": "Test User"})
-        assert result["entities"]["time"] is not None
-        assert expected_time in result["entities"]["time"]
+        assert result["entities"]["time"] is not None, f"Failed to extract time from: {test_text}"
+        assert result["entities"]["time"] == expected_time, f"Wrong time format for: {test_text}"
+        assert result["entities"]["display_time"] == expected_display, f"Wrong display time for: {test_text}"
     
     # Test email extraction
     result = await nlp.process_message(

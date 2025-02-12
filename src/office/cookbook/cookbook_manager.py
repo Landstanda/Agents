@@ -420,91 +420,39 @@ class CookbookManager:
                 "details": error_msg
             }
     
-    def _validate_recipe_requirements(self, recipe: Dict[str, Any], nlp_result: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Validate that all required entities are present in the NLP result.
-        
-        Args:
-            recipe: The recipe to validate
-            nlp_result: The NLP processing result containing entities
-            
-        Returns:
-            Dict containing validation status and any missing requirements
-        """
-        try:
-            if not recipe or not isinstance(recipe, dict):
-                return {
-                    "status": "error",
-                    "recipe": None,
-                    "missing_requirements": [],
-                    "suggested_next_steps": "consult_ceo",
-                    "details": "Invalid recipe format"
-                }
-
-            required_entities = set(recipe.get("required_entities", []))
-            if not required_entities:
-                return {
-                    "status": "success",
-                    "recipe": recipe,
-                    "missing_requirements": [],
-                    "suggested_next_steps": "execute_recipe",
-                    "details": "Recipe found with no required entities"
-                }
-
-            # Get entities from NLP result
-            provided_entities = {}
-            if isinstance(nlp_result, dict):
-                provided_entities = nlp_result.get("entities", {})
-            elif isinstance(nlp_result, str):
-                # Handle case where nlp_result is just the intent string
-                return {
-                    "status": "missing_info",
-                    "recipe": recipe,
-                    "missing_requirements": list(required_entities),
-                    "suggested_next_steps": "request_info",
-                    "details": f"Recipe found for {nlp_result} but requires additional information"
-                }
-            
-            # Check each required entity
-            missing = []
-            for entity in required_entities:
-                entity_value = provided_entities.get(entity)
-                
-                # Special handling for different entity types
-                if entity == "time":
-                    if not entity_value or not isinstance(entity_value, str):
-                        missing.append(entity)
-                elif entity == "participants":
-                    if not entity_value or not isinstance(entity_value, list) or not entity_value:
-                        missing.append(entity)
-                elif not entity_value:  # General case for missing or None values
-                    missing.append(entity)
-
-            if not missing:
-                return {
-                    "status": "success",
-                    "recipe": recipe,
-                    "missing_requirements": [],
-                    "suggested_next_steps": "execute_recipe",
-                    "details": "Recipe found with all required information"
-                }
-
-            return {
-                "status": "missing_info",
-                "recipe": recipe,
-                "missing_requirements": missing,
-                "suggested_next_steps": "request_info",
-                "details": f"Recipe found for {recipe.get('intent')} but requires additional information"
-            }
-
-        except Exception as e:
-            logger.error(f"Error validating recipe requirements: {str(e)}")
+    def _validate_recipe_requirements(self, recipe: Dict[str, Any], entities: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate that all required entities for a recipe are present."""
+        if not recipe or not entities:
             return {
                 "status": "error",
                 "recipe": None,
                 "missing_requirements": [],
                 "suggested_next_steps": "consult_ceo",
-                "details": str(e)
+                "details": "Invalid recipe or entities"
+            }
+            
+        required_entities = recipe.get("required_entities", [])
+        missing_entities = []
+        
+        for entity in required_entities:
+            if entity not in entities or not entities[entity]:
+                missing_entities.append(entity)
+                
+        if not missing_entities:
+            return {
+                "status": "success",
+                "recipe": recipe,
+                "missing_requirements": [],
+                "suggested_next_steps": "execute_recipe",
+                "details": "All required entities present"
+            }
+        else:
+            return {
+                "status": "missing_info",
+                "recipe": recipe,
+                "missing_requirements": missing_entities,
+                "suggested_next_steps": "request_info",
+                "details": f"Missing required entities: {', '.join(missing_entities)}"
             }
     
     def list_recipes(self) -> List[str]:

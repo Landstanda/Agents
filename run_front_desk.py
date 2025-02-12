@@ -2,16 +2,53 @@
 
 import asyncio
 import logging
+import os
 from pathlib import Path
 from datetime import datetime
 import signal
-import os
-import sys
-from src.office.utils.logging_config import setup_logging
-from src.office.reception.front_desk import FrontDesk
+from dotenv import load_dotenv
+from slack_sdk.web.async_client import AsyncWebClient
+from slack_sdk.socket_mode.aiohttp import SocketModeClient
+from openai import AsyncOpenAI
+from src.utils.flow_logger import FlowLogger
 
-# Initialize logging first
-logger = setup_logging()
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Create logs directory
+log_dir = Path("logs")
+log_dir.mkdir(exist_ok=True)
+logger.info(f"Log directory created/verified at: {log_dir.absolute()}")
+
+# Add file handlers for different log levels
+debug_log = log_dir / f"front_desk_debug_{datetime.now().strftime('%Y%m%d')}.log"
+error_log = log_dir / f"front_desk_error_{datetime.now().strftime('%Y%m%d')}.log"
+
+debug_handler = logging.FileHandler(debug_log)
+debug_handler.setLevel(logging.DEBUG)
+debug_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
+error_handler = logging.FileHandler(error_log)
+error_handler.setLevel(logging.ERROR)
+error_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
+logger.addHandler(debug_handler)
+logger.addHandler(error_handler)
+
+logger.info("Logging system initialized")
+logger.info(f"Debug log: {debug_log}")
+logger.info(f"Error log: {error_log}")
+
+# Import our modules after logging is set up
+from src.office.reception.front_desk import FrontDesk
+from src.office.reception.nlp_processor import NLPProcessor
+from src.office.cookbook.cookbook_manager import CookbookManager
+from src.office.task.task_manager import TaskManager
+from src.office.executive.ceo import CEO
 
 class FlowEventLogger:
     def __init__(self):
@@ -99,88 +136,53 @@ async def main():
     global front_desk, flow_logger
     
     try:
-        logger.info("Starting Front Desk service...")
+        # Load environment variables
+        load_dotenv()
         
-        # Initialize flow logger with error handling
-        try:
-            flow_logger = FlowEventLogger()
-            logger.info("Flow logger initialized successfully")
-            
-            # Print the location of log files for easy access
-            logger.info(f"Flow logs will be written to: {flow_logger.log_dir.absolute()}")
-            logger.info(f"General logs will be written to: {Path('logs').absolute()}")
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize flow logger: {str(e)}")
-            logger.exception(e)  # Add full stack trace
-            logger.error("Continuing without flow logging...")
-            flow_logger = None
+        # Initialize components
+        web_client = AsyncWebClient(token=os.getenv("SLACK_BOT_TOKEN"))
+        socket_client = SocketModeClient(
+            app_token=os.getenv("SLACK_APP_TOKEN"),
+            web_client=web_client
+        )
+        openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
-        # Register signal handlers
-        signal.signal(signal.SIGINT, handle_shutdown)
-        signal.signal(signal.SIGTERM, handle_shutdown)
+        # Initialize flow logger
+        flow_logger = FlowLogger()
         
-        # Start the Front Desk with flow logger
-        front_desk = FrontDesk()
-        if flow_logger:
-            logger.info("Attaching flow logger to components...")
-            # Attach flow logger to all components
-            front_desk.flow_logger = flow_logger
-            front_desk.nlp.flow_logger = flow_logger
-            front_desk.cookbook.flow_logger = flow_logger
-            front_desk.task_manager.flow_logger = flow_logger
-            front_desk.ceo.flow_logger = flow_logger
-            front_desk.request_tracker.flow_logger = flow_logger
-            logger.info("Flow logger attached to all components successfully")
-            
-            # Verify flow logger attachment with a test event
-            try:
-                await flow_logger.log_event(
-                    "System",
-                    "Initialization",
-                    {
-                        "status": "initialized",
-                        "components": [
-                            "FrontDesk",
-                            "NLPProcessor",
-                            "CookbookManager",
-                            "TaskManager",
-                            "CEO",
-                            "RequestTracker"
-                        ],
-                        "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        "log_directory": str(flow_logger.log_dir.absolute())
-                    }
-                )
-                logger.info("Successfully wrote test event to flow log")
-            except Exception as e:
-                logger.error(f"Failed to write test event: {str(e)}")
-                logger.exception(e)
+        # Create core components
+        nlp = NLPProcessor(flow_logger=flow_logger)
+        cookbook = CookbookManager()
+        task_manager = TaskManager()
+        ceo = CEO(cookbook_manager=cookbook, task_manager=task_manager)
         
-        await front_desk.start()
+        # Create front desk
+        front_desk = FrontDesk(
+            web_client=web_client,
+            socket_client=socket_client,
+            openai_client=openai_client,
+            nlp=nlp,
+            cookbook=cookbook,
+            task_manager=task_manager,
+            ceo=ceo
+        )
+        front_desk.flow_logger = flow_logger
+        
+        # Set up socket mode handler
+        socket_client.socket_mode_request_listeners.append(front_desk.process_event)
+        
+        # Start the client
+        await socket_client.connect()
+        logger.info("Front Desk is running!")
+        
+        # Keep the connection alive
+        while True:
+            await asyncio.sleep(1)
             
-    except KeyboardInterrupt:
-        logger.info("Shutting down Front Desk service...")
     except Exception as e:
-        logger.error(f"Error in Front Desk service: {str(e)}")
+        logger.error(f"Error in main: {str(e)}")
         logger.exception(e)
         raise
-    finally:
-        if front_desk:
-            if flow_logger:
-                try:
-                    await flow_logger.log_event(
-                        "System",
-                        "Shutdown",
-                        {
-                            "status": "shutting_down",
-                            "time": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                            "reason": "user_requested" if isinstance(sys.exc_info()[0], KeyboardInterrupt) else "error"
-                        }
-                    )
-                except Exception as log_error:
-                    logger.error(f"Error logging shutdown event: {str(log_error)}")
-            await front_desk.stop()
 
 if __name__ == "__main__":
     asyncio.run(main()) 

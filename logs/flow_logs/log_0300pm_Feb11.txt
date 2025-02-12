@@ -1,0 +1,107 @@
+================================================================================
+Session Started: 03:00:49 PM Feb 11, 2025
+================================================================================
+
+
+================================================================================
+[03:00:49 PM] System - Initialization
+----------------------------------------
+status: initialized
+components:
+  - FrontDesk
+  - NLPProcessor
+  - CookbookManager
+  - TaskManager
+  - CEO
+  - RequestTracker
+timestamp: 2025-02-11 15:00:49
+log_directory: /home/jeff/Agents/logs/flow_logs
+
+================================================================================
+[03:01:06 PM] User Message - Incoming Request
+----------------------------------------
+text: can you schedule a meeting for me for tomorrow at 11 am with Gabi?
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+================================================================================
+[03:01:06 PM] NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+intent_type: task
+confidence: 0.7
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11']
+  - emails: []
+  - email_attributes: []
+  - time: tomorrow at 11:00
+  - participants: ['Gabi']
+urgency: 0.3
+needs_tracking: True
+message_length: 66
+
+================================================================================
+[03:01:06 PM] NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+intent_type: task
+confidence: 0.7
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11']
+  - emails: []
+  - email_attributes: []
+  - time: tomorrow at 11:00
+  - participants: ['Gabi']
+
+================================================================================
+[03:01:06 PM] Request Tracker - New Request Created
+----------------------------------------
+request_id: 380c8776-1886-434b-b4ea-54939dfa3e6a
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+initial_message: can you schedule a meeting for me for tomorrow at 11 am with Gabi?
+
+================================================================================
+[03:01:06 PM] Request Tracker - Request Updated
+----------------------------------------
+request_id: 380c8776-1886-434b-b4ea-54939dfa3e6a
+old_status: new
+new_status: new
+updates:
+  - intent: schedule_meeting
+  - entities: {'people': [], 'dates': [], 'numbers': ['11'], 'emails': [], 'email_attributes': [], 'time': 'tomorrow at 11:00', 'participants': ['Gabi']}
+
+================================================================================
+[03:01:06 PM] Cookbook Manager - Recipe Found
+----------------------------------------
+intent: schedule_meeting
+recipe: schedule_meeting
+status: error
+missing_requirements:
+
+================================================================================
+[03:01:06 PM] Request Tracker - Request Updated
+----------------------------------------
+request_id: 380c8776-1886-434b-b4ea-54939dfa3e6a
+old_status: new
+new_status: error
+updates:
+  - status: error
+  - error: Unable to process request
+
+================================================================================
+[03:01:06 PM] Front Desk - Error Handling
+----------------------------------------
+error: Unable to process request
+request_id: 380c8776-1886-434b-b4ea-54939dfa3e6a
+
+================================================================================
+[03:01:59 PM] System - Shutdown
+----------------------------------------
+status: shutting_down
+time: 2025-02-11 15:01:59
+reason: error

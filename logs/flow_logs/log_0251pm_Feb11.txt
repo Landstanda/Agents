@@ -1,0 +1,213 @@
+================================================================================
+Session Started: 02:51:27 PM Feb 11, 2025
+================================================================================
+
+
+================================================================================
+[02:51:28 PM] System - Initialization
+----------------------------------------
+status: initialized
+components:
+  - FrontDesk
+  - NLPProcessor
+  - CookbookManager
+  - TaskManager
+  - CEO
+  - RequestTracker
+timestamp: 2025-02-11 14:51:28
+log_directory: /home/jeff/Agents/logs/flow_logs
+
+================================================================================
+[02:52:02 PM] User Message - Incoming Request
+----------------------------------------
+text: can you schedule a meeting for me for tomorrow at 11:23 am with Gabi?
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+================================================================================
+[02:52:03 PM] NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+intent_type: task
+confidence: 0.7
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11', '23']
+  - emails: []
+  - email_attributes: []
+  - time: tomorrow at 11:23
+  - participants: ['Gabi']
+urgency: 0.3
+needs_tracking: True
+message_length: 69
+
+================================================================================
+[02:52:03 PM] NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+intent_type: task
+confidence: 0.7
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11', '23']
+  - emails: []
+  - email_attributes: []
+  - time: tomorrow at 11:23
+  - participants: ['Gabi']
+
+================================================================================
+[02:52:03 PM] Request Tracker - New Request Created
+----------------------------------------
+request_id: e3e91707-e964-4db1-8d56-6dc630dc1f79
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+initial_message: can you schedule a meeting for me for tomorrow at 11:23 am with Gabi?
+
+================================================================================
+[02:52:03 PM] Request Tracker - Request Updated
+----------------------------------------
+request_id: e3e91707-e964-4db1-8d56-6dc630dc1f79
+old_status: new
+new_status: new
+updates:
+  - intent: schedule_meeting
+  - entities: {'people': [], 'dates': [], 'numbers': ['11', '23'], 'emails': [], 'email_attributes': [], 'time': 'tomorrow at 11:23', 'participants': ['Gabi']}
+
+================================================================================
+[02:52:03 PM] Cookbook Manager - Recipe Found
+----------------------------------------
+intent: schedule_meeting
+recipe: schedule_meeting
+status: missing_info
+missing_requirements:
+  - time
+  - participants
+
+================================================================================
+[02:52:04 PM] Request Tracker - Request Updated
+----------------------------------------
+request_id: e3e91707-e964-4db1-8d56-6dc630dc1f79
+old_status: new
+new_status: waiting_for_info
+updates:
+  - status: waiting_for_info
+
+================================================================================
+[03:01:06 PM] User Message - Incoming Request
+----------------------------------------
+text: can you schedule a meeting for me for tomorrow at 11 am with Gabi?
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+================================================================================
+[03:01:07 PM] NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+intent_type: task
+confidence: 0.7
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11']
+  - emails: []
+  - email_attributes: []
+  - time: tomorrow at 11:00
+  - participants: ['Gabi']
+urgency: 0.3
+needs_tracking: True
+message_length: 66
+
+================================================================================
+[03:01:07 PM] NLP Processor - Message Analysis
+----------------------------------------
+intent: schedule_meeting
+intent_type: task
+confidence: 0.7
+entities:
+  - people: []
+  - dates: []
+  - numbers: ['11']
+  - emails: []
+  - email_attributes: []
+  - time: tomorrow at 11:00
+  - participants: ['Gabi']
+
+================================================================================
+[03:01:07 PM] Request Tracker - Request Updated
+----------------------------------------
+request_id: e3e91707-e964-4db1-8d56-6dc630dc1f79
+old_status: waiting_for_info
+new_status: waiting_for_info
+updates:
+  - entities: {'people': [], 'dates': [], 'numbers': ['11'], 'emails': [], 'email_attributes': [], 'time': 'tomorrow at 11:00', 'participants': ['Gabi']}
+
+================================================================================
+[03:01:07 PM] Cookbook Manager - Recipe Found
+----------------------------------------
+intent: schedule_meeting
+recipe: schedule_meeting
+status: missing_info
+missing_requirements:
+  - time
+  - participants
+
+================================================================================
+[03:01:31 PM] User Message - Incoming Request
+----------------------------------------
+text: What didnt you understand ?
+channel: C08CF2DPMH8
+user: U08CTNTT97B
+
+================================================================================
+[03:01:32 PM] NLP Processor - Message Analysis
+----------------------------------------
+intent: None
+intent_type: None
+confidence: 0.0
+entities:
+  - people: []
+  - dates: []
+  - numbers: []
+  - emails: []
+  - email_attributes: []
+  - time: tomorrow at 11:00
+  - participants: ['What']
+urgency: 0.1
+needs_tracking: False
+message_length: 27
+
+================================================================================
+[03:01:32 PM] NLP Processor - Message Analysis
+----------------------------------------
+intent: None
+intent_type: None
+confidence: 0.0
+entities:
+  - people: []
+  - dates: []
+  - numbers: []
+  - emails: []
+  - email_attributes: []
+  - time: tomorrow at 11:00
+  - participants: ['What']
+
+================================================================================
+[03:01:32 PM] Request Tracker - Request Updated
+----------------------------------------
+request_id: e3e91707-e964-4db1-8d56-6dc630dc1f79
+old_status: waiting_for_info
+new_status: waiting_for_info
+updates:
+  - entities: {'people': [], 'dates': [], 'numbers': [], 'emails': [], 'email_attributes': [], 'time': 'tomorrow at 11:00', 'participants': ['What']}
+
+================================================================================
+[03:01:32 PM] Cookbook Manager - Recipe Found
+----------------------------------------
+intent: schedule_meeting
+recipe: schedule_meeting
+status: missing_info
+missing_requirements:
+  - time
+  - participants
