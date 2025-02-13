@@ -1,0 +1,2362 @@
+MODULE CAPABILITIES AND INTEGRATION GUIDE
+=====================================
+
+This document provides detailed information about each module's capabilities, requirements, and integration patterns. Use this information to orchestrate module interactions and achieve complex tasks.
+
+For each module below, you'll find:
+1. Purpose: The main function and role of the module
+2. Capabilities: List of operations/actions the module can perform
+3. Required Input Parameters: Mandatory parameters and data types
+4. Optional Input Parameters: Additional configurable parameters
+5. Output Format: Expected return data structure
+6. Dependencies: Required external services or authentication
+7. Common Workflows: Typical usage patterns and examples
+8. Error Handling: Module-specific errors and handling strategies
+
+**** Global Best Practices ****
+1. Always validate input parameters before passing to modules
+2. Implement proper error handling and logging
+3. Check authentication before operations
+4. Monitor and respect rate limits
+5. Handle asynchronous operations properly
+6. Maintain state consistency across module chains
+7. Clean up resources after use
+8. Log all critical operations and errors
+9. Implement retry mechanisms for transient failures
+10. Use appropriate timeouts for external service calls
+
+=== Basic Auth Module ===
+Purpose:
+- Handles secure username/password authentication
+- Manages encrypted credential storage
+- Provides session management
+- Implements secure password hashing
+
+Capabilities:
+- Secure credential storage and retrieval
+- Password hashing and verification
+- Session creation and management
+- Credential removal
+- Session validation and expiration
+- Encrypted storage management
+
+Required Input Parameters:
+store_credentials:
+- service: str (service identifier)
+- username: str
+- password: str
+
+verify_credentials:
+- service: str
+- username: str
+- password: str
+
+create_session:
+- service: str
+- username: str
+- password: str
+
+verify_session:
+- token: str
+
+end_session:
+- token: str
+
+remove_credentials:
+- service: str
+- username: str
+
+Optional Input Parameters:
+None (all parameters are required for their respective operations)
+
+Output Format:
+store_credentials:
+- bool: Success status
+
+verify_credentials:
+- bool: Validity status
+
+create_session:
+- Optional[str]: Session token if successful, None if failed
+
+verify_session:
+- Tuple[bool, Optional[Dict]]: (is_valid, session_info)
+  session_info format if valid:
+  {
+      'service': str,
+      'username': str,
+      'created_at': str (ISO format),
+      'expires_at': str (ISO format)
+  }
+
+Dependencies:
+- cryptography.fernet package
+- Secure storage directory (.credentials)
+- Environment variables configuration
+- Access to filesystem for credential storage
+
+Common Workflows:
+1. User Authentication:
+   - Store user credentials securely
+   - Verify credentials when needed
+   - Create session token
+   - Validate session for subsequent requests
+
+2. Session Management:
+   - Create new session
+   - Verify session validity
+   - Handle session expiration
+   - End session when needed
+
+3. Credential Management:
+   - Store encrypted credentials
+   - Remove outdated credentials
+   - Update existing credentials
+   - Manage multiple services
+
+Error Handling:
+- Encryption Errors: Secure fallback
+- File Access Errors: Proper error reporting
+- Invalid Credentials: False return values
+- Session Expiration: Automatic cleanup
+- Storage Errors: Graceful degradation
+- Malformed Input: Input validation
+
+=== Browser Automation Module ===
+Purpose:
+- Provides automated browser interactions
+- Handles web page navigation and manipulation
+- Manages headless browser operations
+- Implements web scraping capabilities
+
+Capabilities:
+- Browser initialization and management
+- Page navigation
+- Element interaction (find, click)
+- Form filling
+- Screenshot capture
+- Page source extraction
+- Headless operation support
+- Download management
+
+Required Input Parameters:
+navigate_to:
+- url: str
+
+find_element:
+- by: str (selector type)
+- value: str (selector value)
+
+click_element:
+- by: str
+- value: str
+
+fill_form:
+- form_data: Dict[str, str]
+
+take_screenshot:
+- filename: str
+
+Optional Input Parameters:
+initialization:
+- headless: bool (defaults to True)
+
+find_element:
+- timeout: int (defaults to 10)
+
+click_element:
+- timeout: int (defaults to 10)
+
+Output Format:
+navigate_to:
+- bool: Success status
+
+find_element:
+- WebElement: Selenium web element
+
+click_element:
+- bool: Success status
+
+fill_form:
+- bool: Success status
+
+take_screenshot:
+- bool: Success status
+
+get_page_source:
+- str: HTML source of current page
+
+Dependencies:
+- undetected_chromedriver
+- Selenium WebDriver
+- Chrome/Chromium browser
+- ChromeDriver executable
+- System graphics capabilities
+
+Common Workflows:
+1. Web Interaction:
+   - Initialize browser
+   - Navigate to URL
+   - Find and interact with elements
+   - Extract data or take action
+   - Close browser
+
+2. Form Automation:
+   - Locate form elements
+   - Fill in form fields
+   - Submit form
+   - Verify submission
+   - Handle results
+
+3. Data Extraction:
+   - Navigate to target page
+   - Find relevant elements
+   - Extract data
+   - Process information
+   - Capture evidence (screenshots)
+
+Error Handling:
+- Driver Initialization: Proper setup verification
+- Element Not Found: Timeout handling
+- Navigation Errors: Retry mechanism
+- Click Failures: Element state checking
+- Browser Crashes: Automatic recovery
+- Resource Cleanup: Proper driver shutdown
+
+=== Browser Headers Module ===
+Purpose:
+- Manages browser-like HTTP headers
+- Provides realistic web request headers
+- Ensures web compatibility
+- Maintains consistent browser identity
+
+Capabilities:
+- Default header generation
+- Header customization
+- Browser impersonation
+- Request header management
+
+Required Input Parameters:
+execute:
+- params: Dict[str, Any] (containing optional headers to merge)
+
+Optional Input Parameters:
+headers:
+- Dict of additional headers to merge with defaults
+
+Output Format:
+Standard response:
+{
+    'headers': Dict[str, str],  # Combined headers
+    **original_params  # All other parameters preserved
+}
+
+Default Headers Provided:
+{
+    'User-Agent': 'Mozilla/5.0 ...',
+    'Accept': 'text/html,application/xhtml+xml...',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1'
+}
+
+Dependencies:
+- None (standalone module)
+
+Common Workflows:
+1. Header Generation:
+   - Initialize module
+   - Get default headers
+   - Merge with custom headers
+   - Apply to requests
+
+2. Request Preparation:
+   - Prepare request parameters
+   - Add browser-like headers
+   - Execute request
+   - Handle response
+
+3. Header Customization:
+   - Start with defaults
+   - Override specific headers
+   - Validate combinations
+   - Apply to request
+
+Error Handling:
+- Invalid Parameters: Type checking
+- Header Conflicts: Resolution strategy
+- Malformed Headers: Validation
+- Integration Errors: Proper error reporting 
+
+=== Business Context Module ===
+Purpose:
+- Manages business context and planning information
+- Stores and retrieves business metadata
+- Processes and structures business information
+- Integrates with GPT for context parsing
+
+Capabilities:
+- Context storage and retrieval
+- Business plan management
+- GPT-powered context parsing
+- Structured data organization
+- JSON-based storage
+- Section-specific updates
+
+Required Input Parameters:
+update_context:
+- operation: str ('update_context')
+- updates: Dict[str, Any]
+
+get_context:
+- operation: str ('get_context')
+
+import_context:
+- operation: str ('import_context')
+- text: str (raw business context text)
+
+Optional Input Parameters:
+get_context:
+- section: str (specific section to retrieve)
+
+Output Format:
+Standard response:
+{
+    "context": {
+        "business_name": str,
+        "description": str,
+        "goals": List[str],
+        "plans": List[Any],
+        "current_phase": str,
+        "key_features": List[str],
+        "target_market": str,
+        "timeline": Dict[str, Any],
+        "team": List[str],
+        "resources": List[str]
+    }
+}
+
+Dependencies:
+- GPT Handler module for context parsing
+- File system access for JSON storage
+- JSON processing capabilities
+
+Common Workflows:
+1. Context Management:
+   - Load existing context
+   - Update specific sections
+   - Save changes to file
+   - Retrieve context data
+
+2. Context Import:
+   - Receive raw text
+   - Parse with GPT
+   - Structure information
+   - Save to context file
+
+3. Context Retrieval:
+   - Load context file
+   - Filter specific sections
+   - Return structured data
+   - Handle missing data
+
+Error Handling:
+- File Access Errors: Graceful fallback to empty context
+- Parse Errors: Error reporting with context
+- GPT Integration Errors: Fallback handling
+- Invalid Updates: Parameter validation
+- Storage Errors: Proper error logging
+- JSON Processing Errors: Data integrity checks
+
+=== Core Request Module ===
+Purpose:
+- Handles all HTTP/HTTPS requests
+- Manages request caching and rate limiting
+- Implements retry mechanisms
+- Provides advanced request features
+
+Capabilities:
+- Async HTTP requests
+- Request caching
+- Rate limiting
+- Automatic retries
+- Timeout management
+- Session handling
+- Multiple HTTP methods
+- Response processing
+
+Required Input Parameters:
+request:
+- method: str (HTTP method)
+- url: str (target URL)
+
+Optional Input Parameters:
+request:
+- headers: Optional[Dict]
+- params: Optional[Dict]
+- data: Optional[Union[Dict, str]]
+- json_data: Optional[Dict]
+- use_cache: bool (defaults to True)
+- custom_retry: Optional[int]
+- custom_timeout: Optional[int]
+
+initialization:
+- max_retries: int (defaults to 3)
+- rate_limit: int (defaults to 60)
+- cache_ttl: int (defaults to 300)
+- timeout: int (defaults to 30)
+
+Output Format:
+Standard response:
+{
+    "status": int,
+    "headers": Dict[str, str],
+    "data": Union[Dict, str],
+    "timestamp": str (ISO format)
+}
+
+Dependencies:
+- aiohttp package
+- backoff package
+- cachetools package
+- ratelimit package
+- asyncio support
+
+Common Workflows:
+1. Basic Request:
+   - Initialize session
+   - Make request
+   - Process response
+   - Handle caching
+   - Clean up
+
+2. Advanced Request:
+   - Configure custom parameters
+   - Handle rate limiting
+   - Manage retries
+   - Process response
+   - Cache results
+
+3. Batch Operations:
+   - Manage multiple requests
+   - Handle rate limits
+   - Process responses
+   - Update cache
+   - Monitor statistics
+
+Error Handling:
+- Network Errors: Automatic retry
+- Timeout Errors: Configurable handling
+- Rate Limit Errors: Automatic backoff
+- Cache Errors: Fallback to live request
+- Session Errors: Auto-reconnection
+- Response Errors: Status code handling
+
+=== Data Cleaner Module ===
+Purpose:
+- Cleans and standardizes various data types
+- Normalizes text and dates
+- Validates emails and phone numbers
+- Processes structured data
+
+Capabilities:
+- Text normalization
+- Date standardization
+- Phone number formatting
+- Email validation
+- DataFrame cleaning
+- JSON cleaning
+- Duplicate removal
+- Unicode handling
+
+Required Input Parameters:
+normalize_text:
+- text: str
+
+standardize_date:
+- date_str: str
+
+clean_dict:
+- data: Dict[str, Any]
+
+clean_dataframe:
+- df: pd.DataFrame
+
+Optional Input Parameters:
+normalize_text:
+- lowercase: bool (defaults to True)
+
+clean_dataframe:
+- date_columns: List[str]
+
+Output Format:
+normalize_text:
+- str: Normalized text
+
+standardize_date:
+- Optional[str]: ISO format date (YYYY-MM-DD)
+
+clean_dict:
+- Dict[str, Any]: Cleaned dictionary
+
+clean_dataframe:
+- pd.DataFrame: Cleaned DataFrame
+
+Dependencies:
+- pandas package
+- unicodedata support
+- regex support
+- JSON processing
+
+Common Workflows:
+1. Text Processing:
+   - Normalize unicode
+   - Remove extra whitespace
+   - Standardize case
+   - Remove duplicates
+
+2. Data Standardization:
+   - Parse dates
+   - Format phones
+   - Validate emails
+   - Clean dictionaries
+
+3. Bulk Processing:
+   - Clean DataFrames
+   - Process JSON
+   - Handle nested structures
+   - Validate results
+
+Error Handling:
+- Invalid Input: Type checking
+- Parse Errors: None returns
+- Date Format Errors: Standardization
+- Unicode Errors: Fallback handling
+- DataFrame Errors: Original preservation
+- JSON Errors: Validation checks
+
+=== Data Extractor Module ===
+Purpose:
+- Extracts structured data from inputs
+- Processes text using patterns
+- Applies filtering criteria
+- Organizes extracted information
+
+Capabilities:
+- Pattern-based extraction
+- Regular expression processing
+- Data filtering
+- Structured output
+- Nested data handling
+- Custom filter application
+
+Required Input Parameters:
+execute:
+- data: Dict[str, Any] (input data)
+- patterns: Dict[str, str] (regex patterns)
+
+Optional Input Parameters:
+execute:
+- filters: Dict[str, Any] (filtering criteria)
+
+Output Format:
+Standard response:
+{
+    "extracted_data": {
+        "key": {
+            "pattern_key": List[str] or Dict[str, List[str]]
+        }
+    }
+}
+
+Dependencies:
+- Regular expression support
+- Logging system
+
+Common Workflows:
+1. Basic Extraction:
+   - Apply patterns
+   - Collect matches
+   - Structure results
+   - Return data
+
+2. Filtered Extraction:
+   - Extract initial data
+   - Apply filters
+   - Process results
+   - Format output
+
+3. Nested Processing:
+   - Handle nested structures
+   - Apply patterns recursively
+   - Combine results
+   - Filter outputs
+
+Error Handling:
+- Pattern Errors: Exception handling
+- Filter Errors: Graceful degradation
+- Input Validation: Type checking
+- Processing Errors: Error logging
+- Structure Errors: Result validation
+- Memory Issues: Size management
+
+=== Document Management Module ===
+Purpose:
+- Manages document storage and retrieval
+- Handles document versioning
+- Supports multiple document formats
+- Provides format conversion capabilities
+
+Capabilities:
+- Document creation and storage
+- Version control management
+- Format conversion
+- Document listing and retrieval
+- Multiple format support (doc, docx, pdf, txt, md)
+- Directory management
+- Document metadata tracking
+- Async operations support
+
+Required Input Parameters:
+save_document:
+- operation: str ('save_document')
+- name: str
+- content: str/Dict
+- format: str
+
+load_document:
+- operation: str ('load_document')
+- name: str
+
+convert_format:
+- operation: str ('convert_format')
+- name: str
+- to_format: str
+
+create_version:
+- operation: str ('create_version')
+- name: str
+
+Optional Input Parameters:
+load_document:
+- format: str (defaults to 'txt')
+- version: str
+
+list_documents:
+- format: str (filter by format)
+
+Output Format:
+save_document:
+{
+    'success': bool,
+    'filepath': str,
+    'format': str
+}
+
+load_document:
+{
+    'content': Any,
+    'format': str,
+    'filepath': str
+}
+
+list_documents:
+{
+    'documents': List[{
+        'name': str,
+        'format': str,
+        'size': int,
+        'modified': str (ISO format)
+    }]
+}
+
+Dependencies:
+- File system access
+- JSON/YAML processing
+- Markdown support
+- Environment configuration
+
+Common Workflows:
+1. Document Creation:
+   - Validate format
+   - Process content
+   - Save document
+   - Create version
+   - Return metadata
+
+2. Version Management:
+   - Load current version
+   - Create new version
+   - Update metadata
+   - Manage versions directory
+
+3. Format Conversion:
+   - Load source document
+   - Convert format
+   - Validate output
+   - Save new format
+
+Error Handling:
+- File Access Errors: Proper reporting
+- Format Validation: Type checking
+- Version Conflicts: Resolution strategy
+- Storage Errors: Graceful fallback
+- Conversion Errors: Format validation
+- Directory Issues: Auto-creation
+
+=== Email Classifier Module ===
+Purpose:
+- Classifies incoming emails
+- Determines email priority
+- Suggests actions based on content
+- Integrates with GPT for analysis
+
+Capabilities:
+- Email content classification
+- Priority assessment
+- Action determination
+- GPT-powered analysis
+- Response requirement detection
+- Time sensitivity analysis
+- Content summarization
+
+Required Input Parameters:
+classify_email:
+- operation: str ('classify_email')
+- email_data: Dict{
+    'subject': str,
+    'from': str,
+    'body': str,
+    'message_id': str
+}
+
+determine_action:
+- operation: str ('determine_action')
+- classification: Dict
+
+Output Format:
+classify_email:
+{
+    'email_id': str,
+    'classification': {
+        'categories': List[str],
+        'priority': str,
+        'needs_response': bool,
+        'time_sensitivity': str,
+        'summary': str,
+        'key_points': List[str]
+    }
+}
+
+determine_action:
+{
+    'actions': List[{
+        'type': str,
+        'priority': str
+    }],
+    'classification': Dict
+}
+
+Dependencies:
+- GPT Handler module
+- JSON processing
+- Logging system
+
+Common Workflows:
+1. Email Analysis:
+   - Process email content
+   - Generate GPT prompt
+   - Classify content
+   - Determine priority
+   - Extract key points
+
+2. Action Planning:
+   - Analyze classification
+   - Determine required actions
+   - Set action priorities
+   - Generate task list
+
+3. Response Management:
+   - Check response requirement
+   - Assess time sensitivity
+   - Plan follow-up actions
+   - Set priorities
+
+Error Handling:
+- GPT Errors: Fallback classification
+- Parse Errors: Default categories
+- Invalid Input: Parameter validation
+- Classification Errors: Safe defaults
+- Action Determination: Graceful degradation
+
+=== Email Reader Module ===
+Purpose:
+- Reads emails from Gmail
+- Processes email content
+- Manages email status
+- Handles email metadata
+
+Capabilities:
+- Gmail API integration
+- Email content retrieval
+- Unread email management
+- Email metadata extraction
+- Batch email processing
+- Email marking/status updates
+- Async operations
+
+Required Input Parameters:
+get_email_content:
+- operation: str ('get_email_content')
+- message_id: str
+
+mark_as_read:
+- operation: str ('mark_as_read')
+- message_id: str
+
+Optional Input Parameters:
+get_recent_emails:
+- max_emails: int (defaults to 10)
+- unread_only: bool (defaults to True)
+
+Output Format:
+get_recent_emails:
+{
+    'success': bool,
+    'emails': List[Dict],
+    'timestamp': str (ISO format)
+}
+
+get_email_content:
+{
+    'success': bool,
+    'email': {
+        'id': str,
+        'thread_id': str,
+        'subject': str,
+        'from': str,
+        'to': str,
+        'date': str,
+        'body': str,
+        'labels': List[str]
+    }
+}
+
+Dependencies:
+- Google API credentials
+- Gmail API access
+- OAuth2 authentication
+- Base64 processing
+
+Common Workflows:
+1. Email Retrieval:
+   - Initialize service
+   - Fetch messages
+   - Process content
+   - Extract metadata
+   - Return structured data
+
+2. Content Processing:
+   - Get message data
+   - Decode content
+   - Parse headers
+   - Extract body
+   - Format response
+
+3. Status Management:
+   - Update email status
+   - Modify labels
+   - Track changes
+   - Confirm updates
+
+Error Handling:
+- API Errors: Proper logging
+- Authentication: Token refresh
+- Content Decode: Safe parsing
+- Service Init: Auto-retry
+- Label Management: Validation
+
+=== Email Sender Module ===
+Purpose:
+- Sends emails via Gmail
+- Manages follow-ups
+- Handles email scheduling
+- Tracks email status
+
+Capabilities:
+- Gmail API integration
+- Email composition
+- Follow-up scheduling
+- Label management
+- Thread tracking
+- Status monitoring
+- Async operations
+
+Required Input Parameters:
+send_email:
+- operation: str ('send_email')
+- to_address: str
+- response_data: Dict{
+    'subject': str,
+    'body': str
+}
+
+schedule_followup:
+- operation: str ('schedule_followup')
+- email_id: str
+- follow_up_date: str (ISO format)
+
+Optional Input Parameters:
+send_email:
+- response_data: Dict{
+    'follow_up_needed': bool,
+    'follow_up_date': str,
+    'next_steps': List[str]
+}
+
+Output Format:
+send_email:
+{
+    'success': bool,
+    'message_id': str,
+    'thread_id': str,
+    'timestamp': str,
+    'to_address': str,
+    'subject': str,
+    'follow_up': Optional[Dict]
+}
+
+schedule_followup:
+{
+    'email_id': str,
+    'follow_up_date': str,
+    'next_steps': List[str],
+    'status': str,
+    'label_id': Optional[str]
+}
+
+Dependencies:
+- Google API credentials
+- Gmail API access
+- OAuth2 authentication
+- MIME support
+
+Common Workflows:
+1. Email Sending:
+   - Compose message
+   - Add attachments
+   - Send via API
+   - Track status
+   - Handle follow-up
+
+2. Follow-up Management:
+   - Schedule follow-up
+   - Create/find labels
+   - Set reminders
+   - Track status
+   - Update metadata
+
+3. Label Management:
+   - Create labels
+   - Apply to messages
+   - Track changes
+   - Maintain status
+
+Error Handling:
+- API Errors: Proper logging
+- Authentication: Token refresh
+- Send Failures: Retry mechanism
+- Label Errors: Graceful fallback
+- Schedule Errors: Status tracking
+- MIME Errors: Format validation
+
+=== File Transfer Module ===
+Purpose:
+- Manages file transfers between local and cloud services
+- Handles multi-platform file operations
+- Provides secure file transfer capabilities
+- Manages file organization and metadata
+
+Capabilities:
+- Google Drive integration
+- Slack file transfers
+- Email attachments
+- File organization
+- Directory management
+- Transfer tracking
+- Multi-service support
+- Batch operations
+
+Required Input Parameters:
+upload_to_drive:
+- operation: str ('upload_to_drive')
+- file_path: str
+
+download_from_drive:
+- operation: str ('download_from_drive')
+- file_id: str
+
+send_to_slack:
+- operation: str ('send_to_slack')
+- file_path: str
+- channel: str
+
+send_email:
+- operation: str ('send_email')
+- file_path: str
+- to_email: str
+
+Optional Input Parameters:
+upload_to_drive:
+- folder_id: str (defaults to 'root')
+
+organize_files:
+- directory: str (defaults to transfer_directory)
+- organize_by: str (defaults to 'type')
+- start_index: int
+- end_index: int
+
+Output Format:
+upload_to_drive:
+{
+    'success': bool,
+    'file_id': str,
+    'service': str
+}
+
+download_from_drive:
+{
+    'success': bool,
+    'local_path': str,
+    'filename': str
+}
+
+organize_files:
+{
+    'success': bool,
+    'organized_files': List[Dict],
+    'organize_by': str
+}
+
+Dependencies:
+- Google Drive API
+- Slack SDK
+- SMTP support
+- File system access
+- Email MIME support
+
+Common Workflows:
+1. Cloud Upload:
+   - Validate file
+   - Upload to service
+   - Track progress
+   - Return metadata
+   - Handle response
+
+2. File Organization:
+   - Scan directory
+   - Categorize files
+   - Create structure
+   - Move files
+   - Update metadata
+
+3. Email Transfer:
+   - Prepare attachment
+   - Configure email
+   - Send message
+   - Verify delivery
+   - Log transfer
+
+Error Handling:
+- File Access Errors: Proper reporting
+- API Errors: Retry mechanism
+- Transfer Failures: Recovery options
+- Permission Issues: Validation
+- Size Limits: Pre-check
+- Network Errors: Auto-retry
+
+=== Google Auth Module ===
+Purpose:
+- Manages Google Workspace authentication
+- Handles OAuth2 flow
+- Maintains credential security
+- Provides token management
+
+Capabilities:
+- OAuth2 authentication
+- Token refresh management
+- Credential storage
+- Multi-scope authorization
+- Service initialization
+- Token persistence
+- Secure storage
+- Port management
+
+Required Input Parameters:
+execute:
+- params: Dict[str, Any] (optional configuration)
+
+Output Format:
+Standard response:
+{
+    'credentials': Credentials,
+    'scopes': List[str],
+    **params
+}
+
+Dependencies:
+- Google Auth libraries
+- OAuth2 client
+- Credential storage
+- Pickle support
+- Environment configuration
+
+Common Workflows:
+1. Authentication Flow:
+   - Check existing tokens
+   - Validate credentials
+   - Refresh if needed
+   - Start OAuth flow
+   - Store tokens
+
+2. Token Management:
+   - Load stored tokens
+   - Check expiration
+   - Handle refresh
+   - Secure storage
+   - Validate access
+
+3. Service Setup:
+   - Initialize credentials
+   - Configure scopes
+   - Setup client
+   - Verify access
+   - Enable services
+
+Error Handling:
+- Token Expiry: Auto-refresh
+- Auth Failures: Retry flow
+- Storage Errors: Safe fallback
+- Port Conflicts: Alternative ports
+- Invalid Scopes: Validation
+- Network Issues: Retry logic
+
+=== Google Calendar Module ===
+Purpose:
+- Manages Google Calendar operations
+- Handles event scheduling and management
+- Provides calendar access and control
+- Manages calendar permissions and sharing
+
+Capabilities:
+- Create/update/delete events
+- List events and calendars
+- Check availability
+- Manage event attendees
+- Set reminders
+- Calendar creation/deletion
+- Free/busy time checking
+- Attendee management
+- Timezone handling
+
+Required Input Parameters:
+For all operations:
+- operation: str (operation name)
+
+Operation-specific required parameters:
+create_event:
+- summary: str
+- start_time: datetime
+- end_time: datetime
+
+update_event:
+- event_id: str
+
+delete_event:
+- event_id: str
+
+get_event:
+- event_id: str
+
+create_calendar:
+- summary: str
+
+check_availability:
+- start_time: datetime
+- end_time: datetime
+
+set_event_reminders:
+- event_id: str
+- reminders: Dict
+
+Optional Input Parameters:
+create_event:
+- calendar_id: str (defaults to 'primary')
+- description: str
+- location: str
+- attendees: List[str]
+- timezone: str (defaults to 'UTC')
+- recurrence: str
+- reminders: Dict (defaults to {'useDefault': True})
+
+list_events:
+- calendar_id: str (defaults to 'primary')
+- max_results: int (defaults to 10)
+- time_min: datetime (defaults to current time)
+- time_max: datetime
+- query: str
+
+update_event_attendees:
+- add_attendees: List[str]
+- remove_attendees: List[str]
+- calendar_id: str (defaults to 'primary')
+
+Output Format:
+Standard response format:
+{
+    "success": bool,
+    "data": Dict,  # Operation-specific response data
+    "error": Optional[str]
+}
+
+Operation-specific responses:
+create_event/update_event:
+{
+    "success": bool,
+    "event_id": str,
+    "html_link": str
+}
+
+list_events:
+{
+    "success": bool,
+    "events": List[Dict],
+    "count": int
+}
+
+check_availability:
+{
+    "success": bool,
+    "is_available": bool,
+    "conflicts": Dict
+}
+
+Dependencies:
+- Google Calendar API credentials
+- OAuth2 authentication
+- Google API service account
+- Google API Python client library
+
+Common Workflows:
+1. Event Creation:
+   - Validate time slots
+   - Check attendee availability
+   - Create event with reminders
+   - Send invitations
+   - Handle responses
+   - Return event link
+
+2. Calendar Management:
+   - List upcoming events
+   - Update event details
+   - Process attendee responses
+   - Send reminders
+   - Handle recurring events
+
+3. Availability Checking:
+   - Get available/busy information
+   - Find available slots
+   - Check multiple attendees
+   - Handle timezone differences
+   - Validate time ranges
+
+Error Handling:
+- Authentication Expiry: Token refresh mechanism
+- Conflicting Events: Detailed conflict information
+- Invalid Time Zones: Standardization to UTC
+- Attendee Errors: Validation and notification
+- API Quotas: Rate limiting and scheduling
+- Permission Issues: Access verification
+- Network Errors: Retry mechanism
+- Invalid Parameters: Parameter validation
+- Calendar Access: Permission checking
+
+=== Google Docs Module ===
+Purpose:
+- Manages Google Docs operations
+- Handles document creation and editing
+- Provides formatting capabilities
+- Manages document structure
+
+Capabilities:
+- Document creation
+- Content management
+- Text formatting
+- Table operations
+- Image insertion
+- Header/footer control
+- Style application
+- Batch updates
+
+Required Input Parameters:
+create_document:
+- operation: str ('create_document')
+- title: str
+
+update_document:
+- operation: str ('update_document')
+- document_id: str
+- requests: List[Dict]
+
+insert_text:
+- operation: str ('insert_text')
+- document_id: str
+- text: str
+
+Optional Input Parameters:
+create_document:
+- content: str
+
+format_text:
+- format_options: Dict
+- start_index: int
+- end_index: int
+
+create_table:
+- rows: int (defaults to 1)
+- columns: int (defaults to 1)
+
+Output Format:
+create_document:
+{
+    'success': bool,
+    'document_id': str,
+    'title': str,
+    'url': str
+}
+
+update_document:
+{
+    'success': bool,
+    'replies': List[Dict]
+}
+
+Dependencies:
+- Google Docs API
+- Google Auth module
+- JSON processing
+- Batch operations support
+
+Common Workflows:
+1. Document Creation:
+   - Initialize document
+   - Add content
+   - Apply formatting
+   - Set permissions
+   - Return metadata
+
+2. Content Management:
+   - Load document
+   - Make changes
+   - Apply styles
+   - Update content
+   - Save changes
+
+3. Structure Editing:
+   - Insert elements
+   - Format content
+   - Manage tables
+   - Handle images
+   - Update layout
+
+Error Handling:
+- API Errors: Proper logging
+- Format Errors: Validation
+- Content Limits: Size checking
+- Permission Issues: Verification
+- Update Conflicts: Resolution
+- Batch Failures: Partial updates
+
+=== Google Drive Module ===
+Purpose:
+- Manages Google Drive operations
+- Handles file and folder management
+- Controls sharing permissions
+- Provides search capabilities
+
+Capabilities:
+- File upload/download
+- Folder management
+- File sharing
+- Search operations
+- Metadata handling
+- Permission control
+- Batch operations
+- MIME type support
+
+Required Input Parameters:
+upload_file:
+- operation: str ('upload_file')
+- file_path: str
+
+download_file:
+- operation: str ('download_file')
+- file_id: str
+
+create_folder:
+- operation: str ('create_folder')
+- folder_name: str
+
+Optional Input Parameters:
+upload_file:
+- parent_folder: str (defaults to 'root')
+
+list_files:
+- folder_id: str (defaults to 'root')
+- page_size: int (defaults to 100)
+
+update_sharing:
+- role: str (defaults to 'reader')
+- email: str
+
+Output Format:
+upload_file:
+{
+    'success': bool,
+    'file_id': str,
+    'name': str,
+    'mime_type': str,
+    'web_link': str
+}
+
+create_folder:
+{
+    'success': bool,
+    'folder_id': str,
+    'name': str,
+    'web_link': str
+}
+
+Dependencies:
+- Google Drive API
+- Google Auth module
+- MIME type support
+- File system access
+- IO operations
+
+Common Workflows:
+1. File Management:
+   - Upload content
+   - Set metadata
+   - Configure sharing
+   - Handle permissions
+   - Return links
+
+2. Folder Operations:
+   - Create structure
+   - Set permissions
+   - Manage content
+   - Track changes
+   - Update metadata
+
+3. Search Operations:
+   - Query files
+   - Filter results
+   - Process metadata
+   - Return matches
+   - Handle pagination
+
+Error Handling:
+- Upload Errors: Retry mechanism
+- Permission Errors: Validation
+- Quota Issues: Size checking
+- API Limits: Rate handling
+- Network Errors: Auto-retry
+- MIME Errors: Type validation
+
+=== Google Sheets Module ===
+Purpose:
+- Manages Google Sheets operations
+- Handles spreadsheet data
+- Provides formatting capabilities
+- Manages charts and protection
+
+Capabilities:
+- Spreadsheet creation
+- Data management
+- Cell formatting
+- Chart creation
+- Range protection
+- Conditional formatting
+- Auto-sizing
+- Batch operations
+
+Required Input Parameters:
+create_spreadsheet:
+- operation: str ('create_spreadsheet')
+- title: str (optional, defaults to timestamp)
+
+update_values:
+- operation: str ('update_values')
+- spreadsheet_id: str
+- range: str
+- values: List[List]
+
+create_chart:
+- operation: str ('create_chart')
+- spreadsheet_id: str
+- sheet_id: str
+- chart_spec: Dict
+
+Optional Input Parameters:
+create_spreadsheet:
+- sheets: List[Dict] (defaults to [{'title': 'Sheet1'}])
+- share_with: str
+- role: str
+
+append_values:
+- major_dimension: str (defaults to 'ROWS')
+- input_option: str (defaults to 'USER_ENTERED')
+
+Output Format:
+create_spreadsheet:
+{
+    'success': bool,
+    'spreadsheet_id': str,
+    'url': str
+}
+
+update_values:
+{
+    'success': bool,
+    'updated_cells': int,
+    'updated_range': str
+}
+
+Dependencies:
+- Google Sheets API
+- Google Auth module
+- Google Drive module
+- JSON processing
+- Batch operations support
+
+Common Workflows:
+1. Data Management:
+   - Create spreadsheet
+   - Update values
+   - Format cells
+   - Apply rules
+   - Handle responses
+
+2. Chart Creation:
+   - Prepare data
+   - Configure chart
+   - Set position
+   - Apply styles
+   - Update layout
+
+3. Protection Setup:
+   - Define ranges
+   - Set permissions
+   - Configure rules
+   - Apply formats
+   - Verify access
+
+Error Handling:
+- API Errors: Proper logging
+- Format Errors: Validation
+- Range Issues: Boundary checking
+- Permission Errors: Access verification
+- Update Conflicts: Resolution strategy
+- Batch Failures: Partial updates
+
+=== GPT Handler Module ===
+Purpose:
+- Manages conversations with OpenAI's GPT models
+- Maintains conversation history and context
+- Generates AI responses based on user input
+- Handles context pruning and management
+
+Capabilities:
+- Conversation management
+- Response generation using GPT-4 or GPT-3.5
+- History tracking per user
+- Context maintenance with automatic pruning
+- System prompt management
+- Conversation clearing
+
+Required Input Parameters:
+- user_id: str (unique identifier for each user)
+- message: str (user's input message)
+
+Optional Input Parameters:
+- role: str (system/user/assistant, defaults to "user" for messages)
+- max_tokens: int (defaults to 500)
+- temperature: float (defaults to 0.7)
+- model: str (defaults to "gpt-4-turbo-preview")
+
+Output Format:
+- Response: str (generated AI response)
+- Conversation history: List[Dict[str, str]] (format: [{"role": str, "content": str}, ...])
+- Maximum history length: 11 messages (1 system prompt + 10 conversation messages)
+
+Dependencies:
+- OpenAI API key (OPENAI_API_KEY environment variable)
+- OpenAI Python package
+- Environment variables configuration
+
+Common Workflows:
+1. Basic Conversation Flow:
+   - Initialize conversation with system prompt
+   - Receive user message
+   - Generate response (max 500 tokens)
+   - Update conversation history
+   - Auto-prune if exceeding 11 messages
+
+2. Context-Aware Processing:
+   - Retrieve conversation history
+   - Append new message
+   - Generate contextual response
+   - Automatic history pruning
+   - Maintain system prompt
+
+3. History Management:
+   - Clear conversation history
+   - Reset to initial system prompt
+   - Start fresh conversation thread
+
+Error Handling:
+- API Rate Limits: Implement exponential backoff
+- Token Limit Exceeded: Automatic history pruning
+- Authentication Errors: Verify API key and permissions
+- Network Failures: Retry with backoff strategy
+- Malformed Responses: Return error message to user
+- Missing API Key: Raise ValueError with clear message
+
+=== HTML Parser Module ===
+Purpose:
+- Parses and extracts information from HTML content
+- Handles HTML cleaning and normalization
+- Provides structured data extraction
+- Manages HTML element selection
+
+Capabilities:
+- HTML content parsing
+- Text extraction
+- Link extraction
+- Table parsing
+- Form analysis
+- Element selection
+- HTML cleaning
+- Content normalization
+
+Required Input Parameters:
+load_html:
+- html_content: str
+- parser: str (defaults to 'html.parser')
+
+find_elements:
+- selector: str (CSS selector)
+
+Optional Input Parameters:
+extract_text:
+- selector: Optional[str]
+- clean: bool (defaults to True)
+
+extract_links:
+- base_url: Optional[str]
+
+Output Format:
+extract_text:
+- str: Cleaned text content
+
+extract_links:
+[{
+    'url': str,
+    'text': str,
+    'title': str
+}]
+
+extract_tables:
+[
+    [['cell1', 'cell2'], ['cell3', 'cell4']]  # List of tables with rows
+]
+
+extract_forms:
+[{
+    'action': str,
+    'method': str,
+    'fields': [{
+        'type': str,
+        'name': str,
+        'id': str,
+        'value': str,
+        'required': bool
+    }]
+}]
+
+Dependencies:
+- BeautifulSoup4 library
+- URL parsing support
+- Regular expressions
+- HTML parsing backends
+
+Common Workflows:
+1. Content Extraction:
+   - Load HTML
+   - Clean content
+   - Extract text
+   - Process results
+   - Format output
+
+2. Element Analysis:
+   - Find elements
+   - Extract attributes
+   - Process content
+   - Structure data
+   - Return results
+
+3. Form Processing:
+   - Extract forms
+   - Analyze fields
+   - Validate structure
+   - Process inputs
+   - Return metadata
+
+Error Handling:
+- Parse Errors: Safe fallback
+- Selector Errors: Empty results
+- Encoding Issues: UTF-8 handling
+- Missing Elements: Default values
+- Structure Errors: Graceful degradation
+- Memory Issues: Size management
+
+=== Notification Module ===
+Purpose:
+- Handles system notifications and alerts
+- Manages multiple notification channels
+- Provides unified notification interface
+- Controls notification delivery
+
+Capabilities:
+- Multi-channel notifications
+- Email notifications
+- Slack notifications
+- Desktop notifications
+- Channel management
+- Delivery tracking
+- Status monitoring
+- Async operations
+
+Required Input Parameters:
+send_notification:
+- recipient: str
+- message: str
+
+Optional Input Parameters:
+send_notification:
+- channel: str (defaults to "all")
+- **kwargs: Additional channel-specific parameters
+
+Output Format:
+send_notification (all channels):
+{
+    "status": str,
+    "results": {
+        "email": {"delivered": bool},
+        "slack": {"delivered": bool},
+        "desktop": {"delivered": bool}
+    }
+}
+
+send_notification (single channel):
+{
+    "status": str,
+    "result": {
+        "delivered": bool,
+        "channel": str
+    }
+}
+
+Dependencies:
+- Email sender module
+- Slack integration
+- Desktop notification system
+- Async support
+- Logging system
+
+Common Workflows:
+1. Multi-channel Notification:
+   - Validate message
+   - Check channels
+   - Send notifications
+   - Track delivery
+   - Report status
+
+2. Channel Management:
+   - Enable channels
+   - Verify status
+   - Handle failures
+   - Update settings
+   - Monitor delivery
+
+3. Status Tracking:
+   - Send notification
+   - Monitor delivery
+   - Handle failures
+   - Report results
+   - Log outcomes
+
+Error Handling:
+- Channel Errors: Alternative delivery
+- Delivery Failures: Retry mechanism
+- Invalid Recipients: Validation
+- Message Errors: Format checking
+- Channel Unavailable: Fallback options
+- Connection Issues: Auto-retry
+
+=== Report Generator Module ===
+Purpose:
+- Generates formatted reports from data
+- Supports multiple output formats
+- Handles report structuring
+- Manages report storage
+
+Capabilities:
+- Report generation
+- Multiple format support
+- Data formatting
+- File output
+- Directory management
+- Structure validation
+- Format conversion
+- Template handling
+
+Required Input Parameters:
+execute:
+- data: Dict[str, Any]
+- output_path: str
+
+Optional Input Parameters:
+execute:
+- format: str (defaults to 'json')
+  Options: 'json', 'txt', 'html'
+
+Output Format:
+Standard response:
+{
+    'report_path': str,
+    'format': str
+}
+
+JSON format:
+{
+    // Original data structure preserved
+}
+
+Text format:
+Hierarchical text representation with indentation
+
+HTML format:
+Structured HTML with definition lists
+
+Dependencies:
+- File system access
+- JSON processing
+- HTML generation
+- Path management
+- Logging system
+
+Common Workflows:
+1. Report Creation:
+   - Validate data
+   - Format content
+   - Generate report
+   - Save file
+   - Return path
+
+2. Format Conversion:
+   - Parse input
+   - Apply formatting
+   - Generate output
+   - Validate result
+   - Save report
+
+3. Directory Management:
+   - Check paths
+   - Create directories
+   - Save files
+   - Manage structure
+   - Handle permissions
+
+Error Handling:
+- File Access Errors: Path validation
+- Format Errors: Type checking
+- Data Validation: Structure verification
+- Directory Issues: Auto-creation
+- Permission Errors: Access checking
+- Memory Issues: Size management
+
+=== Response Generator Module ===
+Purpose:
+- Generates email responses
+- Reviews and improves responses
+- Maintains professional tone
+- Handles context-aware generation
+
+Capabilities:
+- Response generation
+- Response review
+- Improvement suggestions
+- Context awareness
+- Tone management
+- Follow-up handling
+- Priority assessment
+- Format validation
+
+Required Input Parameters:
+generate_response:
+- operation: str ('generate_response')
+- email_data: Dict
+- classification: Dict
+
+review_response:
+- operation: str ('review_response')
+- draft_response: str
+- original_email: str
+
+Optional Input Parameters:
+generate_response:
+- business_context: Dict (defaults to empty context)
+  {
+    'company_name': str,
+    'role': str,
+    'tone': str
+  }
+
+Output Format:
+generate_response:
+{
+    'email_id': str,
+    'response': {
+        'subject': str,
+        'body': str,
+        'next_steps': List[str],
+        'follow_up_needed': bool,
+        'follow_up_date': Optional[str]
+    }
+}
+
+review_response:
+{
+    'is_appropriate': bool,
+    'suggestions': List[str],
+    'improved_version': str,
+    'tone_analysis': str,
+    'completeness_score': int
+}
+
+Dependencies:
+- GPT Handler module
+- JSON processing
+- Business context
+- Logging system
+- Email formatting
+
+Common Workflows:
+1. Response Generation:
+   - Process email data
+   - Apply classification
+   - Generate response
+   - Format output
+   - Handle follow-ups
+
+2. Response Review:
+   - Analyze draft
+   - Check completeness
+   - Suggest improvements
+   - Validate tone
+   - Return feedback
+
+3. Context Management:
+   - Load context
+   - Apply settings
+   - Generate content
+   - Validate output
+   - Format response
+
+Error Handling:
+- GPT Errors: Default responses
+- Parse Errors: Safe formatting
+- Context Issues: Default values
+- Generation Failures: Fallback text
+- Format Errors: Structure validation
+- Invalid Input: Parameter checking
+
+=== Session Manager Module ===
+Purpose:
+- Manages web sessions across multiple domains
+- Handles authentication and cookies
+- Maintains session state
+- Controls session lifecycle
+
+Capabilities:
+- Session creation and management
+- Cookie handling
+- Authentication management
+- Request handling
+- Session expiration
+- Domain tracking
+- Multi-domain support
+- Async operations
+
+Required Input Parameters:
+create_session:
+- url: str
+
+authenticate:
+- url: str
+- auth_data: Dict[str, Any]
+
+make_request:
+- method: str
+- url: str
+
+Optional Input Parameters:
+authenticate:
+- auth_method: str (defaults to 'POST')
+
+make_request:
+- session: Optional[Session]
+- **kwargs: Additional request parameters
+
+initialization:
+- session_timeout: int (defaults to 3600)
+- max_sessions: int (defaults to 100)
+
+Output Format:
+create_session/get_session:
+Session object with:
+{
+    'domain': str,
+    'cookies': Dict[str, str],
+    'headers': Dict[str, str],
+    'is_authenticated': bool,
+    'auth_token': Optional[str],
+    'expiry': datetime
+}
+
+get_session_stats:
+{
+    'total_sessions': int,
+    'active_sessions': int,
+    'authenticated_sessions': int,
+    'oldest_session': Optional[str],
+    'newest_session': Optional[str]
+}
+
+Dependencies:
+- aiohttp package
+- Core Request module
+- URL parsing support
+- Cookie handling
+- Async support
+
+Common Workflows:
+1. Session Management:
+   - Create session
+   - Handle cookies
+   - Track expiration
+   - Manage authentication
+   - Clean up expired
+
+2. Request Handling:
+   - Get/create session
+   - Add auth headers
+   - Make request
+   - Update cookies
+   - Handle response
+
+3. Authentication Flow:
+   - Create session
+   - Send auth request
+   - Store tokens
+   - Update session
+   - Handle expiry
+
+Error Handling:
+- Invalid URLs: Proper validation
+- Session Expiry: Auto cleanup
+- Auth Failures: Retry logic
+- Cookie Errors: Safe parsing
+- Request Errors: Error propagation
+- Concurrent Access: Thread safety
+
+=== System Interaction Module ===
+Purpose:
+- Handles system-level operations
+- Manages file operations
+- Controls process management
+- Provides system interface
+
+Capabilities:
+- File opening
+- Process management
+- Application handling
+- System monitoring
+- Process listing
+- Process termination
+- Default application mapping
+- Error handling
+
+Required Input Parameters:
+open_file:
+- file_path: str
+
+kill_process:
+- pid: int
+
+Optional Input Parameters:
+open_file:
+- application: Optional[str]
+
+Output Format:
+open_file:
+- bool: Success status
+
+list_running_processes:
+[{
+    'pid': int,
+    'name': str,
+    'cpu_percent': float,
+    'memory_percent': float
+}]
+
+kill_process:
+- bool: Success status
+
+Dependencies:
+- psutil package
+- subprocess module
+- OS-specific utilities
+- File system access
+- Process access rights
+
+Common Workflows:
+1. File Operations:
+   - Validate path
+   - Check permissions
+   - Open file
+   - Handle response
+   - Monitor process
+
+2. Process Management:
+   - List processes
+   - Monitor resources
+   - Kill processes
+   - Track status
+   - Handle errors
+
+3. Application Control:
+   - Select application
+   - Launch process
+   - Monitor execution
+   - Handle termination
+   - Clean up
+
+Error Handling:
+- File Access: Permission checking
+- Process Control: Safe termination
+- Application Errors: Graceful fallback
+- System Errors: Proper logging
+- Resource Issues: Monitoring
+- Permission Errors: User notification
+
+=== Trello Integration Module ===
+Purpose:
+- Manages Trello integration
+- Handles task management
+- Controls board operations
+- Provides card management
+
+Capabilities:
+- Board creation/management
+- List management
+- Card operations
+- Task tracking
+- Board retrieval
+- List organization
+- API integration
+- Authentication handling
+
+Required Input Parameters:
+create_board:
+- operation: str ('create_board')
+- name: str
+
+create_list:
+- operation: str ('create_list')
+- board_id: str
+- name: str
+
+create_card:
+- operation: str ('create_card')
+- list_id: str
+- name: str
+
+get_lists:
+- operation: str ('get_lists')
+- board_id: str
+
+Optional Input Parameters:
+create_card:
+- description: str
+
+create_board:
+- defaultLists: bool (defaults to false)
+
+Output Format:
+create_board:
+{
+    'id': str,
+    'name': str,
+    'url': str
+}
+
+create_list:
+{
+    'id': str,
+    'name': str,
+    'idBoard': str
+}
+
+get_boards:
+{
+    'boards': [{
+        'id': str,
+        'name': str,
+        'url': str
+    }]
+}
+
+Dependencies:
+- Trello API credentials
+- Requests package
+- Environment configuration
+- Credential management
+- HTTP client
+
+Common Workflows:
+1. Board Management:
+   - Create board
+   - Add lists
+   - Configure settings
+   - Track changes
+   - Manage access
+
+2. Task Organization:
+   - Create lists
+   - Add cards
+   - Update status
+   - Move items
+   - Track progress
+
+3. Card Handling:
+   - Create cards
+   - Add details
+   - Set attributes
+   - Update status
+   - Manage attachments
+
+Error Handling:
+- API Errors: Proper logging
+- Auth Issues: Token refresh
+- Rate Limits: Request throttling
+- Network Errors: Retry logic
+- Invalid Data: Parameter validation
+- Permission Errors: Access checking
+
+=== Web Scraper Module ===
+Purpose:
+- Scrapes web content
+- Extracts structured data
+- Handles multiple URLs
+- Processes HTML content
+
+Capabilities:
+- Web scraping
+- HTML parsing
+- Content extraction
+- Multi-URL support
+- Selector-based extraction
+- Async operations
+- Header management
+- Error handling
+
+Required Input Parameters:
+execute:
+- url: str or List[str]
+- selectors: Dict[str, str]
+
+Optional Input Parameters:
+execute:
+- headers: Dict[str, str]
+
+Output Format:
+Standard response:
+{
+    'scraped_data': {
+        'url1': {
+            'selector_key1': List[str],
+            'selector_key2': List[str]
+        },
+        'url2': {
+            'selector_key1': List[str],
+            'selector_key2': List[str]
+        }
+    }
+}
+
+Error response:
+{
+    'url': {
+        'error': str
+    }
+}
+
+Dependencies:
+- aiohttp package
+- BeautifulSoup4
+- Async support
+- HTML parsing
+- HTTP client
+
+Common Workflows:
+1. Content Extraction:
+   - Fetch URLs
+   - Parse HTML
+   - Apply selectors
+   - Extract content
+   - Format results
+
+2. Batch Processing:
+   - Handle multiple URLs
+   - Manage connections
+   - Process responses
+   - Aggregate results
+   - Handle errors
+
+3. Data Collection:
+   - Configure selectors
+   - Extract data
+   - Clean content
+   - Remove duplicates
+   - Format output
+
+Error Handling:
+- Network Errors: Retry mechanism
+- Parse Errors: Safe extraction
+- Invalid URLs: Proper validation
+- Timeout Issues: Configurable limits
+- Memory Issues: Resource management
+- Connection Errors: Graceful degradation

@@ -1,6 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
+<<<<<<< HEAD
     name="office-agent",
     version="0.1.0",
     packages=find_packages(where="src"),
@@ -23,4 +24,19 @@ setup(
             if line.strip() and not line.startswith("#") and not line.startswith("-r")
         ],
     },
+=======
+    name="office-assistant",
+    version="0.1.0",
+    packages=find_packages(),
+    install_requires=[
+        "slack-bolt",
+        "slack-sdk",
+        "openai",
+        "pyyaml",
+        "python-dotenv",
+        "pytest",
+        "pytest-asyncio"
+    ],
+    python_requires=">=3.11",
+>>>>>>> main
 ) 

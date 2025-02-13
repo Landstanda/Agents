@@ -1,0 +1,271 @@
+================================================================================
+Session Started: 03:03:17 AM Feb 12, 2025
+================================================================================
+
+
+================================================================================
+[03:03:17 AM] OfficeAssistant - incoming_message
+--------------------------------------------------------------------------------
+Incoming Message: "<@U08CFAH1H1Q> can you schedule a meeting for 11:11 am tomorrow?"
+
+
+================================================================================
+[03:03:17 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+message: "can you schedule a meeting for 11:11 am tomorrow?"
+user: "U08CFAH1H1Q"
+
+
+================================================================================
+[03:03:17 AM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+service: "schedule_meeting"
+intent: "schedule_meeting"
+entities: {
+  "time": "11:11",
+  "date": "tomorrow"
+}
+user: "U08CFAH1H1Q"
+
+
+================================================================================
+[03:03:17 AM] OfficeAssistant - message_analysis
+--------------------------------------------------------------------------------
+nlp_result: {
+  "status": "matched",
+  "service": "schedule_meeting",
+  "intent": "schedule_meeting",
+  "entities": {
+    "time": "11:11",
+    "date": "tomorrow"
+  },
+  "user_info": {
+    "user_id": "U08CFAH1H1Q"
+  }
+}
+
+
+================================================================================
+[03:03:17 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+analysis: {
+  "status": "matched",
+  "service": "schedule_meeting",
+  "intent": "schedule_meeting",
+  "entities": {
+    "time": "11:11",
+    "date": "tomorrow"
+  },
+  "user_info": {
+    "user_id": "U08CFAH1H1Q"
+  }
+}
+
+
+================================================================================
+[03:03:17 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "schedule_meeting"
+response: {
+  "text": "I've scheduled the meeting for {date} at {display_time}.",
+  "params": {
+    "date": "tomorrow",
+    "display_time": "11:11",
+    "participants": ""
+  }
+}
+
+
+================================================================================
+[03:03:17 AM] OfficeAssistant - response_generation
+--------------------------------------------------------------------------------
+Original Message: "can you schedule a meeting for 11:11 am tomorrow?"
+Response Type: direct
+Response Text: "I've scheduled the meeting for {date} at {display_time}."
+Parameters:
+  - date: tomorrow
+  - display_time: 11:11
+  - participants: 
+
+
+================================================================================
+[03:03:17 AM] OfficeAssistant - sending_response
+--------------------------------------------------------------------------------
+response: {
+  "text": "I've scheduled the meeting for {date} at {display_time}.",
+  "params": {
+    "date": "tomorrow",
+    "display_time": "11:11",
+    "participants": ""
+  },
+  "use_gpt": true
+}
+
+
+================================================================================
+[03:03:17 AM] MessageMaker - preparing_message
+--------------------------------------------------------------------------------
+Channel: C08CF2DPMH8
+Original Text: "{'text': "I've scheduled the meeting for {date} at {display_time}.", 'params': {'date': 'tomorrow', 'display_time': '11:11', 'participants': ''}, 'use_gpt': True}"
+
+
+================================================================================
+[03:03:19 AM] MessageMaker - message_formatted
+--------------------------------------------------------------------------------
+Original Text: "{'text': "I've scheduled the meeting for {date} at {display_time}.", 'params': {'date': 'tomorrow', 'display_time': '11:11', 'participants': ''}, 'use_gpt': True}"
+Formatted Text: "Great! The meeting has been scheduled for tomorrow at 11:11. Thank you for arranging that."
+
+
+================================================================================
+[03:03:19 AM] MessageMaker - message_sent
+--------------------------------------------------------------------------------
+Channel: C08CF2DPMH8
+Final Message: "Great! The meeting has been scheduled for tomorrow at 11:11. Thank you for arranging that."
+Send Status: Success
+
+
+================================================================================
+[03:03:34 AM] OfficeAssistant - incoming_message
+--------------------------------------------------------------------------------
+Incoming Message: "<@U08CFAH1H1Q> help"
+
+
+================================================================================
+[03:03:34 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+message: "help"
+user: "U08CFAH1H1Q"
+
+
+================================================================================
+[03:03:34 AM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+service: "help"
+intent: "help"
+entities: {}
+user: "U08CFAH1H1Q"
+
+
+================================================================================
+[03:03:34 AM] OfficeAssistant - message_analysis
+--------------------------------------------------------------------------------
+nlp_result: {
+  "status": "matched",
+  "service": "help",
+  "intent": "help",
+  "entities": {},
+  "user_info": {
+    "user_id": "U08CFAH1H1Q"
+  }
+}
+
+
+================================================================================
+[03:03:34 AM] OfficeAssistant - response_generation
+--------------------------------------------------------------------------------
+Original Message: "help"
+Response Type: direct
+Response Text: "Show me what commands and capabilities are available"
+
+================================================================================
+[03:03:34 AM] OfficeAssistant - sending_response
+--------------------------------------------------------------------------------
+response: {
+  "text": "Show me what commands and capabilities are available",
+  "params": {},
+  "use_gpt": true
+}
+
+
+================================================================================
+[03:03:34 AM] MessageMaker - preparing_message
+--------------------------------------------------------------------------------
+Channel: C08CF2DPMH8
+Original Text: "{'text': 'Show me what commands and capabilities are available', 'params': {}, 'use_gpt': True}"
+
+
+================================================================================
+[03:03:35 AM] MessageMaker - message_formatted
+--------------------------------------------------------------------------------
+Original Text: "{'text': 'Show me what commands and capabilities are available', 'params': {}, 'use_gpt': True}"
+Formatted Text: "Of course! I can assist you with a variety of tasks such as providing information, answering questions, setting reminders, and more. Feel free to ask me anything you need help with!"
+
+
+================================================================================
+[03:03:36 AM] MessageMaker - message_sent
+--------------------------------------------------------------------------------
+Channel: C08CF2DPMH8
+Final Message: "Of course! I can assist you with a variety of tasks such as providing information, answering questions, setting reminders, and more. Feel free to ask me anything you need help with!"
+Send Status: Success
+
+
+================================================================================
+[03:03:53 AM] OfficeAssistant - incoming_message
+--------------------------------------------------------------------------------
+Incoming Message: "<@U08CFAH1H1Q> check my emails"
+
+
+================================================================================
+[03:03:53 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+message: "check my emails"
+user: "U08CFAH1H1Q"
+
+
+================================================================================
+[03:03:53 AM] NLPAnalyzer - no_match_found
+--------------------------------------------------------------------------------
+message: "check my emails"
+user: "U08CFAH1H1Q"
+
+
+================================================================================
+[03:03:53 AM] OfficeAssistant - message_analysis
+--------------------------------------------------------------------------------
+nlp_result: {
+  "status": "unknown",
+  "message": "check my emails",
+  "user_info": {
+    "user_id": "U08CFAH1H1Q"
+  }
+}
+
+
+================================================================================
+[03:03:53 AM] OfficeAssistant - response_generation
+--------------------------------------------------------------------------------
+Original Message: "check my emails"
+Response Type: request_info
+Response Text: "Inform the user that I don't understand their request and suggest using the help command"
+
+================================================================================
+[03:03:53 AM] OfficeAssistant - sending_response
+--------------------------------------------------------------------------------
+response: {
+  "text": "Inform the user that I don't understand their request and suggest using the help command",
+  "params": {},
+  "use_gpt": true
+}
+
+
+================================================================================
+[03:03:53 AM] MessageMaker - preparing_message
+--------------------------------------------------------------------------------
+Channel: C08CF2DPMH8
+Original Text: "{'text': "Inform the user that I don't understand their request and suggest using the help command", 'params': {}, 'use_gpt': True}"
+
+
+================================================================================
+[03:03:54 AM] MessageMaker - message_formatted
+--------------------------------------------------------------------------------
+Original Text: "{'text': "Inform the user that I don't understand their request and suggest using the help command", 'params': {}, 'use_gpt': True}"
+Formatted Text: "I'm sorry, but I'm not quite sure what you're asking. Feel free to use the "help" command for assistance with your query!"
+
+
+================================================================================
+[03:03:54 AM] MessageMaker - message_sent
+--------------------------------------------------------------------------------
+Channel: C08CF2DPMH8
+Final Message: "I'm sorry, but I'm not quite sure what you're asking. Feel free to use the "help" command for assistance with your query!"
+Send Status: Success
+

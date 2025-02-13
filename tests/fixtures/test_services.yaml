@@ -1,0 +1,15 @@
+test_service:
+  description: A test service
+  intent: test_intent
+  name: test_service
+  required_entities:
+  - entity1
+  steps:
+  - action: test_action
+    params:
+      param1: value1
+    tool: test_tool
+  success_criteria:
+  - test_criterion
+  triggers:
+  - test trigger

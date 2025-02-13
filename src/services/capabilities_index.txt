@@ -1,0 +1,183 @@
+# AI Secretary Capabilities Index
+
+## Part 1: Direct Capability Mapping
+This section maps specific capabilities to modules that can perform them, ordered by capability name.
+
+### A
+- Attachment Handling → Email Sender, File Transfer
+- Authentication (Basic) → Basic Auth
+- Authentication (Google) → Google Auth
+- Automated Web Browsing → Browser Automation
+
+### B
+- Board Management → Trello Integration
+- Browser Control → Browser Automation
+
+### C
+- Calendar Management → Google Calendar
+- Card Management → Trello Integration
+- Content Extraction → Web Scraper, HTML Parser
+- Cookie Management → Session Manager
+- Credential Storage → Basic Auth
+
+### D
+- Data Cleaning → Data Cleaner
+- Document Creation → Google Docs
+- Document Management → Document Management
+- Document Storage → Google Drive
+
+### E
+- Email Classification → Email Classifier
+- Email Reading → Email Reader
+- Email Response Generation → Response Generator
+- Email Searching → Email Reader
+- Email Sending → Email Sender
+
+### F
+- File Conversion → Document Management
+- File Organization → File Transfer
+- File Search → Google Drive
+- File Transfer → File Transfer
+- Form Automation → Browser Automation
+
+### H
+- Header Management → Browser Headers
+- HTML Parsing → HTML Parser, Web Scraper
+
+### N
+- Notifications → Notification Module
+
+### P
+- Process Management → System Interaction
+- Project Organization → Trello Integration
+
+### R
+- Report Generation → Report Generator
+- Response Generation → Response Generator
+
+### S
+- Session Management → Session Manager
+- Slack Communication → Message Maker
+- System Operations → System Interaction
+
+### T
+- Task Tracking → Trello Integration
+- Text Extraction → HTML Parser, Web Scraper
+
+### W
+- Web Scraping → Web Scraper
+- Web Session Management → Session Manager
+
+## Part 2: Module Capability Suites
+This section shows the complete capability suite of each module, helping identify which modules can handle multiple related tasks.
+
+### Browser Automation Module Suite
+- Web page navigation
+- Element interaction
+- Form filling
+- Screenshot capture
+- Download management
+- Headless browsing
+- JavaScript execution
+
+### Email Management Suite
+Email Reader:
+- Email search
+- Content retrieval
+- Metadata extraction
+- Label management
+
+Email Classifier:
+- Content analysis
+- Priority assessment
+- Action determination
+- Time sensitivity analysis
+
+Email Sender:
+- Message composition
+- Attachment handling
+- Follow-up scheduling
+- Thread management
+
+### File Management Suite
+File Transfer:
+- Multi-service transfer
+- Batch operations
+- Directory management
+- Organization
+
+Document Management:
+- Version control
+- Format conversion
+- Metadata tracking
+- Content management
+
+Google Drive:
+- File storage
+- Permission management
+- Search operations
+- Folder organization
+
+### Integration Suite
+Trello Integration:
+- Board management
+- List organization
+- Card handling
+- Task tracking
+
+Google Calendar:
+- Event scheduling
+- Availability checking
+- Reminder management
+- Attendee coordination
+
+### System Suite
+System Interaction:
+- Process management
+- File operations
+- Application control
+- Resource monitoring
+
+Session Manager:
+- Cookie handling
+- Authentication state
+- Request management
+- Domain tracking
+
+## Part 3: Common Task Chains
+This section shows how to combine modules for common complex tasks.
+
+### Email Processing Chain
+Find and Process Email → Send Response with Attachments:
+1. Email Reader (find email)
+2. Email Classifier (analyze content)
+3. Google Drive (find referenced files)
+4. Response Generator (create response)
+5. Email Sender (send with attachments)
+
+### Document Processing Chain
+Create and Share Document:
+1. Document Management (create document)
+2. Google Docs (edit content)
+3. Google Drive (set permissions)
+4. Email Sender (notify recipients)
+
+### Web Data Collection Chain
+Gather and Process Web Data:
+1. Browser Headers (prepare request)
+2. Web Scraper (collect data)
+3. Data Cleaner (normalize data)
+4. Report Generator (create report)
+
+### Task Management Chain
+Create and Track Project Tasks:
+1. Email Classifier (analyze requirements)
+2. Trello Integration (create board/cards)
+3. Google Calendar (schedule deadlines)
+4. Notification Module (send updates)
+
+## Usage Guidelines
+1. For single capabilities, use Part 1 to find the most appropriate module
+2. For related tasks, check Part 2 to find modules that can handle multiple aspects
+3. For complex operations, refer to Part 3 for proven module chains
+4. Always verify module dependencies in module_capabilities.txt before chaining 

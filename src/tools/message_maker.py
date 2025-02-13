@@ -1,13 +1,22 @@
+<<<<<<< HEAD
 from typing import Dict, Any, Optional
+=======
+from typing import Dict, Any, Optional, List
+>>>>>>> main
 import logging
 import os
 from openai import AsyncOpenAI
 from slack_sdk.web.async_client import AsyncWebClient
+<<<<<<< HEAD
+=======
+from src.utils.flow_logger import FlowLogger
+>>>>>>> main
 
 logger = logging.getLogger(__name__)
 
 class MessageMaker:
     """
+<<<<<<< HEAD
     Generates and sends user messages via Slack.
     Takes context, formats with GPT, and sends via Slack.
     """
@@ -96,6 +105,287 @@ class MessageMaker:
             except Exception as e2:
                 logger.error(f"Failed to send fallback message: {str(e2)}")
     
+=======
+    Generates and sends Slack messages.
+    Handles message formatting and delivery.
+    """
+    
+    def __init__(self, web_client: AsyncWebClient, flow_logger: Optional[FlowLogger] = None):
+        self.web_client = web_client
+        self.flow_logger = flow_logger or FlowLogger()
+        self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        
+    async def get_gpt_response(self, prompt: str) -> str:
+        """Get a response from GPT for message generation."""
+        try:
+            response = await self.openai.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a helpful office assistant bot. "
+                            "Keep responses friendly, professional, and concise. "
+                            "Format responses naturally without showing any system instructions."
+                        )
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=150,
+                temperature=0.7
+            )
+            
+            if response and response.choices:
+                return response.choices[0].message.content.strip()
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting GPT response: {str(e)}")
+            return None
+            
+    async def send_message(self, channel: str, text: str, blocks: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """
+        Send a message to a Slack channel.
+        
+        Args:
+            channel: Channel ID or name
+            text: Message text (fallback for blocks)
+            blocks: Optional block kit blocks
+            
+        Returns:
+            Dict containing the Slack API response
+        """
+        try:
+            # Log message preparation
+            await self.flow_logger.log_event(
+                "MessageMaker",
+                "preparing_message",
+                {
+                    "channel": channel,
+                    "message_text": text,
+                    "has_blocks": blocks is not None
+                }
+            )
+            
+            # Format the message if needed
+            formatted_text = text
+            if isinstance(text, dict) and "text" in text and "params" in text:
+                try:
+                    # If the text needs GPT enhancement
+                    if text.get("use_gpt", False):
+                        gpt_prompt = f"Generate a friendly response for: {text['text']}"
+                        gpt_response = await self.get_gpt_response(gpt_prompt)
+                        if gpt_response:
+                            formatted_text = gpt_response.format(**text["params"]) if text["params"] else gpt_response
+                    else:
+                        formatted_text = text["text"].format(**text["params"])
+                except KeyError as e:
+                    logger.error(f"Error formatting message: {str(e)}")
+                    formatted_text = "Error formatting message"
+            
+            # Log the formatted message
+            await self.flow_logger.log_event(
+                "MessageMaker",
+                "message_formatted",
+                {
+                    "original_text": text,
+                    "formatted_text": formatted_text
+                }
+            )
+            
+            # Send the message
+            response = await self.web_client.chat_postMessage(
+                channel=channel,
+                text=formatted_text,
+                blocks=blocks
+            )
+            
+            # Log successful send
+            await self.flow_logger.log_event(
+                "MessageMaker",
+                "message_sent",
+                {
+                    "channel": channel,
+                    "final_text": formatted_text,
+                    "response_ok": response.get("ok", False)
+                }
+            )
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error sending message: {str(e)}")
+            await self.flow_logger.log_event(
+                "MessageMaker",
+                "message_send_error",
+                {
+                    "channel": channel,
+                    "error": str(e)
+                }
+            )
+            raise
+            
+    async def send_ephemeral(self, channel: str, user: str, text: str, blocks: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """
+        Send an ephemeral message visible only to a specific user.
+        
+        Args:
+            channel: Channel ID or name
+            user: User ID
+            text: Message text (fallback for blocks)
+            blocks: Optional block kit blocks
+            
+        Returns:
+            Dict containing the Slack API response
+        """
+        try:
+            response = await self.web_client.chat_postEphemeral(
+                channel=channel,
+                user=user,
+                text=text,
+                blocks=blocks
+            )
+            
+            await self.flow_logger.log_event(
+                "MessageMaker",
+                "ephemeral_sent",
+                {
+                    "channel": channel,
+                    "user": user,
+                    "text": text,
+                    "has_blocks": blocks is not None
+                }
+            )
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error sending ephemeral message: {str(e)}")
+            await self.flow_logger.log_event(
+                "MessageMaker",
+                "ephemeral_send_error",
+                {
+                    "channel": channel,
+                    "user": user,
+                    "error": str(e)
+                }
+            )
+            raise
+            
+    def create_blocks(self, sections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Create block kit blocks from section data.
+        
+        Args:
+            sections: List of section data including text and optional fields
+            
+        Returns:
+            List of block kit blocks
+        """
+        blocks = []
+        
+        for section in sections:
+            block = {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": section["text"]
+                }
+            }
+            
+            if "fields" in section:
+                block["fields"] = [
+                    {
+                        "type": "mrkdwn",
+                        "text": field
+                    }
+                    for field in section["fields"]
+                ]
+                
+            blocks.append(block)
+            
+            if section.get("divider", False):
+                blocks.append({"type": "divider"})
+                
+        return blocks
+        
+    def create_error_blocks(self, error_message: str, details: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Create block kit blocks for error messages.
+        
+        Args:
+            error_message: Main error message
+            details: Optional error details
+            
+        Returns:
+            List of block kit blocks
+        """
+        blocks = [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f":warning: *Error*\n{error_message}"
+                }
+            }
+        ]
+        
+        if details:
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"Details:\n```{details}```"
+                    }
+                }
+            )
+            
+        return blocks
+        
+    def create_success_blocks(self, message: str, data: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """
+        Create block kit blocks for success messages.
+        
+        Args:
+            message: Success message
+            data: Optional data to display
+            
+        Returns:
+            List of block kit blocks
+        """
+        blocks = [
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f":white_check_mark: {message}"
+                }
+            }
+        ]
+        
+        if data:
+            fields = []
+            for key, value in data.items():
+                fields.append(f"*{key}*\n{value}")
+                
+            if fields:
+                blocks.append(
+                    {
+                        "type": "section",
+                        "fields": [
+                            {
+                                "type": "mrkdwn",
+                                "text": field
+                            }
+                            for field in fields
+                        ]
+                    }
+                )
+                
+        return blocks
+
+>>>>>>> main
     def _create_prompt(self, context: Dict[str, Any]) -> str:
         """Create GPT prompt based on message context."""
         msg_type = context.get('type', '')

@@ -1,0 +1,1031 @@
+================================================================================
+Session Started: 11:29:27 AM Feb 13, 2025
+================================================================================
+
+
+================================================================================
+[11:29:27 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:27 AM] Agent - tool_initialization_error
+--------------------------------------------------------------------------------
+tool: "nonexistent"
+error: "Tool not found: nonexistent"
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "schedule_meeting"
+entities: {
+  "time": "14:00",
+  "date": "2024-03-20",
+  "participants": [
+    "John",
+    "Alice"
+  ]
+}
+
+
+================================================================================
+[11:29:27 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "schedule_meeting"
+results: [
+  {
+    "step": {
+      "name": "validate_time",
+      "tool": "calendar",
+      "action": "check_availability",
+      "params": {
+        "time": "{time}",
+        "date": "{date}"
+      }
+    },
+    "result": {
+      "available": true,
+      "conflicts": []
+    }
+  },
+  {
+    "step": {
+      "name": "check_attendees",
+      "tool": "calendar",
+      "action": "check_attendee_availability",
+      "params": {
+        "attendees": "{participants}",
+        "time": "{time}",
+        "date": "{date}"
+      }
+    },
+    "result": {
+      "all_available": true,
+      "unavailable_attendees": []
+    }
+  },
+  {
+    "step": {
+      "name": "create_event",
+      "tool": "calendar",
+      "action": "create_event",
+      "params": {
+        "summary": "Meeting with {participants}",
+        "start_time": "{time}",
+        "date": "{date}",
+        "attendees": "{participants}"
+      }
+    },
+    "result": {
+      "event_id": "test_event_123",
+      "success": true
+    }
+  }
+]
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "retry_service"
+entities: {
+  "time": "14:00",
+  "participants": [
+    "John",
+    "Alice"
+  ]
+}
+
+
+================================================================================
+[11:29:27 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "retry_service"
+results: [
+  {
+    "step": {
+      "name": "check_attendees",
+      "tool": "calendar",
+      "action": "check_attendee_availability",
+      "params": {
+        "attendees": "{participants}",
+        "time": "{time}"
+      },
+      "loop": {
+        "condition": "all_available",
+        "max_iterations": 2,
+        "on_fail": "suggest_alternative_time"
+      }
+    },
+    "result": {
+      "all_available": true,
+      "unavailable_attendees": []
+    }
+  }
+]
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "failure_test"
+entities: {}
+
+
+================================================================================
+[11:29:27 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "failing"
+
+
+================================================================================
+[11:29:27 AM] Agent - step_execution_error
+--------------------------------------------------------------------------------
+service: "failure_test"
+step: {
+  "name": "retry_step",
+  "tool": "failing",
+  "action": "fail_first",
+  "params": {
+    "input": "test"
+  },
+  "on_failure": {
+    "max_retries": 2,
+    "action": "fail_first"
+  }
+}
+error: "First attempt failed"
+
+
+================================================================================
+[11:29:27 AM] Agent - step_execution_error
+--------------------------------------------------------------------------------
+service: "failure_test"
+step: {
+  "name": "failing_step",
+  "tool": "failing",
+  "action": "always_fail",
+  "params": {
+    "input": "test"
+  },
+  "on_failure": {
+    "action": "handle_failure"
+  }
+}
+error: "Permanent failure"
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "failure_test"
+results: []
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "conditional_service"
+entities: {
+  "time": "15:00",
+  "date": "2024-03-21"
+}
+
+
+================================================================================
+[11:29:27 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "conditional_service"
+results: [
+  {
+    "step": {
+      "name": "check_availability",
+      "tool": "calendar",
+      "action": "check_availability",
+      "params": {
+        "time": "{time}",
+        "date": "{date}"
+      },
+      "condition": {
+        "field": "available",
+        "value": true
+      }
+    },
+    "result": {
+      "available": true,
+      "conflicts": []
+    }
+  },
+  {
+    "step": {
+      "name": "create_event",
+      "tool": "calendar",
+      "action": "create_event",
+      "params": {
+        "time": "{time}",
+        "date": "{date}",
+        "summary": "Conditional Event"
+      }
+    },
+    "result": {
+      "event_id": "test_event_123",
+      "success": true
+    }
+  }
+]
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "complex_response"
+entities: {
+  "title": "Team Meeting",
+  "time": "16:00",
+  "date": "2024-03-22",
+  "participants": [
+    "John",
+    "Alice",
+    "Bob"
+  ]
+}
+
+
+================================================================================
+[11:29:27 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "complex_response"
+results: [
+  {
+    "step": {
+      "name": "create_event",
+      "tool": "calendar",
+      "action": "create_event",
+      "params": {
+        "summary": "{title}",
+        "time": "{time}",
+        "date": "{date}",
+        "attendees": "{participants}"
+      }
+    },
+    "result": {
+      "event_id": "test_event_123",
+      "success": true
+    }
+  },
+  {
+    "step": {
+      "name": "send_invites",
+      "tool": "calendar",
+      "action": "send_calendar_invites",
+      "params": {
+        "to": "{participants}",
+        "event_id": "{previous_step.result.event_id}"
+      }
+    },
+    "result": {
+      "sent": true,
+      "recipients": "['John', 'Alice', 'Bob']"
+    }
+  }
+]
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "complex_workflow"
+entities: {
+  "title": "Strategic Planning",
+  "time": "14:00",
+  "date": "2024-03-22",
+  "participants": [
+    "John",
+    "Alice",
+    "Bob"
+  ],
+  "location": "Conference Room A"
+}
+
+
+================================================================================
+[11:29:27 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "complex_workflow"
+results: [
+  {
+    "step": {
+      "name": "initial_check",
+      "tool": "calendar",
+      "action": "check_availability",
+      "params": {
+        "time": "{time}",
+        "date": "{date}"
+      },
+      "condition": {
+        "field": "available",
+        "value": true
+      },
+      "on_failure": {
+        "action": "suggest_alternative_time"
+      }
+    },
+    "result": {
+      "available": true,
+      "conflicts": []
+    }
+  },
+  {
+    "step": {
+      "name": "attendee_check",
+      "tool": "calendar",
+      "action": "check_attendee_availability",
+      "params": {
+        "attendees": "{participants}",
+        "time": "{time}",
+        "date": "{date}"
+      },
+      "loop": {
+        "condition": "all_available",
+        "max_iterations": 2,
+        "on_fail": "suggest_alternative_time"
+      }
+    },
+    "result": {
+      "all_available": true,
+      "unavailable_attendees": []
+    }
+  },
+  {
+    "step": {
+      "name": "create_event",
+      "tool": "calendar",
+      "action": "create_event",
+      "params": {
+        "summary": "{title}",
+        "time": "{time}",
+        "date": "{date}",
+        "attendees": "{participants}",
+        "location": "{location}"
+      }
+    },
+    "result": {
+      "event_id": "test_event_123",
+      "success": true
+    }
+  },
+  {
+    "step": {
+      "name": "send_invites",
+      "tool": "calendar",
+      "action": "send_calendar_invites",
+      "params": {
+        "to": "{participants}",
+        "event_id": "{create_event.event_id}",
+        "summary": "{title}",
+        "time": "{time}"
+      }
+    },
+    "result": {
+      "sent": true,
+      "recipients": "['John', 'Alice', 'Bob']"
+    }
+  }
+]
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "failure_test"
+entities: {}
+
+
+================================================================================
+[11:29:27 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "failing"
+
+
+================================================================================
+[11:29:27 AM] Agent - step_execution_error
+--------------------------------------------------------------------------------
+service: "failure_test"
+step: {
+  "name": "initial_attempt",
+  "tool": "failing",
+  "action": "always_fail",
+  "params": {
+    "input": "test"
+  },
+  "on_failure": {
+    "max_retries": 2,
+    "action": "always_fail",
+    "fallback_steps": [
+      {
+        "tool": "failing",
+        "action": "handle_failure",
+        "params": {
+          "error": "{error_message}"
+        }
+      }
+    ]
+  }
+}
+error: "Permanent failure"
+
+
+================================================================================
+[11:29:27 AM] Agent - failure_report_sent
+--------------------------------------------------------------------------------
+service: "failure_test"
+steps_taken: []
+failed_step: {
+  "name": "initial_attempt",
+  "tool": "failing",
+  "action": "always_fail",
+  "params": {
+    "input": "test"
+  },
+  "on_failure": {
+    "max_retries": 2,
+    "action": "always_fail",
+    "fallback_steps": [
+      {
+        "tool": "failing",
+        "action": "handle_failure",
+        "params": {
+          "error": "{error_message}"
+        }
+      }
+    ]
+  }
+}
+error: "Permanent failure"
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "nonexistent_service"
+entities: {}
+
+
+================================================================================
+[11:29:27 AM] Agent - execute_service_error
+--------------------------------------------------------------------------------
+service: "nonexistent_service"
+error: "No execution plan found for service: nonexistent_service"
+
+
+================================================================================
+[11:29:52 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:52 AM] Agent - tool_initialization_error
+--------------------------------------------------------------------------------
+tool: "nonexistent"
+error: "Tool not found: nonexistent"
+
+
+================================================================================
+[11:29:52 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "schedule_meeting"
+entities: {
+  "time": "14:00",
+  "date": "2024-03-20",
+  "participants": [
+    "John",
+    "Alice"
+  ]
+}
+
+
+================================================================================
+[11:29:52 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:52 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "schedule_meeting"
+results: [
+  {
+    "step": {
+      "name": "validate_time",
+      "tool": "calendar",
+      "action": "check_availability",
+      "params": {
+        "time": "{time}",
+        "date": "{date}"
+      }
+    },
+    "result": {
+      "available": true,
+      "conflicts": []
+    }
+  },
+  {
+    "step": {
+      "name": "check_attendees",
+      "tool": "calendar",
+      "action": "check_attendee_availability",
+      "params": {
+        "attendees": "{participants}",
+        "time": "{time}",
+        "date": "{date}"
+      }
+    },
+    "result": {
+      "all_available": true,
+      "unavailable_attendees": []
+    }
+  },
+  {
+    "step": {
+      "name": "create_event",
+      "tool": "calendar",
+      "action": "create_event",
+      "params": {
+        "summary": "Meeting with {participants}",
+        "start_time": "{time}",
+        "date": "{date}",
+        "attendees": "{participants}"
+      }
+    },
+    "result": {
+      "event_id": "test_event_123",
+      "success": true
+    }
+  }
+]
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "retry_service"
+entities: {
+  "time": "14:00",
+  "participants": [
+    "John",
+    "Alice"
+  ]
+}
+
+
+================================================================================
+[11:29:53 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "retry_service"
+results: [
+  {
+    "step": {
+      "name": "check_attendees",
+      "tool": "calendar",
+      "action": "check_attendee_availability",
+      "params": {
+        "attendees": "{participants}",
+        "time": "{time}"
+      },
+      "loop": {
+        "condition": "all_available",
+        "max_iterations": 2,
+        "on_fail": "suggest_alternative_time"
+      }
+    },
+    "result": {
+      "all_available": true,
+      "unavailable_attendees": []
+    }
+  }
+]
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "failure_test"
+entities: {}
+
+
+================================================================================
+[11:29:53 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "failing"
+
+
+================================================================================
+[11:29:53 AM] Agent - step_execution_error
+--------------------------------------------------------------------------------
+service: "failure_test"
+step: {
+  "name": "retry_step",
+  "tool": "failing",
+  "action": "fail_first",
+  "params": {
+    "input": "test"
+  },
+  "on_failure": {
+    "max_retries": 2,
+    "action": "fail_first"
+  }
+}
+error: "First attempt failed"
+
+
+================================================================================
+[11:29:53 AM] Agent - step_execution_error
+--------------------------------------------------------------------------------
+service: "failure_test"
+step: {
+  "name": "failing_step",
+  "tool": "failing",
+  "action": "always_fail",
+  "params": {
+    "input": "test"
+  },
+  "on_failure": {
+    "action": "handle_failure"
+  }
+}
+error: "Permanent failure"
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "failure_test"
+results: []
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "conditional_service"
+entities: {
+  "time": "15:00",
+  "date": "2024-03-21"
+}
+
+
+================================================================================
+[11:29:53 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "conditional_service"
+results: [
+  {
+    "step": {
+      "name": "check_availability",
+      "tool": "calendar",
+      "action": "check_availability",
+      "params": {
+        "time": "{time}",
+        "date": "{date}"
+      },
+      "condition": {
+        "field": "available",
+        "value": true
+      }
+    },
+    "result": {
+      "available": true,
+      "conflicts": []
+    }
+  },
+  {
+    "step": {
+      "name": "create_event",
+      "tool": "calendar",
+      "action": "create_event",
+      "params": {
+        "time": "{time}",
+        "date": "{date}",
+        "summary": "Conditional Event"
+      }
+    },
+    "result": {
+      "event_id": "test_event_123",
+      "success": true
+    }
+  }
+]
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "complex_response"
+entities: {
+  "title": "Team Meeting",
+  "time": "16:00",
+  "date": "2024-03-22",
+  "participants": [
+    "John",
+    "Alice",
+    "Bob"
+  ]
+}
+
+
+================================================================================
+[11:29:53 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "complex_response"
+results: [
+  {
+    "step": {
+      "name": "create_event",
+      "tool": "calendar",
+      "action": "create_event",
+      "params": {
+        "summary": "{title}",
+        "time": "{time}",
+        "date": "{date}",
+        "attendees": "{participants}"
+      }
+    },
+    "result": {
+      "event_id": "test_event_123",
+      "success": true
+    }
+  },
+  {
+    "step": {
+      "name": "send_invites",
+      "tool": "calendar",
+      "action": "send_calendar_invites",
+      "params": {
+        "to": "{participants}",
+        "event_id": "{previous_step.result.event_id}"
+      }
+    },
+    "result": {
+      "sent": true,
+      "recipients": "['John', 'Alice', 'Bob']"
+    }
+  }
+]
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "complex_workflow"
+entities: {
+  "title": "Strategic Planning",
+  "time": "14:00",
+  "date": "2024-03-22",
+  "participants": [
+    "John",
+    "Alice",
+    "Bob"
+  ],
+  "location": "Conference Room A"
+}
+
+
+================================================================================
+[11:29:53 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "calendar"
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "complex_workflow"
+results: [
+  {
+    "step": {
+      "name": "initial_check",
+      "tool": "calendar",
+      "action": "check_availability",
+      "params": {
+        "time": "{time}",
+        "date": "{date}"
+      },
+      "condition": {
+        "field": "available",
+        "value": true
+      },
+      "on_failure": {
+        "action": "suggest_alternative_time"
+      }
+    },
+    "result": {
+      "available": true,
+      "conflicts": []
+    }
+  },
+  {
+    "step": {
+      "name": "attendee_check",
+      "tool": "calendar",
+      "action": "check_attendee_availability",
+      "params": {
+        "attendees": "{participants}",
+        "time": "{time}",
+        "date": "{date}"
+      },
+      "loop": {
+        "condition": "all_available",
+        "max_iterations": 2,
+        "on_fail": "suggest_alternative_time"
+      }
+    },
+    "result": {
+      "all_available": true,
+      "unavailable_attendees": []
+    }
+  },
+  {
+    "step": {
+      "name": "create_event",
+      "tool": "calendar",
+      "action": "create_event",
+      "params": {
+        "summary": "{title}",
+        "time": "{time}",
+        "date": "{date}",
+        "attendees": "{participants}",
+        "location": "{location}"
+      }
+    },
+    "result": {
+      "event_id": "test_event_123",
+      "success": true
+    }
+  },
+  {
+    "step": {
+      "name": "send_invites",
+      "tool": "calendar",
+      "action": "send_calendar_invites",
+      "params": {
+        "to": "{participants}",
+        "event_id": "{create_event.event_id}",
+        "summary": "{title}",
+        "time": "{time}"
+      }
+    },
+    "result": {
+      "sent": true,
+      "recipients": "['John', 'Alice', 'Bob']"
+    }
+  }
+]
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "failure_test"
+entities: {}
+
+
+================================================================================
+[11:29:53 AM] Agent - tool_initialized
+--------------------------------------------------------------------------------
+tool: "failing"
+
+
+================================================================================
+[11:29:53 AM] Agent - step_execution_error
+--------------------------------------------------------------------------------
+service: "failure_test"
+step: {
+  "name": "initial_attempt",
+  "tool": "failing",
+  "action": "always_fail",
+  "params": {
+    "input": "test"
+  },
+  "on_failure": {
+    "max_retries": 1,
+    "action": "handle_failure",
+    "params": {
+      "error": "{error_message}"
+    }
+  }
+}
+error: "Permanent failure"
+
+
+================================================================================
+[11:29:53 AM] Agent - step_execution_error
+--------------------------------------------------------------------------------
+service: "failure_test"
+step: {
+  "name": "conditional_step",
+  "tool": "failing",
+  "action": "always_fail",
+  "params": {
+    "input": "{initial_attempt.result}"
+  },
+  "condition": {
+    "field": "success",
+    "value": true
+  },
+  "on_failure": {
+    "action": "handle_failure",
+    "continue_on_failure": true,
+    "params": {
+      "error": "{error_message}"
+    }
+  }
+}
+error: "Permanent failure"
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_success
+--------------------------------------------------------------------------------
+service: "failure_test"
+results: [
+  {
+    "step": {
+      "name": "final_step",
+      "tool": "failing",
+      "action": "handle_failure",
+      "params": {
+        "context": "{initial_attempt.result}",
+        "error_history": "{conditional_step.error}"
+      }
+    },
+    "result": {
+      "handled": true
+    }
+  }
+]
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_start
+--------------------------------------------------------------------------------
+service: "nonexistent_service"
+entities: {}
+
+
+================================================================================
+[11:29:53 AM] Agent - execute_service_error
+--------------------------------------------------------------------------------
+service: "nonexistent_service"
+error: "No execution plan found for service: nonexistent_service"
+

@@ -1,0 +1,63 @@
+schedule_meeting:
+  name: Schedule Meeting
+  description: Schedule a meeting with specified participants at a given time
+  intent: schedule_meeting
+  triggers:
+    - schedule a meeting
+    - set up a meeting
+    - book a meeting
+    - arrange a meeting
+    - plan a meeting
+  required_entities:
+    - time
+    - date
+  steps:
+    - tool: calendar
+      action: create_event
+      params:
+        time: "{time}"
+        date: "{date}"
+  success_criteria:
+    - Meeting scheduled successfully
+  success_message: "I've scheduled the meeting for {date} at {display_time}."
+  execute: |
+    async def execute(self, intent, entities, user_info):
+        return {
+            'status': 'success',
+            'result': {
+                'time': entities.get('time'),
+                'date': entities.get('date'),
+                'participants': entities.get('participants', [])
+            }
+        }
+
+help:
+  name: Help
+  description: Show available commands and capabilities
+  intent: help
+  triggers:
+    - help
+    - what can you do
+    - show commands
+    - list capabilities
+    - how do you work
+  steps:
+    - tool: help
+      action: show_capabilities
+  success_criteria:
+    - Help information displayed
+  success_message: |
+    I can help you with the following:
+    • Scheduling meetings (e.g., "schedule a meeting with John tomorrow at 2pm")
+    • More capabilities coming soon!
+  execute: |
+    async def execute(self, intent, entities, user_info):
+        return {
+            'status': 'success',
+            'result': {
+                'capabilities': [
+                    'Schedule meetings',
+                    'Show help information'
+                ]
+            }
+        } 
