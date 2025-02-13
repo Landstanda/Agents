@@ -1,0 +1,1996 @@
+---
+# Module Capabilities and Integration Guide
+
+global_best_practices:
+  input_validation:
+    description: "Always validate input parameters before passing to modules"
+    priority: 1
+  error_handling:
+    description: "Implement proper error handling and logging"
+    priority: 2
+  authentication:
+    description: "Check authentication before operations"
+    priority: 3
+  rate_limits:
+    description: "Monitor and respect rate limits"
+    priority: 4huh 
+  async_operations:
+    description: "Handle asynchronous operations properly"
+    priority: 5
+  state_consistency:
+    description: "Maintain state consistency across module chains"
+    priority: 6
+  resource_cleanup:
+    description: "Clean up resources after use"
+    priority: 7
+  logging:
+    description: "Log all critical operations and errors"
+    priority: 8
+  retry_mechanism:
+    description: "Implement retry mechanisms for transient failures"
+    priority: 9
+  timeouts:
+    description: "Use appropriate timeouts for external service calls"
+    priority: 10
+
+modules:
+  basic_auth:
+    purpose: "Handles secure username/password authentication"
+    capabilities:
+      - secure_credential_storage
+      - password_hashing
+      - session_management
+      - credential_removal
+      - session_validation
+      - encrypted_storage
+    
+    operations:
+      store_credentials:
+        required_params:
+          service: string
+          username: string
+          password: string
+        output:
+          type: boolean
+          description: "Success status"
+      
+      verify_credentials:
+        required_params:
+          service: string
+          username: string
+          password: string
+        output:
+          type: boolean
+          description: "Validity status"
+      
+      create_session:
+        required_params:
+          service: string
+          username: string
+          password: string
+        output:
+          type: string
+          description: "Session token if successful, None if failed"
+      
+      verify_session:
+        required_params:
+          token: string
+        output:
+          type: object
+          description: "Tuple[bool, Optional[Dict]] containing validity and session info"
+          format:
+            is_valid: boolean
+            session_info:
+              service: string
+              username: string
+              created_at: string  # ISO format
+              expires_at: string  # ISO format
+      
+      end_session:
+        required_params:
+          token: string
+        output:
+          type: boolean
+          description: "Success status"
+      
+      remove_credentials:
+        required_params:
+          service: string
+          username: string
+        output:
+          type: boolean
+          description: "Success status"
+    
+    dependencies:
+      packages:
+        - cryptography.fernet
+      environment:
+        - secure_storage_directory
+        - encryption_key
+      filesystem:
+        - .credentials directory
+    
+    common_workflows:
+      user_authentication:
+        steps:
+          - store_credentials
+          - verify_credentials
+          - create_session
+          - validate_session
+        description: "Complete user authentication flow"
+      
+      session_management:
+        steps:
+          - create_session
+          - verify_session
+          - handle_expiration
+          - end_session
+        description: "Session lifecycle management"
+      
+      credential_management:
+        steps:
+          - store_credentials
+          - update_credentials
+          - remove_credentials
+        description: "Credential lifecycle management"
+    
+    error_handling:
+      encryption_errors:
+        strategy: "Secure fallback"
+        severity: "high"
+      file_access_errors:
+        strategy: "Proper error reporting"
+        severity: "medium"
+      invalid_credentials:
+        strategy: "False return values"
+        severity: "low"
+      session_expiration:
+        strategy: "Automatic cleanup"
+        severity: "medium"
+      storage_errors:
+        strategy: "Graceful degradation"
+        severity: "high"
+      malformed_input:
+        strategy: "Input validation"
+        severity: "medium"
+
+  browser_automation:
+    purpose: "Provides automated browser interactions and web scraping capabilities"
+    capabilities:
+      - browser_initialization
+      - page_navigation
+      - element_interaction
+      - form_filling
+      - screenshot_capture
+      - page_source_extraction
+      - headless_operation
+      - download_management
+    
+    operations:
+      navigate_to:
+        required_params:
+          url: string
+        output:
+          type: boolean
+          description: "Success status"
+      
+      find_element:
+        required_params:
+          by: string  # selector type
+          value: string  # selector value
+        optional_params:
+          timeout: integer  # defaults to 10
+        output:
+          type: object
+          description: "Selenium WebElement"
+      
+      click_element:
+        required_params:
+          by: string
+          value: string
+        optional_params:
+          timeout: integer  # defaults to 10
+        output:
+          type: boolean
+          description: "Success status"
+      
+      fill_form:
+        required_params:
+          form_data: object  # Dict[str, str]
+        output:
+          type: boolean
+          description: "Success status"
+      
+      take_screenshot:
+        required_params:
+          filename: string
+        output:
+          type: boolean
+          description: "Success status"
+      
+      get_page_source:
+        output:
+          type: string
+          description: "HTML source of current page"
+    
+    dependencies:
+      packages:
+        - undetected_chromedriver
+        - selenium
+      system:
+        - chrome_browser
+        - chromedriver
+        - graphics_capabilities
+    
+    common_workflows:
+      web_interaction:
+        steps:
+          - initialize_browser
+          - navigate_to_url
+          - find_elements
+          - interact_with_elements
+          - close_browser
+        description: "Basic web interaction flow"
+      
+      form_automation:
+        steps:
+          - locate_form
+          - fill_fields
+          - submit_form
+          - verify_submission
+          - handle_results
+        description: "Form submission workflow"
+      
+      data_extraction:
+        steps:
+          - navigate_to_page
+          - find_elements
+          - extract_data
+          - process_information
+          - capture_evidence
+        description: "Web scraping workflow"
+    
+    error_handling:
+      driver_initialization:
+        strategy: "Proper setup verification"
+        severity: "high"
+      element_not_found:
+        strategy: "Timeout handling"
+        severity: "medium"
+      navigation_errors:
+        strategy: "Retry mechanism"
+        severity: "medium"
+      click_failures:
+        strategy: "Element state checking"
+        severity: "low"
+      browser_crashes:
+        strategy: "Automatic recovery"
+        severity: "high"
+      resource_cleanup:
+        strategy: "Proper driver shutdown"
+        severity: "medium"
+
+  email_reader:
+    purpose: "Read and process email content from various providers"
+    capabilities:
+      - email_search
+      - content_retrieval
+      - metadata_extraction
+      - label_management
+      - thread_tracking
+      - attachment_handling
+      - filter_management
+    
+    operations:
+      find_email:
+        required_params:
+          query: string
+          folder: string
+        optional_params:
+          max_results: integer
+        output:
+          type: object
+          description: "Email details including metadata"
+          format:
+            id: string
+            subject: string
+            from: string
+            date: string
+            content: string
+            attachments: list
+      
+      get_content:
+        required_params:
+          email_id: string
+        output:
+          type: object
+          description: "Full email content and metadata"
+      
+      update_labels:
+        required_params:
+          email_id: string
+          labels: list
+        output:
+          type: boolean
+          description: "Success status"
+    
+    dependencies:
+      packages:
+        - google-api-python-client
+        - oauth2client
+      environment:
+        - GMAIL_CREDENTIALS
+      filesystem:
+        - credentials directory
+    
+    common_workflows:
+      email_processing:
+        steps:
+          - find_relevant_emails
+          - extract_content
+          - process_attachments
+          - update_labels
+        description: "Complete email processing workflow"
+
+  email_classifier:
+    purpose: "Analyze and categorize email content"
+    capabilities:
+      - content_analysis
+      - priority_assessment
+      - action_determination
+      - time_sensitivity_analysis
+      - category_assignment
+    
+    operations:
+      analyze_content:
+        required_params:
+          content: string
+        output:
+          type: object
+          description: "Analysis results"
+          format:
+            priority: string
+            category: string
+            actions: list
+            time_sensitive: boolean
+      
+      determine_priority:
+        required_params:
+          subject: string
+          content: string
+        output:
+          type: string
+          description: "Priority level (high/medium/low)"
+      
+      suggest_actions:
+        required_params:
+          analysis_result: object
+        output:
+          type: list
+          description: "List of suggested actions"
+    
+    dependencies:
+      packages:
+        - scikit-learn
+        - nltk
+      models:
+        - email_classifier_model
+        - priority_model
+    
+    common_workflows:
+      email_categorization:
+        steps:
+          - analyze_content
+          - determine_priority
+          - suggest_actions
+        description: "Complete email analysis workflow"
+
+  email_sender:
+    purpose: "Compose and send emails with attachments"
+    capabilities:
+      - message_composition
+      - attachment_handling
+      - follow_up_scheduling
+      - thread_management
+      - template_management
+    
+    operations:
+      send_email:
+        required_params:
+          to: list
+          subject: string
+          content: string
+        optional_params:
+          attachments: list
+          cc: list
+          bcc: list
+          template_id: string
+          thread_id: string
+        output:
+          type: object
+          description: "Send status and message ID"
+      
+      schedule_followup:
+        required_params:
+          email_id: string
+          followup_date: string
+        output:
+          type: boolean
+          description: "Scheduling success status"
+      
+      manage_template:
+        required_params:
+          template_id: string
+          content: string
+        output:
+          type: object
+          description: "Template management status"
+    
+    dependencies:
+      packages:
+        - google-api-python-client
+        - oauth2client
+      environment:
+        - GMAIL_CREDENTIALS
+    
+    common_workflows:
+      send_with_attachment:
+        steps:
+          - prepare_attachments
+          - compose_message
+          - send_email
+          - schedule_followup
+        description: "Send email with attachments workflow"
+
+  google_calendar:
+    purpose: "Manage calendar events and scheduling"
+    capabilities:
+      - event_scheduling
+      - availability_checking
+      - reminder_management
+      - attendee_coordination
+      - recurring_events
+      - resource_booking
+    
+    operations:
+      check_availability:
+        required_params:
+          start_time: string
+          end_time: string
+          attendees: list
+        output:
+          type: object
+          description: "Availability status for all attendees"
+      
+      create_event:
+        required_params:
+          summary: string
+          start_time: string
+          end_time: string
+        optional_params:
+          description: string
+          location: string
+          attendees: list
+          recurrence: object
+          resources: list
+        output:
+          type: object
+          description: "Created event details"
+      
+      set_reminder:
+        required_params:
+          event_id: string
+          reminder_time: string
+        output:
+          type: boolean
+          description: "Reminder set status"
+      
+      share_calendar:
+        required_params:
+          calendar_id: string
+          user_email: string
+          permission: string
+        output:
+          type: object
+          description: "Calendar sharing status"
+    
+    dependencies:
+      packages:
+        - google-api-python-client
+        - oauth2client
+      environment:
+        - GOOGLE_CALENDAR_CREDENTIALS
+    
+    common_workflows:
+      schedule_meeting:
+        steps:
+          - check_availability
+          - create_event
+          - send_invites
+          - set_reminder
+        description: "Complete meeting scheduling workflow"
+
+  google_drive:
+    purpose: "Manage files and folders in Google Drive"
+    capabilities:
+      - file_storage
+      - permission_management
+      - search_operations
+      - folder_organization
+      - version_control
+      - file_synchronization
+    
+    operations:
+      upload_file:
+        required_params:
+          file_path: string
+          destination_folder: string
+        optional_params:
+          permissions: object
+        output:
+          type: object
+          description: "Uploaded file details"
+      
+      search_files:
+        required_params:
+          query: string
+        optional_params:
+          file_type: string
+          max_results: integer
+        output:
+          type: list
+          description: "List of matching files"
+      
+      set_permissions:
+        required_params:
+          file_id: string
+          permissions: object
+        output:
+          type: boolean
+          description: "Permission update status"
+    
+    dependencies:
+      packages:
+        - google-api-python-client
+        - oauth2client
+      environment:
+        - GOOGLE_DRIVE_CREDENTIALS
+    
+    common_workflows:
+      file_sharing:
+        steps:
+          - upload_file
+          - set_permissions
+          - send_notification
+        description: "Complete file sharing workflow"
+
+  trello_integration:
+    purpose: "Manage projects and tasks in Trello"
+    capabilities:
+      - board_management
+      - list_organization
+      - card_handling
+      - task_tracking
+      - automation_rules
+      - api_integration
+      - board_retrieval
+    
+    operations:
+      create_board:
+        required_params:
+          name: string
+        optional_params:
+          description: string
+          template: string
+          defaultLists: boolean
+        output:
+          type: object
+          description: "Created board details"
+      
+      add_card:
+        required_params:
+          list_id: string
+          title: string
+        optional_params:
+          description: string
+          due_date: string
+          labels: list
+        output:
+          type: object
+          description: "Created card details"
+      
+      move_card:
+        required_params:
+          card_id: string
+          list_id: string
+        output:
+          type: boolean
+          description: "Card move status"
+      
+      get_lists:
+        required_params:
+          board_id: string
+        output:
+          type: list
+          description: "List of board lists"
+    
+    dependencies:
+      packages:
+        - py-trello
+      environment:
+        - TRELLO_API_KEY
+        - TRELLO_TOKEN
+    
+    common_workflows:
+      project_setup:
+        steps:
+          - create_board
+          - setup_lists
+          - add_initial_cards
+        description: "Complete project setup workflow"
+
+  document_management:
+    purpose: "Process and manage documents across formats"
+    capabilities:
+      - version_control
+      - format_conversion
+      - metadata_tracking
+      - content_management
+      - template_handling
+      - structure_validation
+      - directory_management
+    
+    operations:
+      convert_format:
+        required_params:
+          source_file: string
+          target_format: string
+        output:
+          type: object
+          description: "Converted file details"
+      
+      track_version:
+        required_params:
+          file_id: string
+          version_info: object
+        output:
+          type: object
+          description: "Version tracking details"
+      
+      apply_template:
+        required_params:
+          template_id: string
+          content: object
+        output:
+          type: object
+          description: "Generated document details"
+      
+      manage_permissions:
+        required_params:
+          file_id: string
+          permissions: object
+        output:
+          type: object
+          description: "Updated permission status"
+      
+      validate_structure:
+        required_params:
+          file_id: string
+          schema: object
+        output:
+          type: object
+          description: "Validation results"
+    
+    dependencies:
+      packages:
+        - python-docx
+        - PyPDF2
+      filesystem:
+        - templates directory
+        - temp directory
+    
+    common_workflows:
+      document_processing:
+        steps:
+          - select_template
+          - apply_content
+          - convert_format
+          - track_version
+        description: "Complete document processing workflow"
+
+  browser_headers:
+    purpose: "Manages browser-like HTTP headers for web requests"
+    capabilities:
+      - header_generation
+      - header_customization
+      - browser_impersonation
+      - request_header_management
+      - header_conflict_resolution
+      - default_header_provision
+    
+    operations:
+      execute:
+        required_params:
+          params: object
+        optional_params:
+          headers: object
+        output:
+          type: object
+          description: "Combined headers and parameters"
+          format:
+            headers: object
+            params: object
+            default_headers:
+              user_agent: string
+              accept: string
+              accept_language: string
+              connection: string
+              upgrade_insecure_requests: string
+    
+    error_handling:
+      header_conflicts:
+        strategy: "Resolution with priority rules"
+        severity: "medium"
+      integration_errors:
+        strategy: "Proper error reporting"
+        severity: "high"
+      validation_errors:
+        strategy: "Type checking and format validation"
+    
+    common_workflows:
+      header_generation:
+        steps:
+          - initialize_module
+          - get_default_headers
+          - merge_custom_headers
+          - apply_to_requests
+        description: "Header generation and application workflow"
+      
+      request_preparation:
+        steps:
+          - prepare_request_parameters
+          - add_browser_headers
+          - execute_request
+          - handle_response
+        description: "Complete request preparation workflow"
+      
+      header_customization:
+        steps:
+          - start_with_defaults
+          - override_specific_headers
+          - validate_combinations
+          - apply_to_request
+        description: "Header customization workflow"
+
+  business_context:
+    purpose: "Manages business context and planning information"
+    capabilities:
+      - context_storage
+      - business_plan_management
+      - gpt_context_parsing
+      - structured_data_organization
+    
+    operations:
+      update_context:
+        required_params:
+          operation: string
+          updates: object
+        output:
+          type: object
+          description: "Updated context information"
+      
+      get_context:
+        required_params:
+          operation: string
+        optional_params:
+          section: string
+        output:
+          type: object
+          description: "Retrieved context data"
+      
+      import_context:
+        required_params:
+          operation: string
+          text: string
+        output:
+          type: object
+          description: "Parsed and structured context"
+    
+    dependencies:
+      packages:
+        - openai
+      filesystem:
+        - context storage directory
+    
+    common_workflows:
+      context_management:
+        steps:
+          - load_existing_context
+          - update_sections
+          - save_changes
+          - retrieve_context
+        description: "Complete context management workflow"
+
+  core_request:
+    purpose: "Handles all HTTP/HTTPS requests with advanced features"
+    capabilities:
+      - async_http_requests
+      - request_caching
+      - rate_limiting
+      - automatic_retries
+      - timeout_management
+    
+    operations:
+      request:
+        required_params:
+          method: string
+          url: string
+        optional_params:
+          headers: object
+          params: object
+          data: object
+          json_data: object
+          use_cache: boolean
+          custom_retry: integer
+          custom_timeout: integer
+        output:
+          type: object
+          description: "HTTP response data"
+          format:
+            status: integer
+            headers: object
+            data: object
+            timestamp: string
+    
+    dependencies:
+      packages:
+        - aiohttp
+        - backoff
+        - cachetools
+        - ratelimit
+      environment:
+        - rate_limit_config
+    
+    common_workflows:
+      basic_request:
+        steps:
+          - initialize_session
+          - make_request
+          - process_response
+          - handle_caching
+          - cleanup
+        description: "Basic HTTP request workflow"
+
+  data_cleaner:
+    purpose: "Cleans and standardizes various data types"
+    capabilities:
+      - text_normalization
+      - date_standardization
+      - phone_number_formatting
+      - email_validation
+      - dataframe_cleaning
+      - error_correction
+      - json_cleaning
+      - duplicate_removal
+      - unicode_handling
+    
+    operations:
+      normalize_text:
+        required_params:
+          text: string
+        optional_params:
+          lowercase: boolean
+        output:
+          type: string
+          description: "Normalized text"
+      
+      standardize_date:
+        required_params:
+          date_str: string
+        output:
+          type: string
+          description: "ISO format date"
+      
+      clean_dict:
+        required_params:
+          data: object
+        output:
+          type: object
+          description: "Cleaned dictionary"
+      
+      clean_dataframe:
+        required_params:
+          df: object
+        optional_params:
+          date_columns: list
+        output:
+          type: object
+          description: "Cleaned DataFrame"
+    
+    error_handling:
+      unicode_errors:
+        strategy: "Fallback to ASCII"
+        severity: "medium"
+      dataframe_errors:
+        strategy: "Original preservation"
+        severity: "high"
+      json_errors:
+        strategy: "Validation checks"
+    
+    common_workflows:
+      text_processing:
+        steps:
+          - normalize_unicode
+          - remove_whitespace
+          - standardize_case
+          - remove_duplicates
+        description: "Complete text cleaning workflow"
+      
+      bulk_processing:
+        steps:
+          - clean_dataframes
+          - process_json
+          - handle_nested_structures
+          - validate_results
+        description: "Bulk data processing workflow"
+
+  data_extractor:
+    purpose: "Extracts structured data from various inputs"
+    capabilities:
+      - pattern_based_extraction
+      - regex_processing
+      - data_filtering
+      - structured_output
+      - nested_data_handling
+      - custom_filter_application
+    
+    operations:
+      execute:
+        required_params:
+          data: object
+          patterns: object
+        optional_params:
+          filters: object
+        output:
+          type: object
+          description: "Extracted and structured data"
+          format:
+            extracted_data:
+              key:
+                pattern_key: list
+    
+    error_handling:
+      pattern_errors:
+        strategy: "Exception handling with fallback"
+        severity: "high"
+      structure_errors:
+        strategy: "Result validation"
+        severity: "medium"
+      memory_issues:
+        strategy: "Size management"
+        severity: "high"
+    
+    common_workflows:
+      basic_extraction:
+        steps:
+          - apply_patterns
+          - collect_matches
+          - structure_results
+          - return_data
+        description: "Basic data extraction workflow"
+      
+      nested_processing:
+        steps:
+          - handle_nested_structures
+          - apply_patterns_recursively
+          - combine_results
+          - filter_outputs
+        description: "Nested data processing workflow"
+
+  file_transfer:
+    purpose: "Manages file transfers between services"
+    capabilities:
+      - google_drive_integration
+      - slack_file_transfers
+      - email_attachments
+      - file_organization
+      - batch_operations
+      - progress_tracking
+      - error_recovery
+    
+    operations:
+      upload_to_drive:
+        required_params:
+          file_path: string
+        optional_params:
+          folder_id: string
+          batch_id: string
+        output:
+          type: object
+          description: "Upload status and file ID"
+      
+      download_from_drive:
+        required_params:
+          file_id: string
+        optional_params:
+          progress_callback: function
+        output:
+          type: object
+          description: "Download status and local path"
+      
+      send_to_slack:
+        required_params:
+          file_path: string
+          channel: string
+        output:
+          type: object
+          description: "Send status"
+    
+    error_handling:
+      transfer_failures:
+        strategy: "Automatic retry with backoff"
+        severity: "high"
+      permission_issues:
+        strategy: "Proper error reporting"
+        severity: "high"
+      network_errors:
+        strategy: "Connection recovery"
+        severity: "medium"
+    
+    common_workflows:
+      cloud_upload:
+        steps:
+          - validate_file
+          - upload_to_service
+          - track_progress
+          - return_metadata
+        description: "Cloud upload workflow"
+      
+      batch_transfer:
+        steps:
+          - prepare_batch
+          - validate_files
+          - track_progress
+          - handle_failures
+        description: "Batch file transfer workflow"
+
+  google_auth:
+    purpose: "Manages Google Workspace authentication and OAuth2 flow"
+    capabilities:
+      - oauth2_authentication
+      - token_refresh_management
+      - credential_storage
+      - multi_scope_authorization
+      - service_initialization
+      - token_persistence
+      - secure_storage
+      - port_management
+    
+    operations:
+      execute:
+        required_params:
+          params: object
+        output:
+          type: object
+          description: "Authentication credentials and scope information"
+          format:
+            credentials: object
+            scopes: list
+            params: object
+    
+    dependencies:
+      packages:
+        - google-auth
+        - google-auth-oauthlib
+        - google-auth-httplib2
+      environment:
+        - GOOGLE_APPLICATION_CREDENTIALS
+      filesystem:
+        - token storage directory
+    
+    common_workflows:
+      authentication_flow:
+        steps:
+          - check_existing_tokens
+          - validate_credentials
+          - refresh_if_needed
+          - start_oauth_flow
+          - store_tokens
+        description: "Complete OAuth2 authentication flow"
+      
+      token_management:
+        steps:
+          - load_stored_tokens
+          - check_expiration
+          - handle_refresh
+          - secure_storage
+          - validate_access
+        description: "Token lifecycle management"
+      
+      service_setup:
+        steps:
+          - initialize_credentials
+          - configure_scopes
+          - setup_client
+          - verify_access
+          - enable_services
+        description: "Service initialization workflow"
+    
+    error_handling:
+      token_expiry:
+        strategy: "Auto-refresh"
+        severity: "medium"
+      auth_failures:
+        strategy: "Retry flow"
+        severity: "high"
+      storage_errors:
+        strategy: "Safe fallback"
+        severity: "medium"
+      port_conflicts:
+        strategy: "Alternative ports"
+        severity: "low"
+      invalid_scopes:
+        strategy: "Validation"
+        severity: "high"
+      network_issues:
+        strategy: "Retry logic"
+        severity: "medium"
+
+  google_docs:
+    purpose: "Manages Google Docs operations and document editing"
+    capabilities:
+      - document_creation
+      - content_management
+      - text_formatting
+      - table_operations
+      - image_insertion
+      - header_footer_control
+      - style_application
+      - batch_updates
+      - collaborative_editing
+      - version_history
+      - comment_management
+      - access_control
+    
+    operations:
+      create_document:
+        required_params:
+          title: string
+        optional_params:
+          content: string
+        output:
+          type: object
+          description: "Created document details"
+          format:
+            document_id: string
+            title: string
+            url: string
+      
+      update_document:
+        required_params:
+          document_id: string
+          requests: list
+        output:
+          type: object
+          description: "Update results"
+          format:
+            replies: list
+      
+      insert_text:
+        required_params:
+          document_id: string
+          text: string
+        optional_params:
+          location: object
+          formatting: object
+        output:
+          type: object
+          description: "Text insertion results"
+      
+      manage_permissions:
+        required_params:
+          document_id: string
+          permissions: object
+        output:
+          type: object
+          description: "Permission update status"
+    
+    dependencies:
+      packages:
+        - google-api-python-client
+        - google-auth-httplib2
+        - google-auth-oauthlib
+      environment:
+        - GOOGLE_DOCS_CREDENTIALS
+    
+    common_workflows:
+      document_creation:
+        steps:
+          - initialize_document
+          - add_content
+          - apply_formatting
+          - set_permissions
+          - return_metadata
+        description: "Complete document creation workflow"
+      
+      content_management:
+        steps:
+          - load_document
+          - make_changes
+          - apply_styles
+          - update_content
+          - save_changes
+        description: "Content update workflow"
+      
+      collaboration_setup:
+        steps:
+          - set_permissions
+          - add_collaborators
+          - configure_sharing
+          - send_notifications
+        description: "Collaboration setup workflow"
+    
+    error_handling:
+      api_errors:
+        strategy: "Proper logging and retry"
+        severity: "high"
+      format_errors:
+        strategy: "Validation checks"
+        severity: "medium"
+      content_limits:
+        strategy: "Size checking"
+        severity: "medium"
+      permission_issues:
+        strategy: "Verification"
+        severity: "high"
+      update_conflicts:
+        strategy: "Resolution handling"
+        severity: "high"
+      batch_failures:
+        strategy: "Partial updates"
+        severity: "medium"
+
+  google_sheets:
+    purpose: "Manages Google Sheets operations and data management"
+    capabilities:
+      - spreadsheet_creation
+      - data_management
+      - cell_formatting
+      - chart_creation
+      - range_protection
+      - conditional_formatting
+      - auto_sizing
+      - batch_operations
+      - formula_management
+      - data_validation
+      - sheet_protection
+      - pivot_tables
+    
+    operations:
+      create_spreadsheet:
+        required_params:
+          title: string
+        optional_params:
+          sheets: list
+          share_with: string
+          role: string
+        output:
+          type: object
+          description: "Created spreadsheet details"
+          format:
+            spreadsheet_id: string
+            url: string
+      
+      update_values:
+        required_params:
+          spreadsheet_id: string
+          range: string
+          values: list
+        output:
+          type: object
+          description: "Update results"
+          format:
+            updated_cells: integer
+            updated_range: string
+      
+      create_chart:
+        required_params:
+          spreadsheet_id: string
+          sheet_id: string
+          chart_spec: object
+        output:
+          type: object
+          description: "Created chart details"
+      
+      manage_protection:
+        required_params:
+          spreadsheet_id: string
+          range: string
+          editors: list
+        output:
+          type: object
+          description: "Protection settings"
+    
+    dependencies:
+      packages:
+        - google-api-python-client
+        - google-auth-httplib2
+        - google-auth-oauthlib
+      environment:
+        - GOOGLE_SHEETS_CREDENTIALS
+    
+    common_workflows:
+      data_management:
+        steps:
+          - create_spreadsheet
+          - update_values
+          - format_cells
+          - apply_rules
+          - handle_responses
+        description: "Data management workflow"
+      
+      chart_creation:
+        steps:
+          - prepare_data
+          - configure_chart
+          - set_position
+          - apply_styles
+          - update_layout
+        description: "Chart creation workflow"
+      
+      protection_setup:
+        steps:
+          - define_ranges
+          - set_permissions
+          - configure_rules
+          - apply_formats
+          - verify_access
+        description: "Protection setup workflow"
+    
+    error_handling:
+      api_errors:
+        strategy: "Proper logging"
+        severity: "high"
+      format_errors:
+        strategy: "Validation"
+        severity: "medium"
+      range_issues:
+        strategy: "Boundary checking"
+        severity: "high"
+      permission_errors:
+        strategy: "Access verification"
+        severity: "high"
+      update_conflicts:
+        strategy: "Resolution strategy"
+        severity: "medium"
+      batch_failures:
+        strategy: "Partial updates"
+        severity: "medium"
+
+  html_parser:
+    purpose: "Parses and extracts information from HTML content"
+    capabilities:
+      - html_content_parsing
+      - text_extraction
+      - link_extraction
+      - table_parsing
+      - form_analysis
+      - element_selection
+      - html_cleaning
+      - content_normalization
+      - structure_validation
+      - attribute_extraction
+      - dynamic_content_handling
+      - encoding_management
+    
+    operations:
+      load_html:
+        required_params:
+          html_content: string
+        optional_params:
+          parser: string
+        output:
+          type: object
+          description: "Parsed HTML document"
+      
+      find_elements:
+        required_params:
+          selector: string
+        output:
+          type: list
+          description: "Matching elements"
+      
+      extract_text:
+        optional_params:
+          selector: string
+          clean: boolean
+        output:
+          type: string
+          description: "Extracted text content"
+      
+      extract_links:
+        optional_params:
+          base_url: string
+        output:
+          type: list
+          description: "Extracted links"
+          format:
+            - url: string
+              text: string
+              title: string
+      
+      extract_tables:
+        output:
+          type: list
+          description: "Extracted tables"
+          format:
+            - list of lists (rows and cells)
+      
+      extract_forms:
+        output:
+          type: list
+          description: "Extracted form details"
+          format:
+            - action: string
+              method: string
+              fields:
+                - type: string
+                  name: string
+                  id: string
+                  value: string
+                  required: boolean
+    
+    dependencies:
+      packages:
+        - beautifulsoup4
+        - lxml
+      system:
+        - url_parsing_support
+        - regex_support
+    
+    common_workflows:
+      content_extraction:
+        steps:
+          - load_html
+          - clean_content
+          - extract_text
+          - process_results
+          - format_output
+        description: "Content extraction workflow"
+      
+      element_analysis:
+        steps:
+          - find_elements
+          - extract_attributes
+          - process_content
+          - structure_data
+          - return_results
+        description: "Element analysis workflow"
+      
+      form_processing:
+        steps:
+          - extract_forms
+          - analyze_fields
+          - validate_structure
+          - process_inputs
+          - return_metadata
+        description: "Form processing workflow"
+    
+    error_handling:
+      parse_errors:
+        strategy: "Safe fallback"
+        severity: "high"
+      selector_errors:
+        strategy: "Empty results"
+        severity: "low"
+      encoding_issues:
+        strategy: "UTF-8 handling"
+        severity: "medium"
+      missing_elements:
+        strategy: "Default values"
+        severity: "low"
+      structure_errors:
+        strategy: "Graceful degradation"
+        severity: "medium"
+      memory_issues:
+        strategy: "Size management"
+        severity: "high"
+
+  notification:
+    purpose: "Handles system notifications and alerts"
+    capabilities:
+      - multi_channel_notifications
+      - email_notifications
+      - slack_notifications
+      - desktop_notifications
+      - status_monitoring
+      - delivery_tracking
+      - async_operations
+    
+    operations:
+      send_notification:
+        required_params:
+          recipient: string
+          message: string
+        optional_params:
+          channel: string
+        output:
+          type: object
+          description: "Notification status per channel"
+    
+    dependencies:
+      packages:
+        - slack_sdk
+        - desktop-notifier
+      environment:
+        - NOTIFICATION_CONFIG
+    
+    common_workflows:
+      multi_channel_notification:
+        steps:
+          - validate_message
+          - check_channels
+          - send_notifications
+          - track_delivery
+        description: "Multi-channel notification workflow"
+
+  report_generator:
+    purpose: "Generates formatted reports from data"
+    capabilities:
+      - report_generation
+      - multiple_format_support
+      - data_formatting
+      - file_output
+    
+    operations:
+      execute:
+        required_params:
+          data: object
+          output_path: string
+        optional_params:
+          format: string
+        output:
+          type: object
+          description: "Report generation status and path"
+    
+    dependencies:
+      packages:
+        - jinja2
+        - pdfkit
+      filesystem:
+        - templates directory
+        - output directory
+    
+    common_workflows:
+      report_creation:
+        steps:
+          - validate_data
+          - format_content
+          - generate_report
+          - save_file
+        description: "Report creation workflow"
+
+  response_generator:
+    purpose: "Generates email responses with GPT and maintains professional communication standards"
+    capabilities:
+      - response_generation
+      - response_review
+      - improvement_suggestions
+      - context_awareness
+      - tone_management
+      - follow_up_handling
+      - priority_assessment
+      - format_validation
+    
+    operations:
+      generate_response:
+        required_params:
+          email_data: object
+          classification: object
+        optional_params:
+          business_context:
+            type: object
+            properties:
+              company_name: string
+              role: string
+              tone: string
+        output:
+          type: object
+          description: "Generated response data"
+          format:
+            email_id: string
+            response:
+              subject: string
+              body: string
+              next_steps: array
+              follow_up_needed: boolean
+              follow_up_date: string
+      
+      review_response:
+        required_params:
+          draft_response: string
+          original_email: string
+        output:
+          type: object
+          description: "Response review results"
+          format:
+            is_appropriate: boolean
+            suggestions: array
+            improved_version: string
+            tone_analysis: string
+            completeness_score: integer
+    
+    dependencies:
+      modules:
+        - gpt_handler
+        - business_context
+      packages:
+        - json
+      system:
+        - logging_system
+        - email_formatter
+    
+    common_workflows:
+      response_generation:
+        steps:
+          - process_email_data
+          - apply_classification
+          - generate_response
+          - format_output
+          - handle_follow_ups
+        description: "Complete response generation workflow"
+      
+      response_review:
+        steps:
+          - analyze_draft
+          - check_completeness
+          - suggest_improvements
+          - validate_tone
+          - return_feedback
+        description: "Response review and improvement workflow"
+      
+      context_management:
+        steps:
+          - load_context
+          - apply_settings
+          - generate_content
+          - validate_output
+          - format_response
+        description: "Context-aware response management workflow"
+    
+    error_handling:
+      gpt_errors:
+        strategy: "Default responses"
+        severity: "high"
+      parse_errors:
+        strategy: "Safe formatting"
+        severity: "medium"
+      context_issues:
+        strategy: "Default values"
+        severity: "low"
+      generation_failures:
+        strategy: "Fallback text"
+        severity: "high"
+      format_errors:
+        strategy: "Structure validation"
+        severity: "medium"
+      invalid_input:
+        strategy: "Parameter checking"
+        severity: "high"
+
+  session_manager:
+    purpose: "Manages web sessions across domains and handles authentication, cookies, and session lifecycle"
+    capabilities:
+      - session_creation
+      - cookie_handling
+      - authentication_management
+      - request_handling
+      - session_persistence
+      - security_monitoring
+      - domain_tracking
+      - multi_domain_support
+      - async_operations
+      - session_expiration
+    
+    operations:
+      create_session:
+        required_params:
+          url: string
+        optional_params:
+          session_timeout: integer
+          max_sessions: integer
+        output:
+          type: object
+          description: "Session details"
+          format:
+            domain: string
+            cookies: object
+            headers: object
+            is_authenticated: boolean
+            auth_token: string
+            expiry: string
+      
+      authenticate:
+        required_params:
+          url: string
+          auth_data: object
+        optional_params:
+          auth_method: string
+        output:
+          type: object
+          description: "Authentication status"
+      
+      make_request:
+        required_params:
+          method: string
+          url: string
+        optional_params:
+          session: object
+          kwargs: object
+        output:
+          type: object
+          description: "Request response data"
+      
+      get_session_stats:
+        output:
+          type: object
+          description: "Session statistics"
+          format:
+            total_sessions: integer
+            active_sessions: integer
+            authenticated_sessions: integer
+            oldest_session: string
+            newest_session: string
+    
+    dependencies:
+      packages:
+        - aiohttp
+        - yarl
+      modules:
+        - core_request
+      system:
+        - url_parsing_support
+        - cookie_handling
+        - async_support
+      environment:
+        - session_config
+    
+    common_workflows:
+      session_management:
+        steps:
+          - create_session
+          - handle_cookies
+          - track_expiration
+          - manage_authentication
+          - clean_up_expired
+        description: "Complete session management workflow"
+      
+      request_handling:
+        steps:
+          - get_or_create_session
+          - add_auth_headers
+          - make_request
+          - update_cookies
+          - handle_response
+        description: "Request handling workflow"
+      
+      authentication_flow:
+        steps:
+          - create_session
+          - send_auth_request
+          - store_tokens
+          - update_session
+          - handle_expiry
+        description: "Authentication workflow"
+    
+    error_handling:
+      invalid_urls:
+        strategy: "Proper validation"
+        severity: "high"
+      session_expiry:
+        strategy: "Auto cleanup"
+        severity: "medium"
+      auth_failures:
+        strategy: "Retry logic"
+        severity: "high"
+      cookie_errors:
+        strategy: "Safe parsing"
+        severity: "medium"
+      request_errors:
+        strategy: "Error propagation"
+        severity: "high"
+      concurrent_access:
+        strategy: "Thread safety"
+        severity: "high"
+
+  system_interaction:
+    purpose: "Handles system-level operations and manages file operations, controls process management, and provides system interface"
+    capabilities:
+      - file_opening
+      - process_management
+      - application_handling
+      - system_monitoring
+      - process_listing
+      - process_termination
+      - default_application_mapping
+      - error_handling
+    
+    operations:
+      open_file:
+        required_params:
+          file_path: string
+        optional_params:
+          application: string
+        output:
+          type: boolean
+          description: "Success status"
+      
+      kill_process:
+        required_params:
+          pid: integer
+        output:
+          type: boolean
+          description: "Success status"
+
+      list_running_processes:
+        output:
+          type: array
+          description: "List of running processes"
+          format:
+            - pid: integer
+              name: string
+              cpu_percent: float
+              memory_percent: float
+    
+    dependencies:
+      packages:
+        - psutil
+      modules:
+        - subprocess
+      system:
+        - os_specific_utilities
+        - file_system_access
+        - process_access_rights
+      environment:
+        - system_config
+    
+    common_workflows:
+      file_operations:
+        steps:
+          - validate_path
+          - check_permissions
+          - open_file
+          - handle_response
+          - monitor_process
+        description: "File operation workflow"
+      
+      process_management:
+        steps:
+          - list_processes
+          - monitor_resources
+          - kill_processes
+          - track_status
+          - handle_errors
+        description: "Process management workflow"
+      
+      application_control:
+        steps:
+          - select_application
+          - launch_process
+          - monitor_execution
+          - handle_termination
+          - clean_up
+        description: "Application control workflow"
+    
+    error_handling:
+      file_access:
+        strategy: "Permission checking"
+        severity: "high"
+      process_control:
+        strategy: "Safe termination"
+        severity: "high"
+      application_errors:
+        strategy: "Graceful fallback"
+        severity: "medium"
+      system_errors:
+        strategy: "Proper logging"
+        severity: "high"
+      resource_issues:
+        strategy: "Monitoring"
+        severity: "medium"
+      permission_errors:
+        strategy: "User notification"
+        severity: "high"
+
+  web_scraper:
+    purpose: "Scrapes web content, extracts structured data, handles multiple URLs, and processes HTML content"
+    capabilities:
+      - web_scraping
+      - html_parsing
+      - content_extraction
+      - multi_url_support
+      - selector_based_extraction
+      - async_operations
+      - header_management
+      - error_handling
+    
+    operations:
+      execute:
+        required_params:
+          url: string  # Can be string or array of strings
+          selectors: object
+        optional_params:
+          headers: object
+        output:
+          type: object
+          description: "Scraped and structured data"
+          format:
+            scraped_data:
+              url1:
+                selector_key1: array
+                selector_key2: array
+              url2:
+                selector_key1: array
+                selector_key2: array
+            error:
+              url:
+                error: string
+    
+    dependencies:
+      packages:
+        - aiohttp
+        - beautifulsoup4
+      modules:
+        - async_support
+        - html_parsing
+        - http_client
+      environment:
+        - scraper_config
+    
+    common_workflows:
+      content_extraction:
+        steps:
+          - fetch_urls
+          - parse_html
+          - apply_selectors
+          - extract_content
+          - format_results
+        description: "Basic content extraction workflow"
+      
+      batch_processing:
+        steps:
+          - handle_multiple_urls
+          - manage_connections
+          - process_responses
+          - aggregate_results
+          - handle_errors
+        description: "Multiple URL processing workflow"
+      
+      data_collection:
+        steps:
+          - configure_selectors
+          - extract_data
+          - clean_content
+          - remove_duplicates
+          - format_output
+        description: "Data collection and cleaning workflow"
+    
+    error_handling:
+      network_errors:
+        strategy: "Retry mechanism"
+        severity: "high"
+      parse_errors:
+        strategy: "Safe extraction"
+        severity: "medium"
+      invalid_urls:
+        strategy: "Proper validation"
+        severity: "high"
+      timeout_issues:
+        strategy: "Configurable limits"
+        severity: "medium"
+      memory_issues:
+        strategy: "Resource management"
+        severity: "high"
+      connection_errors:
+        strategy: "Graceful degradation"
+        severity: "medium" 

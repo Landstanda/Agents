@@ -48,6 +48,35 @@ Main components:
       - Handles execution troubleshooting and error recovery
       - Updates documentation with new services 
 
+   5. **Ticket System**
+      The Ticket system manages the complete lifecycle of user requests:
+      - **Core Identification**
+        - Unique ticket ID generation
+        - Timestamp tracking
+        - User and channel information
+
+      - **Request Details**
+        - Original message preservation
+        - Intent and service mapping
+        - Entity tracking (required and optional)
+        - Missing entity management
+
+      - **State Management**
+        - Status tracking (CREATED, ANALYZING, EXECUTING, etc.)
+        - Current step monitoring
+        - Error state handling
+
+      - **History Tracking**
+        - Complete message history
+        - Step execution records
+        - Error logging
+        - Created services documentation
+
+      - **Results Management**
+        - Execution results storage
+        - Final response tracking
+        - Thread management for conversations
+
 Main documents:
 
    1. **Services.yaml**

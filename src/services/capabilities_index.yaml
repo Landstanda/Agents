@@ -1,0 +1,213 @@
+---
+# AI Secretary Capabilities Index
+
+direct_capabilities:
+  attachment_handling:
+    modules:
+      - email_sender
+      - file_transfer
+    description: "Handle and process file attachments"
+
+  authentication:
+    basic:
+      module: basic_auth
+      description: "Basic username/password authentication"
+    google:
+      module: google_auth
+      description: "Google OAuth authentication"
+
+  browser_control:
+    module: browser_automation
+    description: "Automated web browsing and interaction"
+
+  calendar_management:
+    module: google_calendar
+    description: "Calendar operations and scheduling"
+
+  content_extraction:
+    modules:
+      - web_scraper
+      - html_parser
+    description: "Extract content from web pages and documents"
+
+  email_management:
+    classification:
+      module: email_classifier
+      description: "Analyze and categorize emails"
+    reading:
+      module: email_reader
+      description: "Read and process email content"
+    sending:
+      module: email_sender
+      description: "Compose and send emails"
+
+  file_management:
+    conversion:
+      module: document_management
+      description: "Convert between file formats"
+    organization:
+      module: file_transfer
+      description: "Organize and manage files"
+    search:
+      module: google_drive
+      description: "Search and locate files"
+
+  project_management:
+    module: trello_integration
+    description: "Manage projects and tasks"
+
+module_suites:
+  browser_automation:
+    capabilities:
+      - web_page_navigation
+      - element_interaction
+      - form_filling
+      - screenshot_capture
+      - download_management
+      - headless_browsing
+      - javascript_execution
+    description: "Complete web automation suite"
+
+  email_management:
+    email_reader:
+      capabilities:
+        - email_search
+        - content_retrieval
+        - metadata_extraction
+        - label_management
+      description: "Email processing and analysis"
+    email_classifier:
+      capabilities:
+        - content_analysis
+        - priority_assessment
+        - action_determination
+        - time_sensitivity_analysis
+      description: "Email classification and prioritization"
+    email_sender:
+      capabilities:
+        - message_composition
+        - attachment_handling
+        - follow_up_scheduling
+        - thread_management
+      description: "Email composition and sending"
+
+  file_management:
+    file_transfer:
+      capabilities:
+        - multi_service_transfer
+        - batch_operations
+        - directory_management
+        - organization
+      description: "File transfer and organization"
+    document_management:
+      capabilities:
+        - version_control
+        - format_conversion
+        - metadata_tracking
+        - content_management
+      description: "Document processing and management"
+    google_drive:
+      capabilities:
+        - file_storage
+        - permission_management
+        - search_operations
+        - folder_organization
+      description: "Google Drive integration"
+
+  integration:
+    trello:
+      capabilities:
+        - board_management
+        - list_organization
+        - card_handling
+        - task_tracking
+      description: "Trello project management"
+    google_calendar:
+      capabilities:
+        - event_scheduling
+        - availability_checking
+        - reminder_management
+        - attendee_coordination
+      description: "Calendar management"
+
+task_chains:
+  email_processing:
+    name: "Find and Process Email → Send Response with Attachments"
+    steps:
+      - module: email_reader
+        action: find_email
+        description: "Locate relevant email"
+      - module: email_classifier
+        action: analyze_content
+        description: "Analyze email content"
+      - module: google_drive
+        action: find_files
+        description: "Find referenced files"
+      - module: response_generator
+        action: create_response
+        description: "Generate appropriate response"
+      - module: email_sender
+        action: send_email
+        description: "Send response with attachments"
+
+  document_processing:
+    name: "Create and Share Document"
+    steps:
+      - module: document_management
+        action: create_document
+        description: "Create new document"
+      - module: google_docs
+        action: edit_content
+        description: "Edit document content"
+      - module: google_drive
+        action: set_permissions
+        description: "Set sharing permissions"
+      - module: email_sender
+        action: notify_recipients
+        description: "Notify recipients"
+
+  web_data_collection:
+    name: "Gather and Process Web Data"
+    steps:
+      - module: browser_headers
+        action: prepare_request
+        description: "Set up request headers"
+      - module: web_scraper
+        action: collect_data
+        description: "Collect web data"
+      - module: data_cleaner
+        action: normalize_data
+        description: "Clean and normalize data"
+      - module: report_generator
+        action: create_report
+        description: "Generate report"
+
+  task_management:
+    name: "Create and Track Project Tasks"
+    steps:
+      - module: email_classifier
+        action: analyze_requirements
+        description: "Analyze task requirements"
+      - module: trello_integration
+        action: create_board_cards
+        description: "Create Trello board and cards"
+      - module: google_calendar
+        action: schedule_deadlines
+        description: "Set up deadlines"
+      - module: notification_module
+        action: send_updates
+        description: "Send status updates"
+
+usage_guidelines:
+  single_capabilities:
+    description: "Use direct_capabilities to find the most appropriate module"
+    priority: 1
+  related_tasks:
+    description: "Check module_suites to find modules that handle multiple aspects"
+    priority: 2
+  complex_operations:
+    description: "Refer to task_chains for proven module combinations"
+    priority: 3
+  verification:
+    description: "Always verify module dependencies in module_capabilities.yaml"
+    priority: 4 
