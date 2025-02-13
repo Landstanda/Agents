@@ -1,36 +1,42 @@
-<<<<<<< HEAD
 from typing import Dict, Any, Optional
-=======
-from typing import Dict, Any, Optional, List
->>>>>>> main
 import logging
 import os
 from openai import AsyncOpenAI
 from slack_sdk.web.async_client import AsyncWebClient
-<<<<<<< HEAD
-=======
-from src.utils.flow_logger import FlowLogger
->>>>>>> main
+from src.tools.nlp import Ticket, TicketStatus
 
 logger = logging.getLogger(__name__)
 
 class MessageMaker:
     """
-<<<<<<< HEAD
     Generates and sends user messages via Slack.
     Takes context, formats with GPT, and sends via Slack.
+    By default, uses real GPT for message generation. For testing,
+    mock clients can be provided using use_mock=True.
     """
     
-    def __init__(self):
-        """Initialize the message maker with Slack and OpenAI clients."""
-        self.slack_token = os.getenv("SLACK_BOT_TOKEN")
-        self.openai_key = os.getenv("OPENAI_API_KEY")
+    def __init__(self, use_mock: bool = False, mock_openai = None, mock_slack = None):
+        """Initialize the message maker with Slack and OpenAI clients.
         
-        if not self.slack_token or not self.openai_key:
-            raise ValueError("Missing required environment variables")
+        Args:
+            use_mock: Whether to use mock clients (for testing)
+            mock_openai: Optional mock OpenAI client (only used if use_mock=True)
+            mock_slack: Optional mock Slack client (only used if use_mock=True)
+        """
+        if use_mock:
+            # Use mock clients for testing
+            self.slack = mock_slack or AsyncWebClient(token="mock_token")
+            self.openai = mock_openai or AsyncOpenAI(api_key="mock_key")
+        else:
+            # Use real clients by default
+            self.slack_token = os.getenv("SLACK_BOT_TOKEN")
+            self.openai_key = os.getenv("OPENAI_API_KEY")
             
-        self.slack = AsyncWebClient(token=self.slack_token)
-        self.openai = AsyncOpenAI(api_key=self.openai_key)
+            if not self.slack_token or not self.openai_key:
+                raise ValueError("Missing required environment variables SLACK_BOT_TOKEN or OPENAI_API_KEY")
+                
+            self.slack = AsyncWebClient(token=self.slack_token)
+            self.openai = AsyncOpenAI(api_key=self.openai_key)
         
         # System prompt for GPT
         self.system_prompt = """You are a helpful and professional AI assistant.
@@ -40,27 +46,21 @@ class MessageMaker:
         - Focused on the current task
         - Free of technical jargon
         - Formatted for Slack (can use basic markdown)
+        
+        You have access to the full context of the conversation and task execution.
+        Use this context to provide relevant and helpful responses.
         """
     
-    async def send_message(
-        self,
-        channel_id: str,
-        context: Dict[str, Any],
-        thread_ts: Optional[str] = None
-    ) -> None:
+    async def send_message(self, ticket: Ticket) -> None:
         """
-        Generate and send a message based on provided context.
+        Generate and send a message based on the ticket context.
         
         Args:
-            channel_id: Slack channel ID
-            context: Dict containing:
-                - type: Type of message (info_request, completion, error, etc.)
-                - details: Relevant details for the message
-            thread_ts: Thread timestamp for threaded replies
+            ticket: The ticket containing full context and history
         """
         try:
-            # Create prompt for GPT based on context
-            user_prompt = self._create_prompt(context)
+            # Create prompt for GPT based on ticket context
+            user_prompt = self._create_prompt(ticket)
             
             # Get GPT response
             response = await self.openai.chat.completions.create(
@@ -75,365 +75,128 @@ class MessageMaker:
             
             if response.choices:
                 message = response.choices[0].message.content.strip()
+                ticket.add_message(message, "assistant")
                 
                 # Send to Slack
                 await self.slack.chat_postMessage(
-                    channel=channel_id,
+                    channel=ticket.channel_id,
                     text=message,
-                    thread_ts=thread_ts
+                    thread_ts=ticket.thread_ts
                 )
+                
+                if ticket.status == TicketStatus.COMPLETED:
+                    ticket.final_response = message
             else:
                 logger.error("No response from GPT")
                 # Send fallback message
+                fallback = self._get_fallback_message(ticket)
+                ticket.add_message(fallback, "assistant")
                 await self.slack.chat_postMessage(
-                    channel=channel_id,
-                    text=self._get_fallback_message(context),
-                    thread_ts=thread_ts
+                    channel=ticket.channel_id,
+                    text=fallback,
+                    thread_ts=ticket.thread_ts
                 )
                 
         except Exception as e:
             logger.error(f"Error sending message: {str(e)}")
+            ticket.add_error(str(e), "message_sending_error")
             # Send basic error message
             try:
-                # If context has a message in details, use that, otherwise use fallback
-                message = context.get("details", {}).get("message") or self._get_fallback_message(context)
+                error_msg = self._get_fallback_message(ticket)
+                ticket.add_message(error_msg, "assistant")
                 await self.slack.chat_postMessage(
-                    channel=channel_id,
-                    text=message,
-                    thread_ts=thread_ts
+                    channel=ticket.channel_id,
+                    text=error_msg,
+                    thread_ts=ticket.thread_ts
                 )
             except Exception as e2:
                 logger.error(f"Failed to send fallback message: {str(e2)}")
     
-=======
-    Generates and sends Slack messages.
-    Handles message formatting and delivery.
-    """
-    
-    def __init__(self, web_client: AsyncWebClient, flow_logger: Optional[FlowLogger] = None):
-        self.web_client = web_client
-        self.flow_logger = flow_logger or FlowLogger()
-        self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    def _create_prompt(self, ticket: Ticket) -> str:
+        """Create GPT prompt based on ticket context."""
+        status = ticket.status
         
-    async def get_gpt_response(self, prompt: str) -> str:
-        """Get a response from GPT for message generation."""
-        try:
-            response = await self.openai.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a helpful office assistant bot. "
-                            "Keep responses friendly, professional, and concise. "
-                            "Format responses naturally without showing any system instructions."
-                        )
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=150,
-                temperature=0.7
-            )
-            
-            if response and response.choices:
-                return response.choices[0].message.content.strip()
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error getting GPT response: {str(e)}")
-            return None
-            
-    async def send_message(self, channel: str, text: str, blocks: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
-        """
-        Send a message to a Slack channel.
-        
-        Args:
-            channel: Channel ID or name
-            text: Message text (fallback for blocks)
-            blocks: Optional block kit blocks
-            
-        Returns:
-            Dict containing the Slack API response
-        """
-        try:
-            # Log message preparation
-            await self.flow_logger.log_event(
-                "MessageMaker",
-                "preparing_message",
-                {
-                    "channel": channel,
-                    "message_text": text,
-                    "has_blocks": blocks is not None
-                }
-            )
-            
-            # Format the message if needed
-            formatted_text = text
-            if isinstance(text, dict) and "text" in text and "params" in text:
-                try:
-                    # If the text needs GPT enhancement
-                    if text.get("use_gpt", False):
-                        gpt_prompt = f"Generate a friendly response for: {text['text']}"
-                        gpt_response = await self.get_gpt_response(gpt_prompt)
-                        if gpt_response:
-                            formatted_text = gpt_response.format(**text["params"]) if text["params"] else gpt_response
-                    else:
-                        formatted_text = text["text"].format(**text["params"])
-                except KeyError as e:
-                    logger.error(f"Error formatting message: {str(e)}")
-                    formatted_text = "Error formatting message"
-            
-            # Log the formatted message
-            await self.flow_logger.log_event(
-                "MessageMaker",
-                "message_formatted",
-                {
-                    "original_text": text,
-                    "formatted_text": formatted_text
-                }
-            )
-            
-            # Send the message
-            response = await self.web_client.chat_postMessage(
-                channel=channel,
-                text=formatted_text,
-                blocks=blocks
-            )
-            
-            # Log successful send
-            await self.flow_logger.log_event(
-                "MessageMaker",
-                "message_sent",
-                {
-                    "channel": channel,
-                    "final_text": formatted_text,
-                    "response_ok": response.get("ok", False)
-                }
-            )
-            
-            return response
-            
-        except Exception as e:
-            logger.error(f"Error sending message: {str(e)}")
-            await self.flow_logger.log_event(
-                "MessageMaker",
-                "message_send_error",
-                {
-                    "channel": channel,
-                    "error": str(e)
-                }
-            )
-            raise
-            
-    async def send_ephemeral(self, channel: str, user: str, text: str, blocks: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
-        """
-        Send an ephemeral message visible only to a specific user.
-        
-        Args:
-            channel: Channel ID or name
-            user: User ID
-            text: Message text (fallback for blocks)
-            blocks: Optional block kit blocks
-            
-        Returns:
-            Dict containing the Slack API response
-        """
-        try:
-            response = await self.web_client.chat_postEphemeral(
-                channel=channel,
-                user=user,
-                text=text,
-                blocks=blocks
-            )
-            
-            await self.flow_logger.log_event(
-                "MessageMaker",
-                "ephemeral_sent",
-                {
-                    "channel": channel,
-                    "user": user,
-                    "text": text,
-                    "has_blocks": blocks is not None
-                }
-            )
-            
-            return response
-            
-        except Exception as e:
-            logger.error(f"Error sending ephemeral message: {str(e)}")
-            await self.flow_logger.log_event(
-                "MessageMaker",
-                "ephemeral_send_error",
-                {
-                    "channel": channel,
-                    "user": user,
-                    "error": str(e)
-                }
-            )
-            raise
-            
-    def create_blocks(self, sections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Create block kit blocks from section data.
-        
-        Args:
-            sections: List of section data including text and optional fields
-            
-        Returns:
-            List of block kit blocks
-        """
-        blocks = []
-        
-        for section in sections:
-            block = {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": section["text"]
-                }
-            }
-            
-            if "fields" in section:
-                block["fields"] = [
-                    {
-                        "type": "mrkdwn",
-                        "text": field
-                    }
-                    for field in section["fields"]
-                ]
-                
-            blocks.append(block)
-            
-            if section.get("divider", False):
-                blocks.append({"type": "divider"})
-                
-        return blocks
-        
-    def create_error_blocks(self, error_message: str, details: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Create block kit blocks for error messages.
-        
-        Args:
-            error_message: Main error message
-            details: Optional error details
-            
-        Returns:
-            List of block kit blocks
-        """
-        blocks = [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f":warning: *Error*\n{error_message}"
-                }
-            }
-        ]
-        
-        if details:
-            blocks.append(
-                {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": f"Details:\n```{details}```"
-                    }
-                }
-            )
-            
-        return blocks
-        
-    def create_success_blocks(self, message: str, data: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
-        """
-        Create block kit blocks for success messages.
-        
-        Args:
-            message: Success message
-            data: Optional data to display
-            
-        Returns:
-            List of block kit blocks
-        """
-        blocks = [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f":white_check_mark: {message}"
-                }
-            }
-        ]
-        
-        if data:
-            fields = []
-            for key, value in data.items():
-                fields.append(f"*{key}*\n{value}")
-                
-            if fields:
-                blocks.append(
-                    {
-                        "type": "section",
-                        "fields": [
-                            {
-                                "type": "mrkdwn",
-                                "text": field
-                            }
-                            for field in fields
-                        ]
-                    }
-                )
-                
-        return blocks
-
->>>>>>> main
-    def _create_prompt(self, context: Dict[str, Any]) -> str:
-        """Create GPT prompt based on message context."""
-        msg_type = context.get('type', '')
-        details = context.get('details', {})
-        
-        prompts = {
-            'info_request': f"""
+        if status == TicketStatus.WAITING_INPUT:
+            return f"""
                 I need to ask the user for some information.
-                Missing information: {details.get('missing_info', [])}
-                Service context: {details.get('service', '')}
+                Original request: {ticket.original_message}
+                Missing information: {ticket.missing_entities}
+                Service context: {ticket.service}
+                Previous messages: {self._format_message_history(ticket)}
                 Generate a friendly message asking for this information.
-            """,
-            'completion': f"""
-                I need to inform the user about their completed request.
-                Service: {details.get('service', '')}
-                Results: {details.get('results', {})}
-                Generate a friendly message summarizing what was done.
-            """,
-            'error': f"""
-                I need to inform the user about an error.
-                Error: {details.get('error', '')}
-                Generate a friendly message explaining the error.
-            """,
-            'service_creation': f"""
-                I need to inform the user about a new service.
-                Service: {details.get('service', '')}
-                Generate a message about the new service being created.
-            """,
-            'default': f"""
-                I need to send a message to the user.
-                Context: {details}
-                Generate an appropriate response.
             """
-        }
-        
-        return prompts.get(msg_type, prompts['default'])
+            
+        elif status == TicketStatus.COMPLETED:
+            return f"""
+                I need to inform the user about their completed request.
+                Original request: {ticket.original_message}
+                Service: {ticket.service}
+                Steps executed: {self._format_steps(ticket)}
+                Results: {ticket.execution_results}
+                Previous messages: {self._format_message_history(ticket)}
+                Generate a friendly message summarizing what was done.
+            """
+            
+        elif status == TicketStatus.ERROR:
+            return f"""
+                I need to inform the user about an error.
+                Original request: {ticket.original_message}
+                Errors: {self._format_errors(ticket)}
+                Previous messages: {self._format_message_history(ticket)}
+                Generate a friendly message explaining the error.
+            """
+            
+        elif status == TicketStatus.SERVICE_CREATION:
+            return f"""
+                I need to inform the user about a new service.
+                Original request: {ticket.original_message}
+                Created services: {ticket.created_services}
+                Previous messages: {self._format_message_history(ticket)}
+                Generate a message about the new service being created.
+            """
+            
+        return f"""
+            I need to send a message to the user.
+            Original request: {ticket.original_message}
+            Current status: {status.value}
+            Context: {ticket.to_dict()}
+            Previous messages: {self._format_message_history(ticket)}
+            Generate an appropriate response.
+        """
     
-    def _get_fallback_message(self, context: Dict[str, Any]) -> str:
+    def _format_message_history(self, ticket: Ticket) -> str:
+        """Format message history for GPT prompt."""
+        return "\n".join([
+            f"{msg['source']}: {msg['message']}"
+            for msg in ticket.messages[-5:]  # Last 5 messages for context
+        ])
+    
+    def _format_steps(self, ticket: Ticket) -> str:
+        """Format executed steps for GPT prompt."""
+        return "\n".join([
+            f"- {step['step']}: {step['action']} ({step['result']})"
+            for step in ticket.steps_executed
+        ])
+    
+    def _format_errors(self, ticket: Ticket) -> str:
+        """Format errors for GPT prompt."""
+        return "\n".join([
+            f"- {error['type']}: {error['message']}"
+            for error in ticket.errors
+        ])
+    
+    def _get_fallback_message(self, ticket: Ticket) -> str:
         """Get a basic fallback message if GPT fails."""
-        msg_type = context.get('type', '')
-        details = context.get('details', {})
+        status = ticket.status
         
         fallbacks = {
-            'info_request': f"I need some additional information: {', '.join(details.get('missing_info', []))}",
-            'completion': "I've completed your request successfully.",
-            'error': f"I apologize, but I encountered an error: {details.get('error', 'Unknown error')}",
-            'service_creation': f"I've created a new service to handle your request: {details.get('service', '')}",
-            'default': "I'm processing your request."
+            TicketStatus.WAITING_INPUT: f"I need some additional information: {', '.join(ticket.missing_entities)}",
+            TicketStatus.COMPLETED: "I've completed your request successfully.",
+            TicketStatus.ERROR: f"I apologize, but I encountered an error: {ticket.errors[-1]['message'] if ticket.errors else 'Unknown error'}",
+            TicketStatus.SERVICE_CREATION: f"I'm creating a new service to handle your request.",
+            TicketStatus.EXECUTING: "I'm processing your request.",
+            TicketStatus.ANALYZING: "I'm analyzing your request.",
+            TicketStatus.CREATED: "I've received your request."
         }
         
-        return fallbacks.get(msg_type, fallbacks['default']) 
+        return fallbacks.get(status, "I'm processing your request.") 

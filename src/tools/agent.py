@@ -6,6 +6,7 @@ import importlib
 import inspect
 from src.utils.flow_logger import FlowLogger
 import re
+from src.tools.nlp import Ticket, TicketStatus
 
 logger = logging.getLogger(__name__)
 
@@ -15,11 +16,13 @@ class Agent:
     Follows service instructions to complete tasks.
     """
     
-    def __init__(self, tools_path: str = "src/tools"):
+    def __init__(self, executions_path: str = "src/services/executions.yaml", tools_path: str = "src/tools", flow_logger: Optional[FlowLogger] = None):
+        self.executions_path = Path(executions_path)
         self.tools_path = Path(tools_path)
         self.tools = {}
         self.is_busy = False
         self.current_service = None
+        self.flow_logger = flow_logger or FlowLogger()
         self.load_tools()
         
     def load_tools(self):
@@ -68,18 +71,19 @@ class Agent:
         except Exception as e:
             logger.error(f"Error loading tools: {str(e)}")
     
-    async def execute_service(self, service: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_service(self, ticket: Ticket) -> Dict[str, Any]:
         """
-        Execute a service with the given context.
+        Execute a service with the given ticket.
         
         Args:
-            service: Service definition including steps and requirements
-            context: Execution context with entities and user info
+            ticket: Ticket containing service and context information
             
         Returns:
             Dict containing execution results
         """
         if self.is_busy:
+            ticket.update_status(TicketStatus.ERROR)
+            ticket.add_error("Agent is busy with another service", "execution_error")
             return {
                 'status': 'error',
                 'error': 'Agent is busy with another service'
@@ -87,37 +91,65 @@ class Agent:
             
         try:
             self.is_busy = True
-            self.current_service = service
             
-            # Validate service format
-            if not isinstance(service, dict) or 'steps' not in service:
-                raise ValueError("Invalid service format")
+            # Load execution plan
+            if not self.executions_path.exists():
+                raise ValueError(f"Executions file not found: {self.executions_path}")
                 
+            with open(self.executions_path, 'r') as f:
+                executions = yaml.safe_load(f) or {}
+            
+            # Get execution plan for service
+            if ticket.service not in executions:
+                ticket.update_status(TicketStatus.ERROR)
+                ticket.add_error(f"No execution plan found for service: {ticket.service}", "execution_error")
+                return {
+                    'status': 'error',
+                    'error': f'No execution plan found for service: {ticket.service}'
+                }
+            
+            execution_plan = executions[ticket.service]
             results = []
             
             # Execute each step in sequence
-            for step in service['steps']:
-                step_result = await self._execute_step(step, context)
+            for step in execution_plan.get('steps', []):
+                ticket.current_step = step.get('name')
+                step_result = await self._execute_step(step, ticket.entities)
+                
+                # Record step execution
+                ticket.add_step(
+                    step_name=step.get('name', ''),
+                    tool=step.get('tool', ''),
+                    action=step.get('action', ''),
+                    params=step.get('params', {}),
+                    result=step_result
+                )
+                
                 results.append(step_result)
                 
                 if step_result['status'] == 'error':
+                    ticket.update_status(TicketStatus.ERROR)
+                    ticket.add_error(step_result['error'], "step_execution_error", step.get('name'))
                     return {
                         'status': 'error',
                         'error': step_result['error'],
                         'partial_results': results
                     }
-                    
-            # Check success criteria
-            success = self._check_success_criteria(service, results)
+            
+            # Update ticket status
+            ticket.update_status(TicketStatus.COMPLETED)
+            ticket.execution_results = results
             
             return {
-                'status': 'success' if success else 'partial',
+                'status': 'success',
                 'results': results,
-                'success_criteria_met': success
+                'text': self._format_response(execution_plan, results, ticket.entities)
             }
             
         except Exception as e:
             logger.error(f"Error executing service: {str(e)}")
+            ticket.update_status(TicketStatus.ERROR)
+            ticket.add_error(str(e), "execution_error")
             return {
                 'status': 'error',
                 'error': str(e)
@@ -125,7 +157,7 @@ class Agent:
             
         finally:
             self.is_busy = False
-            self.current_service = None
+            ticket.current_step = None
     
     async def _execute_step(self, step: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a single step in the service."""
@@ -209,4 +241,24 @@ class Agent:
             return criterion in str(results)
         except Exception as e:
             logger.error(f"Error evaluating criterion: {str(e)}")
-            return False 
+            return False
+
+    def _format_response(self, execution_plan: Dict[str, Any], results: List[Dict[str, Any]], context: Dict[str, Any]) -> str:
+        """Format the execution result into a standardized response.
+
+        Args:
+            execution_plan: The execution plan for the service.
+            results: The list of results from executing the service.
+            context: The context information for the service.
+
+        Returns:
+            A formatted string representing the execution result.
+        """
+        response = []
+        
+        for step in execution_plan.get('steps', []):
+            step_result = next((result for result in results if result['tool'] == step.get('tool', '') and result['action'] == step.get('action', '')), None)
+            if step_result:
+                response.append(f"{step.get('name', '')}: {step_result['result']}")
+        
+        return "\n".join(response)
