@@ -1,0 +1,152 @@
+================================================================================
+Session Started: 09:54:30 AM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[09:54:30 AM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 6
+triggers_count: 29
+
+
+================================================================================
+[09:54:31 AM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[09:54:50 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+channel: "C08CF2DPMH8"
+ts: "1739555690.436249"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739555690.436249",
+  "client_msg_id": "b5624ec0-da4e-4410-ba80-6b0aa527152d",
+  "text": "<@U08CFAH1H1Q> could you schedule a meeting with Gabby for tonight at 9:30 p.m.?",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "G+4Uv",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739555690.436249",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[09:54:50 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_095450"
+message: "could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+
+
+================================================================================
+[09:54:50 AM] NLPAnalyzer - incomplete_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_095450"
+missing_entities: [
+  "date"
+]
+
+
+================================================================================
+[09:54:52 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+channel: "C08CF2DPMH8"
+ts: "1739555690.436249"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739555690.436249",
+  "client_msg_id": "b5624ec0-da4e-4410-ba80-6b0aa527152d",
+  "text": "<@U08CFAH1H1Q> could you schedule a meeting with Gabby for tonight at 9:30 p.m.?",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "G+4Uv",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739555690.436249"
+}
+
+
+================================================================================
+[09:54:52 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_095452"
+message: "could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+
+
+================================================================================
+[09:54:52 AM] NLPAnalyzer - incomplete_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_095452"
+missing_entities: [
+  "date"
+]
+
+
+================================================================================
+[09:54:53 AM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_095450"
+
+
+================================================================================
+[09:54:54 AM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_095452"
+

@@ -29,6 +29,32 @@ class Agent:
         self.flow_logger = flow_logger or FlowLogger()
         self.load_tools()
         
+    async def load_services(self):
+        """Load services from the services file."""
+        try:
+            if not self.services_path.exists():
+                logger.warning(f"Services file not found at {self.services_path}")
+                return
+                
+            with open(self.services_path, 'r') as f:
+                self.services = yaml.safe_load(f) or {}
+                
+            logger.info(f"Loaded {len(self.services)} services")
+            await self.flow_logger.log_event(
+                "Agent",
+                "services_loaded",
+                {"services_count": len(self.services)}
+            )
+            
+        except Exception as e:
+            logger.error(f"Error loading services: {str(e)}")
+            await self.flow_logger.log_event(
+                "Agent",
+                "services_load_error",
+                {"error": str(e)}
+            )
+            raise
+        
     def load_tools(self):
         """Load all available tools from the tools directory."""
         try:

@@ -4,6 +4,7 @@ import os
 from openai import AsyncOpenAI
 from slack_sdk.web.async_client import AsyncWebClient
 from src.tools.nlp import Ticket, TicketStatus
+from src.utils.flow_logger import FlowLogger
 
 logger = logging.getLogger(__name__)
 
@@ -15,13 +16,15 @@ class MessageMaker:
     mock clients can be provided using use_mock=True.
     """
     
-    def __init__(self, use_mock: bool = False, mock_openai = None, mock_slack = None):
+    def __init__(self, use_mock: bool = False, mock_openai = None, mock_slack = None, flow_logger: Optional[FlowLogger] = None, slack_token: Optional[str] = None):
         """Initialize the message maker with Slack and OpenAI clients.
         
         Args:
             use_mock: Whether to use mock clients (for testing)
             mock_openai: Optional mock OpenAI client (only used if use_mock=True)
             mock_slack: Optional mock Slack client (only used if use_mock=True)
+            flow_logger: Optional flow logger for event tracking
+            slack_token: Optional Slack token to use (if not provided, will use from env)
         """
         if use_mock:
             # Use mock clients for testing
@@ -29,7 +32,7 @@ class MessageMaker:
             self.openai = mock_openai or AsyncOpenAI(api_key="mock_key")
         else:
             # Use real clients by default
-            self.slack_token = os.getenv("SLACK_BOT_TOKEN")
+            self.slack_token = slack_token or os.getenv("SLACK_BOT_TOKEN")
             self.openai_key = os.getenv("OPENAI_API_KEY")
             
             if not self.slack_token or not self.openai_key:
@@ -37,6 +40,8 @@ class MessageMaker:
                 
             self.slack = AsyncWebClient(token=self.slack_token)
             self.openai = AsyncOpenAI(api_key=self.openai_key)
+        
+        self.flow_logger = flow_logger
         
         # System prompt for GPT
         self.system_prompt = """You are a helpful and professional AI assistant.

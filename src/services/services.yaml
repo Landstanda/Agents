@@ -1,63 +1,264 @@
+# Core Business Services
+
 schedule_meeting:
-  name: Schedule Meeting
-  description: Schedule a meeting with specified participants at a given time
-  intent: schedule_meeting
+  name: "Schedule Meeting"
+  description: "Schedule a meeting with specified participants"
+  identifier: "schedule_meeting"
   triggers:
-    - schedule a meeting
-    - set up a meeting
-    - book a meeting
-    - arrange a meeting
-    - plan a meeting
+    - "schedule a meeting"
+    - "set up a meeting"
+    - "book a meeting"
+    - "arrange a meeting"
+    - "plan a meeting"
+    - "organize a meeting"
   required_entities:
     - time
     - date
+  optional_entities:
+    - location
+    - duration
+    - agenda
+    - participants
   steps:
-    - tool: calendar
+    - name: "Check Availability"
+      tool: calendar
+      action: check_availability
+      params:
+        start_time: "{time}"
+        end_time: "{calculated_end_time}"
+        attendees: "{participants}"
+    - name: "Create Event"
+      tool: calendar
       action: create_event
       params:
-        time: "{time}"
-        date: "{date}"
+        summary: "Meeting: {agenda}"
+        start_time: "{time}"
+        end_time: "{calculated_end_time}"
+        location: "{location}"
+        attendees: "{participants}"
+    - name: "Send Notification"
+      tool: send_message
+      action: send_message
+      params:
+        recipient: "{participants}"
+        message: "Meeting scheduled for {date} at {time}"
   success_criteria:
-    - Meeting scheduled successfully
-  success_message: "I've scheduled the meeting for {date} at {display_time}."
-  execute: |
-    async def execute(self, intent, entities, user_info):
-        return {
-            'status': 'success',
-            'result': {
-                'time': entities.get('time'),
-                'date': entities.get('date'),
-                'participants': entities.get('participants', [])
-            }
-        }
+    - "Event created successfully"
+    - "Notifications sent to all participants"
+  error_handling:
+    time_conflict:
+      message: "There is a scheduling conflict at {time}"
+      action: "suggest_alternative"
+    invalid_time:
+      message: "Please provide a valid time"
+      action: "prompt_user"
 
-help:
-  name: Help
-  description: Show available commands and capabilities
-  intent: help
+share_document:
+  name: "Share Document"
+  description: "Upload and share a document with team members"
+  identifier: "share_document"
   triggers:
-    - help
-    - what can you do
-    - show commands
-    - list capabilities
-    - how do you work
+    - "share document"
+    - "upload and share"
+    - "share file"
+    - "send document"
+    - "share this file"
+  required_entities:
+    - file_path
+    - recipients
+  optional_entities:
+    - message
+    - permission_level
   steps:
-    - tool: help
-      action: show_capabilities
+    - name: "Upload File"
+      tool: document
+      action: upload_file
+      params:
+        file_path: "{file_path}"
+        destination: "shared_documents"
+    - name: "Send Share Notification"
+      tool: email
+      action: send_email
+      params:
+        to_address: "{recipients}"
+        subject: "Document Shared: {filename}"
+        body: "A document has been shared with you: {url}"
   success_criteria:
-    - Help information displayed
-  success_message: |
-    I can help you with the following:
-    • Scheduling meetings (e.g., "schedule a meeting with John tomorrow at 2pm")
-    • More capabilities coming soon!
-  execute: |
-    async def execute(self, intent, entities, user_info):
-        return {
-            'status': 'success',
-            'result': {
-                'capabilities': [
-                    'Schedule meetings',
-                    'Show help information'
-                ]
-            }
-        } 
+    - "File uploaded successfully"
+    - "Share notification sent"
+  error_handling:
+    upload_failed:
+      message: "Failed to upload file: {error}"
+      action: "retry"
+    invalid_file:
+      message: "Invalid file type or path"
+      action: "prompt_user"
+
+create_task:
+  name: "Create Task"
+  description: "Create a new task or to-do item with optional assignment"
+  identifier: "create_task"
+  triggers:
+    - "create task"
+    - "add todo"
+    - "new task"
+    - "assign task"
+    - "create todo item"
+  required_entities:
+    - title
+    - description
+  optional_entities:
+    - due_date
+    - assignee
+    - priority
+  steps:
+    - name: "Create Task Item"
+      tool: task
+      action: create_task
+      params:
+        title: "{title}"
+        description: "{description}"
+        due_date: "{due_date}"
+        assignee: "{assignee}"
+    - name: "Notify Assignee"
+      tool: send_message
+      action: send_message
+      params:
+        recipient: "{assignee}"
+        message: "New task assigned: {title}"
+  success_criteria:
+    - "Task created successfully"
+    - "Assignee notified if specified"
+  error_handling:
+    invalid_assignee:
+      message: "Could not find user {assignee}"
+      action: "prompt_user"
+    missing_details:
+      message: "Please provide more details for the task"
+      action: "prompt_user"
+
+extract_and_share:
+  name: "Extract and Share Document Content"
+  description: "Extract text from a document and share the content"
+  identifier: "extract_share"
+  triggers:
+    - "extract and share"
+    - "share document content"
+    - "extract text and send"
+    - "share file contents"
+  required_entities:
+    - file_path
+    - recipients
+  optional_entities:
+    - message
+    - format
+  steps:
+    - name: "Extract Content"
+      tool: file_processing
+      action: extract_text
+      params:
+        file_path: "{file_path}"
+    - name: "Create Summary Document"
+      tool: document
+      action: create_document
+      params:
+        title: "Content Summary: {filename}"
+        content: "{extracted_text}"
+        type: "doc"
+    - name: "Share Results"
+      tool: email
+      action: send_email
+      params:
+        to_address: "{recipients}"
+        subject: "Document Content: {filename}"
+        body: "The extracted content has been shared with you: {url}"
+  success_criteria:
+    - "Text extracted successfully"
+    - "Summary document created"
+    - "Content shared with recipients"
+  error_handling:
+    extraction_failed:
+      message: "Could not extract text from {file_path}"
+      action: "retry"
+    unsupported_format:
+      message: "File format not supported"
+      action: "prompt_user"
+
+send_update:
+  name: "Send Team Update"
+  description: "Send a team update or announcement to multiple channels"
+  identifier: "send_update"
+  triggers:
+    - "send update"
+    - "send announcement"
+    - "team update"
+    - "broadcast message"
+    - "announce to team"
+  required_entities:
+    - message
+    - channels
+  optional_entities:
+    - priority
+    - attachments
+  steps:
+    - name: "Send Message"
+      tool: send_message
+      action: send_message
+      params:
+        recipient: "{channels}"
+        message: "{message}"
+        attachments: "{attachments}"
+    - name: "Send Email Backup"
+      tool: email
+      action: send_email
+      params:
+        to_address: "{team_email}"
+        subject: "Team Update: {timestamp}"
+        body: "{message}"
+  success_criteria:
+    - "Message sent to all channels"
+    - "Email backup sent"
+  error_handling:
+    channel_error:
+      message: "Could not send to channel {channel}"
+      action: "retry"
+    email_error:
+      message: "Email backup failed"
+      action: "log_only"
+
+process_emails:
+  name: "Process Recent Emails"
+  description: "Read and process recent emails, creating tasks for action items"
+  identifier: "process_emails"
+  triggers:
+    - "check emails"
+    - "process emails"
+    - "read my emails"
+    - "create tasks from emails"
+  required_entities: []  # No required entities as it processes recent emails
+  optional_entities:
+    - time_range
+    - labels
+  steps:
+    - name: "Get Recent Emails"
+      tool: email
+      action: read_email
+      params:
+        time_range: "{time_range}"
+    - name: "Create Tasks"
+      tool: task
+      action: create_task
+      params:
+        title: "Email: {email_subject}"
+        description: "Action required: {email_body}"
+        due_date: "{auto_due_date}"
+  success_criteria:
+    - "Emails retrieved successfully"
+    - "Tasks created for action items"
+  error_handling:
+    email_access_error:
+      message: "Could not access emails"
+      action: "retry"
+    task_creation_error:
+      message: "Failed to create some tasks"
+      action: "log_only"

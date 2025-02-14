@@ -1,0 +1,164 @@
+metadata:
+  version: "1.0"
+  purpose: "Template and examples for creating services"
+  usage_instructions: |
+    This template defines how to create services that combine capabilities
+    into useful business functions. Each service needs:
+    1. Basic information (name, description)
+    2. Matching information (identifier, triggers) for NLP processing
+    3. Required input from users
+    4. Step-by-step execution plan using capabilities
+    5. Success criteria and error handling
+
+# Template structure with comments
+template:
+  # Basic Information
+  name: "Service Name"
+  description: "Clear description of what the service does"
+  
+  # NLP Matching - Used to identify which service to run
+  identifier: "unique_service_id"  # Unique ID for exact matching
+  triggers:  # Keywords/phrases that might indicate this service
+    - "exact phrase match"
+    - "partial keyword match"
+    - "alternative wording"
+  
+  # Required Information
+  required_entities:  # Must be provided by user
+    - entity1
+    - entity2
+  optional_entities:  # Enhances service but not required
+    - optional1
+    - optional2
+  
+  # Execution Plan - Sequence of capabilities to run
+  steps:
+    - name: "First Step Name"
+      tool: capability_name    # Must match a capability from capacity_simple.yaml
+      action: action_name      # Must match the capability's action
+      params:                  # Parameters for the capability
+        param1: "{entity1}"    # Use {name} to reference entities
+        param2: "static_value" # Or hardcode values
+  
+  # Validation and Error Handling
+  success_criteria:
+    - "Specific condition that indicates success"
+  error_handling:
+    missing_entity:
+      message: "Please provide {entity}"
+      action: "prompt_user"
+    api_error:
+      message: "Service temporarily unavailable"
+      action: "retry"
+
+# Example 1: Schedule Meeting Service
+schedule_meeting:
+  # Basic Information
+  name: "Schedule Meeting"
+  description: "Schedule a meeting with specified participants"
+  
+  # NLP Matching
+  identifier: "schedule_meeting"
+  triggers:
+    - "schedule a meeting"
+    - "set up a meeting"
+    - "book a meeting"
+    - "arrange a meeting"
+    - "plan a meeting"
+  
+  # Required Information
+  required_entities:
+    - time
+    - date
+  optional_entities:
+    - location
+    - duration
+    - agenda
+  
+  # Execution Plan
+  steps:
+    - name: "Check Availability"
+      tool: calendar
+      action: check_availability
+      params:
+        start_time: "{time}"
+        end_time: "{calculated_end_time}"
+        attendees: "{participants}"
+    - name: "Create Event"
+      tool: calendar
+      action: create_event
+      params:
+        summary: "Meeting: {agenda}"
+        start_time: "{time}"
+        end_time: "{calculated_end_time}"
+        location: "{location}"
+        attendees: "{participants}"
+    - name: "Send Notification"
+      tool: send_message
+      action: send_message
+      params:
+        recipient: "{participants}"
+        message: "Meeting scheduled for {date} at {time}"
+  
+  # Validation and Error Handling
+  success_criteria:
+    - "Event created successfully"
+    - "Notifications sent to all participants"
+  error_handling:
+    time_conflict:
+      message: "There is a scheduling conflict at {time}"
+      action: "suggest_alternative"
+    invalid_time:
+      message: "Please provide a valid time"
+      action: "prompt_user"
+
+# Example 2: Upload and Share Document
+upload_document:
+  # Basic Information
+  name: "Upload and Share Document"
+  description: "Upload a document and share it with team members"
+  
+  # NLP Matching
+  identifier: "share_document"
+  triggers:
+    - "upload and share"
+    - "share document"
+    - "upload file"
+    - "share file"
+    - "send document"
+  
+  # Required Information
+  required_entities:
+    - file_path
+    - recipients
+  optional_entities:
+    - message
+    - permission_level
+  
+  # Execution Plan
+  steps:
+    - name: "Upload File"
+      tool: document
+      action: upload_file
+      params:
+        file_path: "{file_path}"
+        destination: "shared_documents"
+    - name: "Send Share Notification"
+      tool: email
+      action: send_email
+      params:
+        to_address: "{recipients}"
+        subject: "Document Shared: {filename}"
+        body: "A document has been shared with you: {url}"
+  
+  # Validation and Error Handling
+  success_criteria:
+    - "File uploaded successfully"
+    - "Share notification sent"
+  error_handling:
+    upload_failed:
+      message: "Failed to upload file: {error}"
+      action: "retry"
+    invalid_file:
+      message: "Invalid file type or path"
+      action: "prompt_user" 

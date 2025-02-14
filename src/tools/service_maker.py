@@ -6,6 +6,7 @@ from pathlib import Path
 from openai import AsyncOpenAI
 import json
 from src.tools.nlp import Ticket, TicketStatus
+from src.utils.flow_logger import FlowLogger
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +18,15 @@ class ServiceMaker:
     
     def __init__(self, 
                  capacity_path: str = "src/services/capacity.yaml",
-                 modules_path: str = "src/modules"):
-        """Initialize the service maker with all necessary paths and configurations."""
+                 flow_logger: Optional[FlowLogger] = None):
+        """Initialize the service maker with capacity file path."""
         self.capacity_path = Path(capacity_path)
-        self.modules_path = Path(modules_path)
-        
         self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model = "gpt-4"
+        self.flow_logger = flow_logger
         
-        # Load all configurations
+        # Load capacity file
         self.capacity = self._load_capacity()
-        self.available_modules = self._scan_modules()
         
         # System prompts for different scenarios
         self.service_creation_prompt = """You are an expert system designer.
@@ -41,24 +40,6 @@ class ServiceMaker:
            - Each capability's outputs must match the next capability's required inputs
            - Consider where to get initial inputs (user provided or system generated)
         4. Create a service definition that chains these capabilities together
-        
-        The service must follow this exact YAML format.
-        DO NOT include any markdown formatting or code blocks.
-        Return ONLY the raw YAML content.
-        
-        Format:
-        name: <clear name>
-        description: <clear description>
-        intent: <main intent>
-        triggers:
-          - <trigger phrase 1>
-        required_entities:
-          - <required entity 1>
-        steps:
-          - tool: <capability name before _>
-            action: <capability name after _>
-            params:
-              param1: value1
         
         Rules:
         1. Use ONLY capabilities defined in the capacity.yaml file
@@ -107,38 +88,6 @@ class ServiceMaker:
         except Exception as e:
             logger.error(f"Error loading capacity: {str(e)}")
             raise
-    
-    def _scan_modules(self) -> Dict[str, Any]:
-        """Scan for available module implementations."""
-        modules = {}
-        
-        try:
-            # Get all Python files in modules directory
-            module_files = list(self.modules_path.glob("*.py"))
-            
-            for file in module_files:
-                if file.stem in ['__init__']:
-                    continue
-                    
-                # Get capabilities for this module from capacity.yaml
-                module_capabilities = {
-                    name: cap for name, cap in self.capacity.get('capabilities', {}).items()
-                    if name.startswith(file.stem + '_')
-                }
-                
-                if module_capabilities:
-                    modules[file.stem] = {
-                        'name': file.stem,
-                        'file': str(file),
-                        'capabilities': module_capabilities
-                    }
-                else:
-                    logger.warning(f"Module {file.stem} found but has no capabilities defined")
-                    
-        except Exception as e:
-            logger.error(f"Error scanning modules: {str(e)}")
-            
-        return modules
 
     async def handle_new_request(self, ticket: Ticket) -> Ticket:
         """Handle a new request by creating a service."""

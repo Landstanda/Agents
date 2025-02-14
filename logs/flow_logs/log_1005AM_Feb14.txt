@@ -1,0 +1,278 @@
+================================================================================
+Session Started: 10:05:31 AM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[10:05:31 AM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 6
+triggers_count: 29
+
+
+================================================================================
+[10:05:32 AM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[10:05:43 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+channel: "C08CF2DPMH8"
+ts: "1739556343.279029"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739556343.279029",
+  "client_msg_id": "37ffca44-5720-468b-97f1-484e64d8ba08",
+  "text": "<@U08CFAH1H1Q> could you schedule a meeting with Gabby for tonight at 9:30 p.m.?",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "G+4Uv",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739556343.279029",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[10:05:43 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_100543"
+message: "could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+
+
+================================================================================
+[10:05:43 AM] NLPAnalyzer - incomplete_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_100543"
+missing_entities: [
+  "date"
+]
+
+
+================================================================================
+[10:05:43 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+channel: "C08CF2DPMH8"
+ts: "1739556343.279029"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739556343.279029",
+  "client_msg_id": "37ffca44-5720-468b-97f1-484e64d8ba08",
+  "text": "<@U08CFAH1H1Q> could you schedule a meeting with Gabby for tonight at 9:30 p.m.?",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "G+4Uv",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739556343.279029"
+}
+
+
+================================================================================
+[10:05:43 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_100543"
+message: "could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+
+
+================================================================================
+[10:05:43 AM] NLPAnalyzer - incomplete_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_100543"
+missing_entities: [
+  "date"
+]
+
+
+================================================================================
+[10:05:45 AM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_100543"
+
+
+================================================================================
+[10:05:45 AM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "could you schedule a meeting with Gabby for tonight at 9:30 p.m.?"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_100543"
+
+
+================================================================================
+[10:05:45 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "Sure! Here is a friendly message you can use to ask the user for the missing information:\n\n\"Hi there! To schedule the meeting with Gabby at 9:30 p.m. tonight, could you please provide the date for the meeting as well? Thank you!\""
+channel: "C08CF2DPMH8"
+ts: "1739556345.398579"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739556345.398579",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "Sure! Here is a friendly message you can use to ask the user for the missing information:\n\n\"Hi there! To schedule the meeting with Gabby at 9:30 p.m. tonight, could you please provide the date for the meeting as well? Thank you!\"",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "cfXJ=",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "Sure! Here is a friendly message you can use to ask the user for the missing information:\n\n\"Hi there! To schedule the meeting with Gabby at 9:30 p.m. tonight, could you please provide the date for the meeting as well? Thank you!\""
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739556345.398579",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[10:05:45 AM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+
+
+================================================================================
+[10:05:46 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "Sure! Here's a friendly message you can use to ask the user for the missing information:\n\n\"Hi there! To schedule the meeting with Gabby for tonight at 9:30 p.m., could you please provide the date for the meeting as well? Thank you!\""
+channel: "C08CF2DPMH8"
+ts: "1739556345.617419"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739556345.617419",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "Sure! Here's a friendly message you can use to ask the user for the missing information:\n\n\"Hi there! To schedule the meeting with Gabby for tonight at 9:30 p.m., could you please provide the date for the meeting as well? Thank you!\"",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "=lBc",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "Sure! Here's a friendly message you can use to ask the user for the missing information:\n\n\"Hi there! To schedule the meeting with Gabby for tonight at 9:30 p.m., could you please provide the date for the meeting as well? Thank you!\""
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739556345.617419",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[10:05:46 AM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

@@ -1,0 +1,121 @@
+metadata:
+  version: "1.0"
+  purpose: "Core capability definitions for common business tasks"
+  usage_instructions: |
+    This file defines essential capabilities that can be combined to accomplish
+    common business tasks. Each capability is atomic and can be chained with
+    others through their inputs/outputs.
+
+capabilities:
+  # Email Module - Essential for business communication
+  send_email:
+    description: "Sends emails with optional attachments"
+    inputs:
+      to_address: text
+      subject: text
+      body: text
+      attachments: list  # Optional
+    produces:
+      success: boolean
+      message_id: text
+      timestamp: text
+
+  read_email:
+    description: "Retrieves and reads email content"
+    inputs:
+      message_id: text  # Optional, if not provided gets recent emails
+    produces:
+      emails: list  # List of email data including subject, body, from, date
+      success: boolean
+
+  # Calendar Module - For scheduling and time management
+  create_event:
+    description: "Creates calendar events and meetings"
+    inputs:
+      summary: text
+      start_time: text
+      end_time: text
+      attendees: list  # Optional
+      location: text   # Optional
+    produces:
+      success: boolean
+      event_id: text
+      meeting_link: text  # If virtual meeting
+
+  check_availability:
+    description: "Checks calendar availability for time slots"
+    inputs:
+      start_time: text
+      end_time: text
+      attendees: list  # Optional
+    produces:
+      is_available: boolean
+      conflicts: list
+
+  # Document Module - For file management
+  create_document:
+    description: "Creates new documents (docs, sheets, etc.)"
+    inputs:
+      title: text
+      type: text  # doc, sheet, etc.
+      content: text  # Optional
+    produces:
+      document_id: text
+      url: text
+      success: boolean
+
+  upload_file:
+    description: "Uploads files to cloud storage"
+    inputs:
+      file_path: text
+      destination: text  # Optional folder path
+    produces:
+      file_id: text
+      url: text
+      success: boolean
+
+  # Task Management Module - For project tracking
+  create_task:
+    description: "Creates tasks or to-do items"
+    inputs:
+      title: text
+      description: text
+      due_date: text  # Optional
+      assignee: text  # Optional
+    produces:
+      task_id: text
+      status: text
+      success: boolean
+
+  update_task:
+    description: "Updates existing task status or details"
+    inputs:
+      task_id: text
+      status: text
+      updates: dictionary  # Optional additional fields to update
+    produces:
+      success: boolean
+      updated_task: dictionary
+
+  # Communication Module - For team messaging
+  send_message:
+    description: "Sends messages to team channels or individuals"
+    inputs:
+      recipient: text  # Channel or user
+      message: text
+      attachments: list  # Optional
+    produces:
+      success: boolean
+      message_id: text
+      timestamp: text
+
+  # File Processing Module - For handling documents
+  extract_text:
+    description: "Extracts text content from files (PDF, images, etc.)"
+    inputs:
+      file_path: text
+      file_type: text  # Optional, auto-detected if not provided
+    produces:
+      text: text
+      success: boolean
+      metadata: dictionary 

@@ -61,6 +61,11 @@ class Ticket:
         """Called after dataclass initialization to set up initial state."""
         if self.original_message:
             self.add_message(self.original_message, "user")
+            
+        # Set channel_id and thread_ts from user_info if available
+        if self.user_info:
+            self.channel_id = self.user_info.get("channel_id", "")
+            self.thread_ts = self.user_info.get("thread_ts")
 
     def add_message(self, message: str, source: str, timestamp: Optional[datetime] = None):
         """Add a message to the conversation history."""
@@ -252,11 +257,11 @@ class NLPAnalyzer:
         # Extract entities from the new message
         new_entities = self._extract_entities(message)
         
+        # Always update entities, even if no service is matched
+        current_ticket.entities.update(new_entities)
+        
         # If this is a follow-up message, merge with existing entities
         if ticket and ticket.entities:
-            # Update existing entities with new ones
-            current_ticket.entities.update(new_entities)
-            
             # Remove from missing_entities if we found them
             current_ticket.missing_entities = [
                 entity for entity in current_ticket.missing_entities
@@ -301,8 +306,7 @@ class NLPAnalyzer:
             )
             return current_ticket
             
-        # Update ticket with matched service and entities
-        current_ticket.entities.update(new_entities)
+        # Update ticket with matched service
         current_ticket.service = matched_service
         current_ticket.intent = matched_intent
         
@@ -343,29 +347,47 @@ class NLPAnalyzer:
         
         # Extract time
         time_patterns = [
-            r'\b(\d{1,2}(?::\d{2})?)\s*(?:am|pm)\b',
+            r'\b(\d{1,2}(?::\d{2})?)\s*(?:am|pm|AM|PM)\b',
             r'\b(\d{1,2}:\d{2})\b',
             r'\b(morning|afternoon|evening|noon|midnight)\b',
-            r'\b(\d{1,2})\s*(?:am|pm)\b'  # Added pattern for "2pm" format
+            r'\b(\d{1,2})\s*(?:am|pm|AM|PM)\b'  # Added pattern for "2pm" format
         ]
         
+        special_times = {
+            'morning': '09:00',
+            'afternoon': '14:00',
+            'evening': '18:00',
+            'noon': '12:00',
+            'midnight': '00:00'
+        }
+        
         for pattern in time_patterns:
-            match = re.search(pattern, message.lower())
+            match = re.search(pattern, message)  # Don't lowercase here
             if match:
                 time_str = match.group(1)
-                # Convert to 24-hour format if needed
-                if "pm" in message.lower() and ":" in time_str:
+                message_lower = message.lower()
+                
+                # Handle special time words
+                if time_str.lower() in special_times:
+                    time_str = special_times[time_str.lower()]
+                # Handle AM/PM times
+                elif "pm" in message_lower and ":" in time_str:
                     hour, minute = map(int, time_str.split(":"))
                     if hour < 12:
                         hour += 12
                     time_str = f"{hour:02d}:{minute:02d}"
-                elif "pm" in message.lower():
+                elif "pm" in message_lower:
                     hour = int(time_str)
                     if hour < 12:
                         hour += 12
                     time_str = f"{hour:02d}:00"
-                elif ":" not in time_str and not any(word in time_str for word in ['morning', 'afternoon', 'evening', 'noon', 'midnight']):
-                    time_str = f"{time_str}:00"
+                elif ":" not in time_str and not any(word in time_str.lower() for word in special_times.keys()):
+                    # Handle AM times
+                    hour = int(time_str)
+                    if "am" in message_lower and hour == 12:
+                        hour = 0
+                    time_str = f"{hour:02d}:00"
+                
                 entities['time'] = time_str
                 break
                 
@@ -374,15 +396,21 @@ class NLPAnalyzer:
             r'\b(today|tomorrow|next week)\b',
             r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',
             r'\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\b',
-            r'\b(tomorrow|next|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b'  # Added pattern for "next Monday" format
+            r'\b(tomorrow|next|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',
+            r'\b(tonight|this morning|this afternoon|this evening)\b'  # Added pattern for time-based dates
         ]
         
         for pattern in date_patterns:
             match = re.search(pattern, message.lower())
             if match:
                 date_str = match.group(1)
-                if len(match.groups()) > 1:
+                if len(match.groups()) > 1 and match.group(2):
                     date_str = f"{match.group(1)} {match.group(2)}"
+                # Convert time-based references to actual dates
+                if date_str in ['tonight', 'this evening']:
+                    date_str = 'today'
+                elif date_str in ['this morning', 'this afternoon']:
+                    date_str = 'today'
                 entities['date'] = date_str
                 break
                 
