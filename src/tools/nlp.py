@@ -249,7 +249,26 @@ class NLPAnalyzer:
         # Clean and lowercase message for matching
         clean_message = message.lower().strip()
         
-        # Try to match against lexicon
+        # Extract entities from the new message
+        new_entities = self._extract_entities(message)
+        
+        # If this is a follow-up message, merge with existing entities
+        if ticket and ticket.entities:
+            # Update existing entities with new ones
+            current_ticket.entities.update(new_entities)
+            
+            # Remove from missing_entities if we found them
+            current_ticket.missing_entities = [
+                entity for entity in current_ticket.missing_entities
+                if entity not in new_entities or not new_entities[entity]
+            ]
+            
+            # If we have all required entities, update status
+            if not current_ticket.missing_entities:
+                current_ticket.update_status(TicketStatus.EXECUTING)
+            return current_ticket
+            
+        # For new messages, try to match against lexicon
         matched_service = None
         matched_intent = None
         required_entities = []
@@ -282,16 +301,15 @@ class NLPAnalyzer:
             )
             return current_ticket
             
-        # Extract entities
-        entities = self._extract_entities(message)
-        current_ticket.entities.update(entities)
+        # Update ticket with matched service and entities
+        current_ticket.entities.update(new_entities)
         current_ticket.service = matched_service
         current_ticket.intent = matched_intent
         
         # Check for missing required entities
         missing_entities = [
             entity for entity in required_entities
-            if entity not in entities or not entities[entity]
+            if entity not in current_ticket.entities or not current_ticket.entities[entity]
         ]
         
         if missing_entities:
@@ -327,7 +345,8 @@ class NLPAnalyzer:
         time_patterns = [
             r'\b(\d{1,2}(?::\d{2})?)\s*(?:am|pm)\b',
             r'\b(\d{1,2}:\d{2})\b',
-            r'\b(morning|afternoon|evening|noon|midnight)\b'
+            r'\b(morning|afternoon|evening|noon|midnight)\b',
+            r'\b(\d{1,2})\s*(?:am|pm)\b'  # Added pattern for "2pm" format
         ]
         
         for pattern in time_patterns:
@@ -345,6 +364,8 @@ class NLPAnalyzer:
                     if hour < 12:
                         hour += 12
                     time_str = f"{hour:02d}:00"
+                elif ":" not in time_str and not any(word in time_str for word in ['morning', 'afternoon', 'evening', 'noon', 'midnight']):
+                    time_str = f"{time_str}:00"
                 entities['time'] = time_str
                 break
                 
@@ -352,19 +373,24 @@ class NLPAnalyzer:
         date_patterns = [
             r'\b(today|tomorrow|next week)\b',
             r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',
-            r'\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\b'
+            r'\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\b',
+            r'\b(tomorrow|next|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b'  # Added pattern for "next Monday" format
         ]
         
         for pattern in date_patterns:
             match = re.search(pattern, message.lower())
             if match:
-                entities['date'] = match.group(1)
+                date_str = match.group(1)
+                if len(match.groups()) > 1:
+                    date_str = f"{match.group(1)} {match.group(2)}"
+                entities['date'] = date_str
                 break
                 
         # Extract location
         location_patterns = [
             r'\bin\s+([A-Z][a-zA-Z\s]*(?:Room|Hall|Office|Building|Floor)(?:\s+[A-Z])?)\b',
-            r'\bat\s+([A-Z][a-zA-Z\s]*(?:Room|Hall|Office|Building|Floor)(?:\s+[A-Z])?)\b'
+            r'\bat\s+([A-Z][a-zA-Z\s]*(?:Room|Hall|Office|Building|Floor)(?:\s+[A-Z])?)\b',
+            r'\b(Room|Hall|Office|Building|Floor)\s+([A-Z][a-zA-Z0-9\s]*)\b'  # Added pattern for "Room 101" format
         ]
         
         for pattern in location_patterns:
@@ -374,11 +400,11 @@ class NLPAnalyzer:
                 break
                 
         # Extract participants (names starting with capital letters, excluding location matches)
-        participant_pattern = r'\b([A-Z][a-z]+)\b'
+        participant_pattern = r'\b(?:with\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b'  # Updated to handle "with John" format
         participants = re.findall(participant_pattern, message)
         if participants:
-            # Filter out location words
-            location_words = {'Room', 'Hall', 'Office', 'Building', 'Floor', 'Conference'}
+            # Filter out location words and common words
+            location_words = {'Room', 'Hall', 'Office', 'Building', 'Floor', 'Conference', 'Schedule', 'Meeting'}
             participants = [p for p in participants if p not in location_words]
             if participants:
                 entities['participants'] = participants

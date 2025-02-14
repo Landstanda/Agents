@@ -20,7 +20,7 @@ class ResponseGeneratorModule(BaseModule):
             if not operation:
                 raise ValueError("No operation specified")
                 
-            if operation == 'generate_response':
+            if operation == 'response_generate':
                 return self._generate_response(params)
             elif operation == 'review_response':
                 return self._review_response(params)
@@ -152,7 +152,7 @@ Provide feedback in JSON format:
         if not operation:
             return False
             
-        if operation == 'generate_response':
+        if operation == 'response_generate':
             return bool(params.get('email_data')) and bool(params.get('classification'))
         elif operation == 'review_response':
             return bool(params.get('draft_response')) and bool(params.get('original_email'))
@@ -161,4 +161,4 @@ Provide feedback in JSON format:
 
     @property
     def capabilities(self) -> List[str]:
-        return ['response_generation', 'response_review', 'improvement_suggestions'] 
+        return ['response_generate', 'response_review', 'improvement_suggestions'] 

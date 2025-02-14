@@ -16,8 +16,12 @@ class Agent:
     Follows service instructions to complete tasks.
     """
     
-    def __init__(self, executions_path: str = "src/services/executions.yaml", tools_path: str = "src/tools", flow_logger: Optional[FlowLogger] = None):
+    def __init__(self, executions_path: str = "src/services/executions.yaml", 
+                 services_path: str = "src/services/services.yaml",
+                 tools_path: str = "src/tools", 
+                 flow_logger: Optional[FlowLogger] = None):
         self.executions_path = Path(executions_path)
+        self.services_path = Path(services_path)
         self.tools_path = Path(tools_path)
         self.tools = {}
         self.is_busy = False
@@ -101,14 +105,23 @@ class Agent:
             
             # Get execution plan for service
             if ticket.service not in executions:
-                ticket.update_status(TicketStatus.ERROR)
-                ticket.add_error(f"No execution plan found for service: {ticket.service}", "execution_error")
-                return {
-                    'status': 'error',
-                    'error': f'No execution plan found for service: {ticket.service}'
-                }
-            
-            execution_plan = executions[ticket.service]
+                # Check if this is a new service from created_services
+                new_service = next((service for service in ticket.created_services 
+                                  if service['name'] == ticket.service), None)
+                if new_service:
+                    # Create execution plan for new service
+                    execution_plan = self._create_execution_plan(new_service)
+                else:
+                    ticket.update_status(TicketStatus.ERROR)
+                    ticket.add_error(f"No execution plan found for service: {ticket.service}", "execution_error")
+                    return {
+                        'status': 'error',
+                        'error': f'No execution plan found for service: {ticket.service}'
+                    }
+            else:
+                execution_plan = executions[ticket.service]
+                new_service = None  # Not a new service
+
             results = []
             
             # Execute each step in sequence
@@ -139,11 +152,17 @@ class Agent:
             # Update ticket status
             ticket.update_status(TicketStatus.COMPLETED)
             ticket.execution_results = results
+
+            # If this was a new service and execution was successful, save it
+            if new_service and self._check_success_criteria(new_service, results):
+                await self._save_new_service(new_service, execution_plan)
+                logger.info(f"Successfully saved new service: {new_service['name']}")
             
             return {
                 'status': 'success',
                 'results': results,
-                'text': self._format_response(execution_plan, results, ticket.entities)
+                'text': self._format_response(execution_plan, results, ticket.entities),
+                'is_new_service': bool(new_service)
             }
             
         except Exception as e:
@@ -262,3 +281,49 @@ class Agent:
                 response.append(f"{step.get('name', '')}: {step_result['result']}")
         
         return "\n".join(response)
+
+    def _create_execution_plan(self, service: Dict[str, Any]) -> Dict[str, Any]:
+        """Create an execution plan from a service definition."""
+        return {
+            'executor_type': 'default',
+            'steps': service.get('steps', []),
+            'response_templates': {
+                'success': f"Successfully executed {service['name']}",
+                'error': "Error executing {error_message}"
+            }
+        }
+
+    async def _save_new_service(self, service: Dict[str, Any], execution_plan: Dict[str, Any]) -> None:
+        """Save a new service and its execution plan to the respective files."""
+        try:
+            # Ensure parent directories exist
+            self.services_path.parent.mkdir(parents=True, exist_ok=True)
+            self.executions_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Update services file
+            services = {}
+            if self.services_path.exists():
+                with open(self.services_path, 'r') as f:
+                    services = yaml.safe_load(f) or {}
+
+            services[service['name']] = service
+
+            with open(self.services_path, 'w') as f:
+                yaml.safe_dump(services, f, default_flow_style=False)
+
+            # Update executions file
+            executions = {}
+            if self.executions_path.exists():
+                with open(self.executions_path, 'r') as f:
+                    executions = yaml.safe_load(f) or {}
+
+            executions[service['name']] = execution_plan
+
+            with open(self.executions_path, 'w') as f:
+                yaml.safe_dump(executions, f, default_flow_style=False)
+
+            logger.info(f"Successfully saved service {service['name']} to files")
+
+        except Exception as e:
+            logger.error(f"Error saving new service: {str(e)}")
+            raise

@@ -1,0 +1,495 @@
+metadata:
+  version: "1.0"
+  purpose: "Maps capabilities to their source modules for agent execution"
+  description: |
+    This file maps each capability defined in capacity.yaml to its source module.
+    Used to translate GPT function call sequences into executable module calls.
+    Format: capability_name: module_name
+
+# Basic Auth Module capabilities
+module_mappings:
+  store_credentials: basic_auth
+  verify_credentials: basic_auth
+  create_session: basic_auth
+  end_session: basic_auth
+  verify_session: basic_auth
+  remove_credentials: basic_auth
+  encrypted_storage: basic_auth
+
+# Browser Automation Module capabilities
+  setup_driver: browser_automation
+  navigate_to: browser_automation
+  find_element: browser_automation
+  click_element: browser_automation
+  fill_form: browser_automation
+  take_screenshot: browser_automation
+  get_page_source: browser_automation
+
+# Browser Headers Module capabilities
+  execute_headers: browser_headers
+
+# Business Context Module capabilities
+  update_context: business_context
+  get_context: business_context
+  import_context: business_context
+
+# Core Request Module capabilities
+  request: core_request
+  get: core_request
+  post: core_request
+  clear_cache: core_request
+  get_cache_stats: core_request
+
+# Data Cleaner Module capabilities
+  normalize_text: data_cleaner
+  standardize_date: data_cleaner
+  standardize_phone: data_cleaner
+  clean_email: data_cleaner
+  clean_dataframe: data_cleaner
+  clean_json: data_cleaner
+  remove_duplicates: data_cleaner
+  clean_dict: data_cleaner
+
+# Data Extractor Module capabilities
+  data_extraction: data_extractor
+  apply_filters: data_extractor
+
+# Document Management Module capabilities
+  save_document: doc_management
+  load_document: doc_management
+  create_version: doc_management
+  get_versions: doc_management
+  convert_format: doc_management
+  list_documents: doc_management
+
+# Email Classifier Module capabilities
+  classify_email: email_classifier
+  determine_action: email_classifier
+
+# Email Reader Module capabilities
+  get_recent_emails: email_reader
+  get_email_content: email_reader
+  mark_as_read: email_reader
+
+# Email Sender Module capabilities
+  send_email: email_sender
+  schedule_followup: email_sender
+
+# File Transfer Module capabilities
+  upload_to_drive: file_transfer
+  download_from_drive: file_transfer
+  send_to_slack: file_transfer
+  download_from_slack: file_transfer
+  send_file_email: file_transfer
+  organize_files: file_transfer
+
+# Google Auth Module capabilities
+  authenticate_google: google_auth
+  store_google_token: google_auth
+
+# Google Calendar Module capabilities
+  create_event: google_calendar
+  update_event: google_calendar
+  delete_event: google_calendar
+  list_events: google_calendar
+  list_calendars: google_calendar
+  create_calendar: google_calendar
+  delete_calendar: google_calendar
+  check_availability: google_calendar
+  update_event_attendees: google_calendar
+  set_event_reminders: google_calendar
+
+# Google Docs Module capabilities
+  create_document: google_docs
+  get_document: google_docs
+  insert_text: google_docs
+  delete_content: google_docs
+  format_text: google_docs
+  create_table: google_docs
+  insert_table_row: google_docs
+  insert_image: google_docs
+  create_header: google_docs
+  create_footer: google_docs
+  apply_style: google_docs
+
+# Google Drive Module capabilities
+  upload_file: google_drive
+  download_file: google_drive
+  create_folder: google_drive
+  list_files: google_drive
+  search_files: google_drive
+  get_file_metadata: google_drive
+  update_sharing: google_drive
+  delete_file: google_drive
+
+# Google Sheets Module capabilities
+  create_spreadsheet: google_sheets
+  create_sheet: google_sheets
+  get_values: google_sheets
+  update_values: google_sheets
+  append_values: google_sheets
+  clear_values: google_sheets
+  format_range: google_sheets
+  create_chart: google_sheets
+  protect_range: google_sheets
+  add_conditional_format: google_sheets
+  auto_resize: google_sheets
+
+# Response Generator Module capabilities
+  response_generate: response_generator
+  review_response: response_generator
+  analyze_tone: response_generator
+  validate_format: response_generator
+
+# Session Manager Module capabilities
+  session_create: session_manager
+  session_get: session_manager
+  session_authenticate: session_manager
+  session_request: session_manager
+  session_clear: session_manager
+  session_stats: session_manager
+
+# System Interaction Module capabilities
+  system_open_file: system_interaction
+  system_list_processes: system_interaction
+  system_kill_process: system_interaction
+
+# HTML Parser Module capabilities
+  load_html: html_parser
+  extract_text: html_parser
+  extract_links: html_parser
+  extract_tables: html_parser
+  extract_forms: html_parser
+  find_elements: html_parser
+  clean_html: html_parser
+
+# Notification Module capabilities
+  send_notification: notification
+  enable_channel: notification
+  disable_channel: notification
+  get_enabled_channels: notification
+
+# Report Generator Module capabilities
+  generate_report: report_generator
+  write_txt_report: report_generator
+  write_html_report: report_generator
+
+# GPT Handler Module capabilities
+  get_conversation_history: gpt_handler
+  add_to_history: gpt_handler
+  clear_history: gpt_handler
+
+# Trello Integration Module capabilities
+  trello_create_board: trello_integration
+  trello_create_list: trello_integration
+  trello_create_card: trello_integration
+  trello_get_boards: trello_integration
+  trello_get_lists: trello_integration
+
+# Web Scraper Module capabilities
+  scrape_content: web_scraper
+
+# Additional metadata for module initialization
+module_info:
+  basic_auth:
+    class_name: BasicAuthModule
+    import_path: src.modules.basic_auth
+    requires_init: true
+    singleton: true
+
+  browser_automation:
+    class_name: BrowserAutomationModule
+    import_path: src.modules.browser_automation
+    requires_init: true
+    singleton: false
+    init_params:
+      - headless: boolean  # Can be configured during initialization
+
+  browser_headers:
+    class_name: BrowserHeadersModule
+    import_path: src.modules.browser_headers
+    requires_init: true
+    singleton: true
+
+  business_context:
+    class_name: BusinessContextModule
+    import_path: src.modules.business_context
+    requires_init: true
+    singleton: true
+
+  core_request:
+    class_name: CoreRequestModule
+    import_path: src.modules.core_request
+    requires_init: true
+    singleton: true
+    init_params:
+      - max_retries: number  # Default: 3
+      - rate_limit: number   # Default: 60 requests/minute
+      - cache_ttl: number    # Default: 300 seconds
+      - timeout: number      # Default: 30 seconds
+
+  data_cleaner:
+    class_name: DataCleanerModule
+    import_path: src.modules.data_cleaner
+    requires_init: true
+    singleton: true
+
+  data_extractor:
+    class_name: DataExtractorModule
+    import_path: src.modules.data_extractor
+    requires_init: true
+    singleton: true
+
+  doc_management:
+    class_name: DocManagementModule
+    import_path: src.modules.doc_management
+    requires_init: true
+    singleton: true
+    supported_formats:
+      - doc
+      - docx
+      - pdf
+      - txt
+      - md
+
+  email_classifier:
+    class_name: EmailClassifierModule
+    import_path: src.modules.email_classifier
+    requires_init: true
+    singleton: true
+    dependencies:
+      - gpt_handler
+
+  email_reader:
+    class_name: EmailReaderModule
+    import_path: src.modules.email_reader
+    requires_init: true
+    singleton: true
+    dependencies:
+      - google_auth
+    init_params:
+      - credentials: google_credentials  # Gmail API credentials
+
+  email_sender:
+    class_name: EmailSenderModule
+    import_path: src.modules.email_sender
+    requires_init: true
+    singleton: true
+    dependencies:
+      - google_auth
+    init_params:
+      - credentials: google_credentials  # Gmail API credentials
+
+  file_transfer:
+    class_name: FileTransferModule
+    import_path: src.modules.file_transfer
+    requires_init: true
+    singleton: true
+    dependencies:
+      - google_auth
+      - slack_sdk
+      - doc_management
+    init_params:
+      - credentials: google_credentials  # For Google Drive
+      - slack_token: text  # For Slack operations
+      - email_config: dictionary  # For email operations
+
+  google_auth:
+    class_name: GoogleAuthModule
+    import_path: src.modules.google_auth
+    requires_init: true
+    singleton: true
+    dependencies:
+      - credential_manager
+    supported_scopes:
+      - gmail.modify
+      - drive.file
+      - calendar
+      - docs
+      - spreadsheets
+    init_params:
+      - credentials_file: text  # Path to OAuth credentials file
+
+  google_calendar:
+    class_name: GoogleCalendarModule
+    import_path: src.modules.google_calendar
+    requires_init: true
+    singleton: true
+    dependencies:
+      - google_auth
+    supported_scopes:
+      - calendar
+    init_params:
+      - credentials: google_credentials
+      - timezone: text
+
+  google_docs:
+    class_name: GoogleDocsModule
+    import_path: src.modules.google_docs
+    requires_init: true
+    singleton: true
+    dependencies:
+      - google_auth
+    supported_scopes:
+      - docs
+    init_params:
+      - credentials: google_credentials  # Google Docs API credentials
+
+  google_drive:
+    class_name: GoogleDriveModule
+    import_path: src.modules.google_drive
+    requires_init: true
+    singleton: true
+    dependencies:
+      - google_auth
+    supported_scopes:
+      - drive.file
+    init_params:
+      - credentials: google_credentials  # Google Drive API credentials
+
+  google_sheets:
+    class_name: GoogleSheetsModule
+    import_path: src.modules.google_sheets
+    requires_init: true
+    singleton: true
+    dependencies:
+      - google_auth
+    supported_scopes:
+      - spreadsheets
+    init_params:
+      - credentials: google_credentials  # Google Sheets API credentials
+
+  gpt_handler:
+    class_name: GPTHandler
+    import_path: src.modules.gpt_handler
+    requires_init: true
+    singleton: true
+    init_params:
+      - api_key: text  # OpenAI API key from environment variables
+    dependencies:
+      - openai_sdk
+
+  html_parser:
+    class_name: HTMLParserModule
+    import_path: src.modules.html_parser
+    requires_init: true
+    singleton: true
+    dependencies:
+      - beautifulsoup4
+      - lxml
+
+  notification:
+    class_name: NotificationModule
+    import_path: src.modules.notification
+    requires_init: true
+    singleton: true
+    dependencies:
+      - email_sender
+      - slack_sdk
+    supported_channels:
+      - email
+      - slack
+      - desktop
+
+  report_generator:
+    class_name: ReportGeneratorModule
+    import_path: src.modules.report_generator
+    requires_init: true
+    singleton: true
+    supported_formats:
+      - json
+      - txt
+      - html
+
+  response_generator:
+    class_name: ResponseGeneratorModule
+    import_path: src.modules.response_generator
+    requires_init: true
+    singleton: true
+    dependencies:
+      - gpt_handler
+      - business_context
+    supported_features:
+      - response_generation
+      - response_review
+      - tone_analysis
+      - format_validation
+
+  session_manager:
+    class_name: SessionManagerModule
+    import_path: src.modules.session_manager
+    requires_init: true
+    singleton: true
+    dependencies:
+      - core_request
+    init_params:
+      - session_timeout: number  # Default: 3600 seconds
+      - max_sessions: number     # Default: 100
+    supported_features:
+      - cookie_handling
+      - authentication
+      - request_management
+      - session_expiration
+      - multi_domain_support
+      - async_operations
+
+  system_interaction:
+    class_name: SystemInteractionModule
+    import_path: src.modules.system_interaction
+    requires_init: true
+    singleton: true
+    dependencies:
+      - psutil
+    supported_features:
+      - file_opening
+      - process_management
+      - application_handling
+      - system_monitoring
+      - error_handling
+    default_applications:
+      - txt: xdg-open
+      - pdf: xdg-open
+      - doc: xdg-open
+      - docx: xdg-open
+      - xls: xdg-open
+      - xlsx: xdg-open
+      - jpg: xdg-open
+      - png: xdg-open
+      - html: xdg-open
+      - htm: xdg-open
+
+  trello_integration:
+    class_name: TrelloModule
+    import_path: src.modules.trello_integration
+    requires_init: true
+    singleton: true
+    dependencies:
+      - credential_manager
+    init_params:
+      - api_key: text  # Trello API key from environment variables
+      - token: text    # Trello token from environment variables
+    supported_features:
+      - board_management
+      - list_management
+      - card_operations
+      - task_tracking
+      - api_integration
+      - authentication_handling
+
+  web_scraper:
+    class_name: WebScraperModule
+    import_path: src.modules.web_scraper
+    requires_init: true
+    singleton: true
+    dependencies:
+      - aiohttp
+      - beautifulsoup4
+    supported_features:
+      - web_scraping
+      - html_parsing
+      - content_extraction
+      - multi_url_support
+      - selector_based_extraction
+      - async_operations
+      - header_management
+      - error_handling 

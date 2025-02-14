@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 import logging
 import os
 import yaml
@@ -11,107 +11,101 @@ logger = logging.getLogger(__name__)
 
 class ServiceMaker:
     """
-    Creates new services using GPT-4 and available tools.
-    Analyzes requests and creates step-by-step instructions
-    using available tools to accomplish new tasks.
+    Creates and manages services using GPT-4 and available tools.
+    Handles both new service creation and service failure recovery.
     """
     
     def __init__(self, 
-                 capabilities_path: str = "src/services/capabilities_index.yaml",
-                 module_capabilities_path: str = "src/services/module_capabilities.yaml",
+                 capacity_path: str = "src/services/capacity.yaml",
                  modules_path: str = "src/modules"):
-        """Initialize the service maker with capability information.
-        
-        Args:
-            capabilities_path: Path to capabilities index YAML
-            module_capabilities_path: Path to module capabilities YAML
-            modules_path: Path to module implementations
-        """
-        self.capabilities_path = Path(capabilities_path)
-        self.module_capabilities_path = Path(module_capabilities_path)
+        """Initialize the service maker with all necessary paths and configurations."""
+        self.capacity_path = Path(capacity_path)
         self.modules_path = Path(modules_path)
+        
         self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model = "gpt-4"
         
-        # Load capabilities and module information
-        self.capabilities = self._load_capabilities()
-        self.module_capabilities = self._load_module_capabilities()
+        # Load all configurations
+        self.capacity = self._load_capacity()
         self.available_modules = self._scan_modules()
         
-        # System prompt for GPT-4
-        self.system_prompt = """You are an expert system designer.
-        Your task is to create services (workflows) that use available tools to accomplish user requests.
-        Each service must follow this exact YAML format:
-
+        # System prompts for different scenarios
+        self.service_creation_prompt = """You are an expert system designer.
+        Your task is to create a new service using available capabilities to fulfill a user request.
+        
+        Follow these steps:
+        1. First, consider the manual steps a human would take to accomplish this task on a computer
+        2. For each step, search the capabilities descriptions to find matching capabilities
+        3. Verify the input/output chain:
+           - Each capability's required inputs must be available
+           - Each capability's outputs must match the next capability's required inputs
+           - Consider where to get initial inputs (user provided or system generated)
+        4. Create a service definition that chains these capabilities together
+        
+        The service must follow this exact YAML format.
+        DO NOT include any markdown formatting or code blocks.
+        Return ONLY the raw YAML content.
+        
+        Format:
         name: <clear name>
         description: <clear description>
         intent: <main intent>
         triggers:
           - <trigger phrase 1>
-          - <trigger phrase 2>
         required_entities:
           - <required entity 1>
-          - <required entity 2>
         steps:
-          - tool: <tool name>
-            action: <action name>
+          - tool: <capability name before _>
+            action: <capability name after _>
             params:
               param1: value1
-              param2: {entity2}
-        success_criteria:
-          - <criterion 1>
-          - <criterion 2>
-
+        
         Rules:
-        1. Use ONLY tools and actions that are available in the module capabilities
-        2. Each step must specify tool, action, and params as defined in the module specs
-        3. Use {entity} format for required entities in params
-        4. All fields are required
-        5. Keep it focused and efficient
-        6. No markdown code block markers
-        7. Valid YAML format
-        8. Follow the best practices defined in the capabilities
+        1. Use ONLY capabilities defined in the capacity.yaml file
+        2. Each step must have all required inputs from either:
+           - Previous step outputs
+           - Required entities
+           - System-provided values
+        3. Keep it focused and efficient
+        4. Valid YAML format only
+        5. Follow the best practices defined in the capacity metadata
         """
-    
-    def _load_capabilities(self) -> Dict[str, Any]:
-        """Load and validate the capabilities index."""
+        
+        self.service_recovery_prompt = """You are an expert system troubleshooter.
+        Your task is to analyze a failed service execution and create an alternative service.
+        
+        Follow these steps:
+        1. Analyze why the original service failed
+        2. List the manual steps a human would take to accomplish this task
+        3. Search for alternative capabilities that could achieve each step
+        4. Verify the input/output chain works with the new capabilities
+        5. Create a new service that avoids the previous failures
+        
+        Return ONLY the raw YAML content, without any markdown formatting or code blocks.
+        Use the same YAML format as service creation.
+        """
+
+    def _load_capacity(self) -> Dict[str, Any]:
+        """Load and validate the capacity file."""
         try:
-            if not self.capabilities_path.exists():
-                raise FileNotFoundError(f"Capabilities file not found: {self.capabilities_path}")
+            if not self.capacity_path.exists():
+                raise FileNotFoundError(f"Capacity file not found: {self.capacity_path}")
                 
-            with open(self.capabilities_path, 'r') as f:
-                capabilities = yaml.safe_load(f)
+            with open(self.capacity_path, 'r') as f:
+                capacity = yaml.safe_load(f)
                 
             # Validate required sections
-            required_sections = ['direct_capabilities', 'module_suites', 'task_chains']
-            missing_sections = [section for section in required_sections if section not in capabilities]
-            
-            if missing_sections:
-                raise ValueError(f"Missing required sections in capabilities: {missing_sections}")
+            if 'capabilities' not in capacity:
+                raise ValueError("No capabilities section found in capacity file")
                 
-            return capabilities
-            
-        except Exception as e:
-            logger.error(f"Error loading capabilities: {str(e)}")
-            raise
-    
-    def _load_module_capabilities(self) -> Dict[str, Any]:
-        """Load and validate the module capabilities."""
-        try:
-            if not self.module_capabilities_path.exists():
-                raise FileNotFoundError(f"Module capabilities file not found: {self.module_capabilities_path}")
+            # Validate metadata
+            if 'metadata' not in capacity:
+                logger.warning("No metadata section found in capacity file")
                 
-            with open(self.module_capabilities_path, 'r') as f:
-                module_capabilities = yaml.safe_load(f)
-                
-            # Validate required sections
-            if 'modules' not in module_capabilities:
-                raise ValueError("No modules section found in module capabilities")
-                
-            return module_capabilities
+            return capacity
             
         except Exception as e:
-            logger.error(f"Error loading module capabilities: {str(e)}")
+            logger.error(f"Error loading capacity: {str(e)}")
             raise
     
     def _scan_modules(self) -> Dict[str, Any]:
@@ -126,155 +120,205 @@ class ServiceMaker:
                 if file.stem in ['__init__']:
                     continue
                     
-                # Verify module is defined in capabilities
-                if file.stem in self.module_capabilities.get('modules', {}):
+                # Get capabilities for this module from capacity.yaml
+                module_capabilities = {
+                    name: cap for name, cap in self.capacity.get('capabilities', {}).items()
+                    if name.startswith(file.stem + '_')
+                }
+                
+                if module_capabilities:
                     modules[file.stem] = {
                         'name': file.stem,
                         'file': str(file),
-                        'capabilities': self.module_capabilities['modules'][file.stem]
+                        'capabilities': module_capabilities
                     }
                 else:
-                    logger.warning(f"Module {file.stem} found but not defined in capabilities")
+                    logger.warning(f"Module {file.stem} found but has no capabilities defined")
                     
         except Exception as e:
             logger.error(f"Error scanning modules: {str(e)}")
             
         return modules
-    
-    async def create_service(self, ticket: Ticket) -> Ticket:
-        """Create a new service based on the ticket information.
 
-        Args:
-            ticket: The ticket containing the request information.
-
-        Returns:
-            The updated ticket with service creation results.
-        """
+    async def handle_new_request(self, ticket: Ticket) -> Ticket:
+        """Handle a new request by creating a service."""
         try:
-            # Create prompt for GPT
-            prompt = self._create_prompt(ticket)
+            # Create new service
+            logger.info("Attempting to create new service")
+            return await self._create_new_service(ticket)
+            
+        except Exception as e:
+            error_msg = f"Error handling request: {str(e)}"
+            ticket.add_error(error_msg, "service_creation_error")
+            ticket.status = TicketStatus.ERROR
+            logger.error(error_msg)
+            return ticket
+
+    async def handle_service_failure(self, ticket: Ticket, failure_info: Dict[str, Any]) -> Ticket:
+        """Handle a failed service execution by attempting to create a recovery service."""
+        try:
+            logger.info(f"Attempting to recover failed service for ticket {ticket.ticket_id}")
+            # Create recovery prompt
+            prompt = self._create_recovery_prompt(ticket, failure_info)
             
             # Get response from GPT
             response = await self.openai.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": self.system_prompt},
+                    {"role": "system", "content": self.service_recovery_prompt},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
                 max_tokens=1000
             )
-
-            # Extract service YAML from response
+            
+            # Process the response
             service_yaml = response.choices[0].message.content.strip()
             
             try:
                 service = yaml.safe_load(service_yaml)
-                if not isinstance(service, dict):
-                    raise ValueError("Invalid service format: not a dictionary")
-                
-                # Validate required fields
-                required_fields = ["name", "description", "intent", "triggers", "steps"]
-                missing_fields = [field for field in required_fields if field not in service]
-                if missing_fields:
-                    raise ValueError(f"Missing required fields: {', '.join(missing_fields)}")
-                
-                # Validate steps against module capabilities
-                self._validate_service_steps(service)
-                
-                # Add service to ticket
-                ticket.created_services.append(service)
-                ticket.status = TicketStatus.EXECUTING
-                
-                # Save the service
-                await self._save_service(service)
-                
+                if self._validate_service(service):
+                    # Add recovery service to ticket
+                    ticket.created_services.append(service)
+                    ticket.status = TicketStatus.EXECUTING
+                    logger.info(f"Created recovery service for ticket {ticket.ticket_id}")
+                else:
+                    ticket.status = TicketStatus.ERROR
+                    ticket.add_error("Could not create valid recovery service", "recovery_error")
+                    logger.error(f"Failed to create valid recovery service for ticket {ticket.ticket_id}")
+                    
             except yaml.YAMLError as e:
-                error_msg = f"Invalid YAML format: {str(e)}"
-                ticket.add_error(error_msg, "service_creation_error")
                 ticket.status = TicketStatus.ERROR
-                logger.error(error_msg)
-            
+                ticket.add_error(f"Invalid recovery service format: {str(e)}", "recovery_error")
+                logger.error(f"Invalid recovery service format for ticket {ticket.ticket_id}: {str(e)}")
+                
         except Exception as e:
-            error_msg = f"Error creating service: {str(e)}"
-            ticket.add_error(error_msg, "service_creation_error")
+            error_msg = f"Error creating recovery service: {str(e)}"
+            ticket.add_error(error_msg, "recovery_error")
             ticket.status = TicketStatus.ERROR
             logger.error(error_msg)
-        
+            
         return ticket
-    
-    def _create_prompt(self, ticket: Ticket) -> str:
-        """Create a prompt for GPT to generate a new service.
 
-        Args:
-            ticket: The ticket containing request and context information.
-
-        Returns:
-            A formatted prompt string.
-        """
-        # Format capabilities context
-        capabilities_context = {
-            "direct_capabilities": self.capabilities["direct_capabilities"],
-            "module_suites": self.capabilities["module_suites"],
-            "task_chains": self.capabilities["task_chains"]
-        }
+    async def _create_new_service(self, ticket: Ticket) -> Ticket:
+        """Create a new service based on capabilities."""
+        prompt = self._create_service_prompt(ticket)
+        logger.info(f"Service creation prompt:\n{prompt}")
         
-        # Format module specifications
-        module_specs = {
-            name: info["capabilities"]
-            for name, info in self.module_capabilities["modules"].items()
-            if name in self.available_modules
-        }
+        response = await self.openai.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": self.service_creation_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=1000
+        )
         
-        return f"""Create a service to handle this request: {ticket.original_message}
+        service_yaml = response.choices[0].message.content.strip()
+        logger.info(f"GPT response for service creation:\n{service_yaml}")
+        
+        try:
+            service = yaml.safe_load(service_yaml)
+            logger.info(f"Parsed service definition:\n{json.dumps(service, indent=2)}")
+            
+            if self._validate_service(service):
+                ticket.created_services.append(service)
+                ticket.status = TicketStatus.EXECUTING
+                logger.info(f"Created new service for ticket {ticket.ticket_id}")
+            else:
+                ticket.status = TicketStatus.ERROR
+                ticket.add_error("Could not create valid service", "creation_error")
+                logger.error(f"Failed to create valid service for ticket {ticket.ticket_id}")
+                
+        except yaml.YAMLError as e:
+            ticket.status = TicketStatus.ERROR
+            ticket.add_error(f"Invalid service format: {str(e)}", "creation_error")
+            logger.error(f"Invalid service format for ticket {ticket.ticket_id}: {str(e)}")
+            
+        return ticket
 
-Available capabilities and patterns:
-{yaml.dump(capabilities_context, default_flow_style=False)}
+    def _create_service_prompt(self, ticket: Ticket) -> str:
+        """Create prompt for new service creation."""
+        return f"""Create a service for this request: {ticket.original_message}
 
-Available module specifications:
-{yaml.dump(module_specs, default_flow_style=False)}
+Available capabilities:
+{yaml.dump(self.capacity, default_flow_style=False)}
 
 Previous messages and context:
 {self._format_history(ticket)}
 
-Create a service that uses these capabilities to accomplish the request.
-The service should follow the system prompt format and:
-1. Use only available modules and their defined capabilities
-2. Follow established patterns from task_chains where applicable
-3. Include all required fields and proper parameter formats
-4. Consider best practices and error handling
+First, list the manual steps a human would take to accomplish this task.
+Then, create a service that uses the available capabilities to automate these steps.
+Remember to:
+1. Match each manual step to appropriate capabilities
+2. Verify input/output compatibility between steps
+3. Identify required user inputs
+4. Follow best practices from the capacity metadata
 """
 
-    def _validate_service_steps(self, service: Dict[str, Any]) -> None:
-        """Validate service steps against module capabilities.
-        
-        Args:
-            service: The service definition to validate
+    def _create_recovery_prompt(self, ticket: Ticket, failure_info: Dict[str, Any]) -> str:
+        """Create prompt for service recovery."""
+        return f"""Original request: {ticket.original_message}
+
+Failed service execution:
+{yaml.dump(failure_info, default_flow_style=False)}
+
+Available capabilities:
+{yaml.dump(self.capacity, default_flow_style=False)}
+
+First, analyze why the original service failed.
+Then, list alternative manual steps to accomplish the task.
+Finally, create a new service using different capabilities that avoids the previous failures.
+Consider:
+1. What steps failed and why
+2. Alternative capabilities that could achieve the same goal
+3. Input/output compatibility
+4. Error handling strategies
+"""
+
+    def _validate_service(self, service: Dict[str, Any]) -> bool:
+        """Validate a service definition."""
+        try:
+            # Validate required fields
+            required_fields = ["name", "description", "intent", "triggers", "steps"]
+            if not all(field in service for field in required_fields):
+                missing = [f for f in required_fields if f not in service]
+                logger.error(f"Missing required fields in service: {missing}")
+                return False
+                
+            # Validate steps against capabilities
+            self._validate_service_steps(service)
+            return True
             
-        Raises:
-            ValueError: If any step is invalid
-        """
+        except Exception as e:
+            logger.error(f"Service validation error: {str(e)}")
+            return False
+
+    def _validate_service_steps(self, service: Dict[str, Any]) -> None:
+        """Validate service steps against capabilities."""
         for step in service.get('steps', []):
-            tool_name = step.get('tool')
+            tool = step.get('tool')
             action = step.get('action')
             
-            if not tool_name or not action:
+            if not tool or not action:
                 raise ValueError(f"Invalid step: missing tool or action")
                 
-            # Check if tool exists and has the action
-            if tool_name not in self.module_capabilities.get('modules', {}):
-                raise ValueError(f"Unknown tool: {tool_name}")
+            # Create capability name from tool and action
+            capability_name = f"{tool}_{action}"
+            
+            # Check if capability exists
+            if capability_name not in self.capacity.get('capabilities', {}):
+                raise ValueError(f"Unknown capability: {capability_name}")
                 
-            tool_ops = self.module_capabilities['modules'][tool_name].get('operations', {})
-            if action not in tool_ops:
-                raise ValueError(f"Unknown action {action} for tool {tool_name}")
-                
-            # Validate parameters
-            required_params = tool_ops[action].get('required_params', {})
+            capability = self.capacity['capabilities'][capability_name]
+            
+            # Validate parameters against inputs
+            required_inputs = capability.get('inputs', {})
             provided_params = step.get('params', {})
             
             missing_params = [
-                param for param in required_params
+                param for param in required_inputs
                 if param not in provided_params and not any(
                     isinstance(v, str) and v.startswith('{') and v.endswith('}')
                     for v in provided_params.values()
@@ -282,7 +326,7 @@ The service should follow the system prompt format and:
             ]
             
             if missing_params:
-                raise ValueError(f"Missing required parameters for {tool_name}.{action}: {missing_params}")
+                raise ValueError(f"Missing required parameters for {capability_name}: {missing_params}")
 
     def _format_history(self, ticket: Ticket) -> str:
         """Format the ticket's message history for the prompt."""
@@ -291,29 +335,4 @@ The service should follow the system prompt format and:
             source = msg["source"]
             message = msg["message"]
             history.append(f"{source}: {message}")
-        return "\n".join(history)
-    
-    async def _save_service(self, service: Dict[str, Any]) -> None:
-        """Save a new service to the services file."""
-        try:
-            services_file = self.capabilities_path.parent / "services.yaml"
-            
-            # Create services directory if it doesn't exist
-            services_file.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Load existing services
-            services = {}
-            if services_file.exists():
-                with open(services_file, 'r') as f:
-                    services = yaml.safe_load(f) or {}
-                    
-            # Add new service
-            services[service['name']] = service
-            
-            # Save updated services
-            with open(services_file, 'w') as f:
-                yaml.safe_dump(services, f, default_flow_style=False)
-                
-        except Exception as e:
-            logger.error(f"Error saving service: {str(e)}")
-            raise 
+        return "\n".join(history) 

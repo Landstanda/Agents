@@ -1,0 +1,1145 @@
+metadata:
+  version: "1.0"
+  purpose: "Capability definitions for AI task planning and execution"
+  usage_instructions: |
+    This file defines atomic capabilities that can be chained together to accomplish complex tasks.
+    Each capability acts as a building block with defined inputs and outputs.
+    
+    To chain capabilities:
+    1. Identify the final desired output
+    2. Work backwards through capabilities that provide required inputs
+    3. Verify input/output type compatibility when chaining
+    4. Consider error states in the chain
+
+capabilities:
+  store_credentials:
+    description: "Stores credentials for a service securely"
+    inputs:
+      service: text
+      username: text
+      password: text
+    produces:
+      success: boolean
+
+  verify_credentials:
+    description: "Verifies if provided credentials are valid"
+    inputs:
+      service: text
+      username: text
+      password: text
+    produces:
+      valid: boolean
+
+  create_session:
+    description: "Creates an authenticated session with 24-hour expiration"
+    inputs:
+      service: text
+      username: text
+      password: text
+    produces:
+      session_token: text
+
+  end_session:
+    description: "Ends an active session"
+    inputs:
+      token: text
+    produces:
+      success: boolean
+
+  verify_session:
+    description: "Verifies if a session token is valid and not expired"
+    inputs:
+      token: text
+    produces:
+      valid: boolean
+      session_info: dictionary
+
+  remove_credentials:
+    description: "Removes stored credentials for a service"
+    inputs:
+      service: text
+      username: text
+    produces:
+      success: boolean
+
+  encrypted_storage:
+    description: "Manages encrypted file storage using Fernet symmetric encryption"
+    inputs:
+      file_location: text
+      data: text
+    produces:
+      encrypted_data: encrypted_data
+      success: boolean
+
+  setup_driver:
+    description: "Creates a new browser instance for automation"
+    inputs:
+      headless: boolean
+    produces:
+      driver: webdriver_object
+
+  navigate_to:
+    description: "Loads a webpage in the browser"
+    inputs:
+      url: text
+    produces:
+      success: boolean
+
+  find_element:
+    description: "Finds elements on the webpage"
+    inputs:
+      by: text  # id, class_name, css_selector, etc
+      value: text
+    produces:
+      element: web_element
+
+  click_element:
+    description: "Clicks on a webpage element"
+    inputs:
+      by: text
+      value: text
+      timeout: number  # seconds
+    produces:
+      success: boolean
+
+  fill_form:
+    description: "Fills form fields with provided data"
+    inputs:
+      form_data: dictionary  # {identifier: value}
+    produces:
+      success: boolean
+
+  take_screenshot:
+    description: "Captures browser viewport as image"
+    inputs:
+      browser: webdriver_object
+      save_path: text
+    produces:
+      success: boolean
+
+  get_page_source:
+    description: "Extracts current page HTML"
+    inputs: {}  # No inputs required
+    produces:
+      html: text
+
+  # Browser Headers Module capabilities
+  execute_headers:
+    description: "Adds and customizes browser-like headers for web requests"
+    inputs:
+      headers: dictionary  # Optional custom headers to merge with defaults
+    produces:
+      headers: dictionary  # Combined headers with browser defaults
+      params: dictionary  # Original parameters preserved
+
+  # Business Context Module capabilities
+  update_context:
+    description: "Updates specific parts of the business context"
+    inputs:
+      updates: dictionary  # Key-value pairs to update in context
+    produces:
+      context: dictionary  # Complete updated context
+
+  get_context:
+    description: "Retrieves current business context"
+    inputs:
+      section: text  # Optional specific section to retrieve
+    produces:
+      context: dictionary  # Complete or section-specific context
+
+  import_context:
+    description: "Imports and parses business context from text using GPT"
+    inputs:
+      text: text  # Raw business context text to parse
+    produces:
+      context: dictionary  # Structured context data
+
+  # Core Request Module capabilities
+  request:
+    description: "Makes HTTP/HTTPS requests with caching, rate limiting, and retries"
+    inputs:
+      method: text  # HTTP method (GET, POST, etc.)
+      url: text
+    produces:
+      status: number
+      headers: dictionary
+      data: dictionary
+      timestamp: text
+
+  get:
+    description: "Makes GET request with all core features"
+    inputs:
+      url: text
+    produces:
+      status: number
+      headers: dictionary
+      data: dictionary
+      timestamp: text
+
+  post:
+    description: "Makes POST request with all core features"
+    inputs:
+      url: text
+    produces:
+      status: number
+      headers: dictionary
+      data: dictionary
+      timestamp: text
+
+  clear_cache:
+    description: "Clears the request cache"
+    inputs: {}
+    produces:
+      success: boolean
+
+  get_cache_stats:
+    description: "Retrieves cache statistics"
+    inputs: {}
+    produces:
+      stats: dictionary  # Cache size, hits, misses, etc.
+
+  # Data Cleaner Module capabilities
+  normalize_text:
+    description: "Normalizes text by removing extra whitespace and handling unicode characters"
+    inputs:
+      text: text
+    produces:
+      normalized_text: text
+
+  standardize_date:
+    description: "Converts various date formats to ISO format (YYYY-MM-DD)"
+    inputs:
+      date_str: text
+    produces:
+      standardized_date: text
+
+  standardize_phone:
+    description: "Standardizes phone numbers to E.164 format"
+    inputs:
+      phone: text
+    produces:
+      standardized_phone: text
+
+  clean_email:
+    description: "Cleans and validates email addresses"
+    inputs:
+      email: text
+    produces:
+      cleaned_email: text
+
+  clean_dataframe:
+    description: "Cleans an entire pandas DataFrame"
+    inputs:
+      df: dataframe
+    produces:
+      cleaned_df: dataframe
+
+  clean_json:
+    description: "Cleans and validates JSON data"
+    inputs:
+      json_str: text
+    produces:
+      cleaned_json: text
+
+  remove_duplicates:
+    description: "Removes duplicate items from a list while preserving order"
+    inputs:
+      data: list
+    produces:
+      deduplicated_data: list
+
+  clean_dict:
+    description: "Cleans dictionary values by normalizing strings and standardizing dates"
+    inputs:
+      data: dictionary
+    produces:
+      cleaned_data: dictionary
+
+  # Data Extractor Module capabilities
+  data_extraction:
+    description: "Extracts data using regex patterns from input data with nested structure support"
+    inputs:
+      data: dictionary
+      patterns: dictionary
+    produces:
+      extracted_data: dictionary
+
+  apply_filters:
+    description: "Applies custom filtering criteria to extracted data"
+    inputs:
+      data: dictionary
+      filters: dictionary
+    produces:
+      filtered_data: dictionary
+
+  # Document Management Module capabilities
+  save_document:
+    description: "Saves a document with specified content and format"
+    inputs:
+      name: text
+      content: text
+      format: text
+    produces:
+      success: boolean
+      filepath: text
+      format: text
+
+  load_document:
+    description: "Loads a document's content"
+    inputs:
+      name: text
+      format: text
+    produces:
+      content: text
+      format: text
+      filepath: text
+
+  create_version:
+    description: "Creates a new version of an existing document"
+    inputs:
+      name: text
+      format: text
+    produces:
+      success: boolean
+      version: number
+      filepath: text
+
+  get_versions:
+    description: "Retrieves all versions of a document"
+    inputs:
+      name: text
+      format: text
+    produces:
+      versions: list
+      document: text
+      format: text
+
+  convert_format:
+    description: "Converts document between supported formats"
+    inputs:
+      name: text
+      from_format: text
+      to_format: text
+    produces:
+      success: boolean
+      original_format: text
+      new_format: text
+      filepath: text
+
+  list_documents:
+    description: "Lists all documents with metadata"
+    inputs: {}
+    produces:
+      documents: list
+
+  # Email Classifier Module capabilities
+  classify_email:
+    description: "Analyzes and classifies email content using GPT, including priority, category, and time sensitivity"
+    inputs:
+      email_data: dictionary  # Contains subject, from, body
+    produces:
+      email_id: text
+      classification: dictionary  # Contains categories, priority, needs_response, time_sensitivity, summary, key_points
+
+  determine_action:
+    description: "Determines required actions based on email classification"
+    inputs:
+      classification: dictionary  # Email classification data
+    produces:
+      actions: list  # List of required actions with priorities
+      classification: dictionary  # Original classification data
+
+  # Email Reader Module capabilities
+  get_recent_emails:
+    description: "Retrieves recent emails from Gmail with metadata using async operations"
+    inputs: {}
+    produces:
+      success: boolean
+      emails: list  # List of email data
+      timestamp: text
+
+  get_email_content:
+    description: "Gets detailed content and metadata of a specific email"
+    inputs:
+      message_id: text
+    produces:
+      success: boolean
+      email: dictionary  # Contains id, thread_id, subject, from, to, date, body, labels
+
+  mark_as_read:
+    description: "Updates email status to read"
+    inputs:
+      message_id: text
+    produces:
+      success: boolean
+      message_id: text
+
+  # Email Sender Module capabilities
+  send_email:
+    description: "Composes and sends emails using Gmail API with thread tracking"
+    inputs:
+      to_address: text
+      response_data: dictionary  # Contains subject and body
+    produces:
+      success: boolean
+      message_id: text
+      thread_id: text
+      timestamp: text
+      to_address: text
+      subject: text
+
+  schedule_followup:
+    description: "Schedules and tracks email follow-ups with label management"
+    inputs:
+      email_id: text
+      follow_up_date: text
+    produces:
+      email_id: text
+      follow_up_date: text
+      status: text
+      label_id: text
+      next_steps: list
+
+  # File Transfer Module capabilities
+  upload_to_drive:
+    description: "Uploads file to Google Drive with folder organization"
+    inputs:
+      file_path: text
+    produces:
+      success: boolean
+      file_id: text
+      service: text
+
+  download_from_drive:
+    description: "Downloads file from Google Drive"
+    inputs:
+      file_id: text
+    produces:
+      success: boolean
+      local_path: text
+      filename: text
+
+  send_to_slack:
+    description: "Sends file to Slack channel"
+    inputs:
+      file_path: text
+      channel: text
+    produces:
+      success: boolean
+      file_id: text
+      service: text
+
+  download_from_slack:
+    description: "Downloads file from Slack"
+    inputs:
+      file_id: text
+    produces:
+      success: boolean
+      local_path: text
+      filename: text
+
+  send_file_email:
+    description: "Sends file as email attachment"
+    inputs:
+      file_path: text
+      to_email: text
+    produces:
+      success: boolean
+      to_email: text
+      service: text
+
+  organize_files:
+    description: "Organizes files by type, date, or category"
+    inputs:
+      directory: text
+    produces:
+      success: boolean
+      organized_files: list
+      organize_by: text
+
+  # Google Auth Module capabilities
+  authenticate_google:
+    description: "Handles OAuth2 authentication flow for Google services with multiple scopes"
+    inputs: {}  # Uses stored credentials file
+    produces:
+      credentials: google_credentials
+      scopes: list
+
+  store_google_token:
+    description: "Securely stores Google OAuth tokens with encryption"
+    inputs:
+      token_data: bytes
+      service_name: text
+    produces:
+      success: boolean
+
+  # Google Calendar Module capabilities
+  create_event:
+    description: "Creates a calendar event with specified details and attendees"
+    inputs:
+      summary: text
+      start_time: text
+      end_time: text
+      calendar_id: text
+    produces:
+      success: boolean
+      event_id: text
+      html_link: text
+
+  update_event:
+    description: "Updates an existing calendar event's details"
+    inputs:
+      event_id: text
+      calendar_id: text
+    produces:
+      success: boolean
+      event_id: text
+      html_link: text
+
+  delete_event:
+    description: "Deletes a calendar event"
+    inputs:
+      event_id: text
+      calendar_id: text
+    produces:
+      success: boolean
+
+  list_events:
+    description: "Lists calendar events with optional time range and search criteria"
+    inputs:
+      calendar_id: text
+    produces:
+      success: boolean
+      events: list
+      count: number
+
+  list_calendars:
+    description: "Lists all available calendars for the authenticated user"
+    inputs: {}
+    produces:
+      success: boolean
+      calendars: list
+      count: number
+
+  create_calendar:
+    description: "Creates a new Google Calendar"
+    inputs:
+      summary: text
+    produces:
+      success: boolean
+      calendar_id: text
+      summary: text
+
+  delete_calendar:
+    description: "Deletes a Google Calendar"
+    inputs:
+      calendar_id: text
+    produces:
+      success: boolean
+
+  check_availability:
+    description: "Checks availability for a time slot across calendars and attendees"
+    inputs:
+      start_time: text
+      end_time: text
+      calendar_id: text
+    produces:
+      success: boolean
+      is_available: boolean
+      conflicts: dictionary
+
+  update_event_attendees:
+    description: "Updates the attendee list for a calendar event"
+    inputs:
+      event_id: text
+      calendar_id: text
+    produces:
+      success: boolean
+      event_id: text
+      attendees: list
+
+  set_event_reminders:
+    description: "Sets or updates reminders for a calendar event"
+    inputs:
+      event_id: text
+      calendar_id: text
+      reminders: dictionary
+    produces:
+      success: boolean
+      event_id: text
+      reminders: dictionary
+
+  # Google Docs Module capabilities
+  create_document:
+    description: "Creates a new Google Doc with specified title"
+    inputs:
+      title: text
+    produces:
+      success: boolean
+      document_id: text
+      title: text
+      url: text
+
+  get_document:
+    description: "Retrieves document content and metadata"
+    inputs:
+      document_id: text
+    produces:
+      success: boolean
+      document: dictionary
+
+  insert_text:
+    description: "Inserts text at a specific location in document"
+    inputs:
+      document_id: text
+      text: text
+    produces:
+      success: boolean
+      replies: list
+
+  delete_content:
+    description: "Removes content from specified range in document"
+    inputs:
+      document_id: text
+      start_index: number
+      end_index: number
+    produces:
+      success: boolean
+      replies: list
+
+  format_text:
+    description: "Applies text formatting to specified range"
+    inputs:
+      document_id: text
+      start_index: number
+      end_index: number
+    produces:
+      success: boolean
+      replies: list
+
+  create_table:
+    description: "Creates a table at specified location"
+    inputs:
+      document_id: text
+      index: number
+    produces:
+      success: boolean
+      replies: list
+
+  insert_table_row:
+    description: "Inserts new row into existing table"
+    inputs:
+      document_id: text
+      table_index: number
+    produces:
+      success: boolean
+      replies: list
+
+  insert_image:
+    description: "Inserts image at specified location"
+    inputs:
+      document_id: text
+      image_uri: text
+      index: number
+    produces:
+      success: boolean
+      replies: list
+
+  create_header:
+    description: "Creates or updates document header"
+    inputs:
+      document_id: text
+    produces:
+      success: boolean
+      replies: list
+
+  create_footer:
+    description: "Creates or updates document footer"
+    inputs:
+      document_id: text
+    produces:
+      success: boolean
+      replies: list
+
+  apply_style:
+    description: "Applies named style to content range"
+    inputs:
+      document_id: text
+      style: text
+      start_index: number
+      end_index: number
+    produces:
+      success: boolean
+      replies: list
+
+  # Google Drive Module capabilities
+  upload_file:
+    description: "Uploads file to Google Drive with MIME type detection"
+    inputs:
+      file_path: text
+    produces:
+      success: boolean
+      file_id: text
+      name: text
+      mime_type: text
+      web_link: text
+
+  download_file:
+    description: "Downloads file from Google Drive"
+    inputs:
+      file_id: text
+    produces:
+      success: boolean
+      content: bytes
+
+  create_folder:
+    description: "Creates a new folder in Google Drive"
+    inputs:
+      folder_name: text
+    produces:
+      success: boolean
+      folder_id: text
+      name: text
+      web_link: text
+
+  list_files:
+    description: "Lists files in a specified folder"
+    inputs:
+      folder_id: text
+    produces:
+      success: boolean
+      files: list
+
+  search_files:
+    description: "Searches for files in Google Drive"
+    inputs:
+      query: text
+    produces:
+      success: boolean
+      files: list
+
+  get_file_metadata:
+    description: "Retrieves metadata for a specific file"
+    inputs:
+      file_id: text
+    produces:
+      success: boolean
+      metadata: dictionary
+
+  update_sharing:
+    description: "Updates sharing settings for a file"
+    inputs:
+      file_id: text
+    produces:
+      success: boolean
+      permission_id: text
+      web_link: text
+
+  delete_file:
+    description: "Deletes a file from Google Drive"
+    inputs:
+      file_id: text
+    produces:
+      success: boolean
+
+  # Google Sheets Module capabilities
+  create_spreadsheet:
+    description: "Creates a new Google Spreadsheet"
+    inputs:
+      title: text
+    produces:
+      success: boolean
+      spreadsheet_id: text
+      url: text
+
+  create_sheet:
+    description: "Adds a new sheet to an existing spreadsheet"
+    inputs:
+      spreadsheet_id: text
+      title: text
+    produces:
+      success: boolean
+      sheet_id: text
+
+  get_values:
+    description: "Retrieves values from a specified range"
+    inputs:
+      spreadsheet_id: text
+      range: text
+    produces:
+      success: boolean
+      values: list
+      range: text
+
+  update_values:
+    description: "Updates values in a specified range"
+    inputs:
+      spreadsheet_id: text
+      range: text
+      values: list
+    produces:
+      success: boolean
+      updated_cells: number
+      updated_range: text
+
+  append_values:
+    description: "Appends values to a specified range"
+    inputs:
+      spreadsheet_id: text
+      range: text
+      values: list
+    produces:
+      success: boolean
+      updates: dictionary
+      updated_range: text
+
+  clear_values:
+    description: "Clears values in a specified range"
+    inputs:
+      spreadsheet_id: text
+      range: text
+    produces:
+      success: boolean
+      cleared_range: text
+
+  format_range:
+    description: "Applies formatting to a specified range"
+    inputs:
+      spreadsheet_id: text
+      range: text
+      format: dictionary
+    produces:
+      success: boolean
+
+  create_chart:
+    description: "Creates a chart in the spreadsheet"
+    inputs:
+      spreadsheet_id: text
+      sheet_id: text
+      chart_spec: dictionary
+    produces:
+      success: boolean
+      chart_id: text
+
+  protect_range:
+    description: "Protects a range from editing"
+    inputs:
+      spreadsheet_id: text
+      range: text
+    produces:
+      success: boolean
+      protected_range_id: text
+
+  add_conditional_format:
+    description: "Adds conditional formatting to a range"
+    inputs:
+      spreadsheet_id: text
+      range: text
+      condition: dictionary
+      format: dictionary
+    produces:
+      success: boolean
+
+  auto_resize:
+    description: "Auto-resizes columns or rows"
+    inputs:
+      spreadsheet_id: text
+      sheet_id: text
+    produces:
+      success: boolean
+
+  # GPT Handler Module capabilities
+  generate_response:
+    description: "Generates responses using GPT-4 or GPT-3.5 models with context awareness"
+    inputs:
+      user_id: text
+      message: text
+    produces:
+      response: text
+
+  get_conversation_history:
+    description: "Retrieves conversation history for a specific user with system prompt"
+    inputs:
+      user_id: text
+    produces:
+      history: list  # List of message dictionaries with role and content
+
+  add_to_history:
+    description: "Adds messages to conversation history with automatic pruning after 10 messages"
+    inputs:
+      user_id: text
+      role: text
+      content: text
+    produces:
+      success: boolean
+
+  clear_history:
+    description: "Clears conversation history for a user while preserving system prompt"
+    inputs:
+      user_id: text
+    produces:
+      success: boolean
+
+  # HTML Parser Module capabilities
+  load_html:
+    description: "Loads and parses HTML content into BeautifulSoup object"
+    inputs:
+      html_content: text
+    produces:
+      success: boolean
+
+  extract_text:
+    description: "Extracts text content from HTML with optional filtering"
+    inputs: {}
+    produces:
+      text: text
+
+  extract_links:
+    description: "Extracts all links with their metadata from HTML content"
+    inputs: {}
+    produces:
+      links: list  # List of dictionaries containing link information
+
+  extract_tables:
+    description: "Extracts all tables from HTML content"
+    inputs: {}
+    produces:
+      tables: list  # List of lists containing table data
+
+  extract_forms:
+    description: "Extracts forms and their input fields"
+    inputs: {}
+    produces:
+      forms: list  # List of dictionaries containing form information
+
+  find_elements:
+    description: "Finds elements matching a CSS selector"
+    inputs:
+      selector: text
+    produces:
+      elements: list  # List of dictionaries containing element information
+
+  clean_html:
+    description: "Cleans HTML by removing scripts, styles, and comments"
+    inputs:
+      content: text
+    produces:
+      cleaned_html: text
+
+  # Notification Module capabilities
+  send_notification:
+    description: "Sends notifications through specified channel(s) with async support"
+    inputs:
+      recipient: text
+      message: text
+    produces:
+      status: text
+      results: dictionary  # Contains delivery status for each channel
+
+  enable_channel:
+    description: "Enables a notification channel for future notifications"
+    inputs:
+      channel: text
+    produces:
+      success: boolean
+
+  disable_channel:
+    description: "Disables a notification channel"
+    inputs:
+      channel: text
+    produces:
+      success: boolean
+
+  get_enabled_channels:
+    description: "Retrieves list of currently enabled notification channels"
+    inputs: {}
+    produces:
+      channels: list  # List of enabled channel names
+
+  # Report Generator Module capabilities
+  generate_report:
+    description: "Generates a formatted report from input data with directory management"
+    inputs:
+      data: dictionary
+      output_path: text
+    produces:
+      report_path: text
+      format: text
+
+  write_txt_report:
+    description: "Formats and writes data in text format with hierarchical structure"
+    inputs:
+      data: dictionary
+      file: file_object
+    produces:
+      success: boolean
+
+  write_html_report:
+    description: "Formats and writes data in HTML format with nested structure support"
+    inputs:
+      data: dictionary
+      file: file_object
+    produces:
+      success: boolean
+
+  # Response Generator Module capabilities
+  response_generate:
+    description: "Generates an appropriate email response with context awareness and tone management"
+    inputs:
+      email_data: dictionary  # Contains subject, from, body
+      classification: dictionary  # Contains categories, priority, time_sensitivity
+    produces:
+      email_id: text
+      response: dictionary  # Contains subject, body, next_steps, follow_up_needed, follow_up_date
+
+  review_response:
+    description: "Reviews and suggests improvements for draft email responses"
+    inputs:
+      draft_response: text
+      original_email: text
+    produces:
+      is_appropriate: boolean
+      suggestions: list
+      improved_version: text
+      tone_analysis: text
+      completeness_score: number
+
+  analyze_tone:
+    description: "Analyzes and manages email response tone based on business context"
+    inputs:
+      response: text
+    produces:
+      tone_analysis: text
+      suggestions: list
+
+  validate_format:
+    description: "Validates email response format and structure"
+    inputs:
+      response: dictionary
+    produces:
+      is_valid: boolean
+      validation_errors: list
+
+  # Session Manager Module capabilities
+  session_create:
+    description: "Creates a new session for a domain with cookie handling and expiration management"
+    inputs:
+      url: text
+    produces:
+      session: session_object
+      cookies: dictionary
+      expiry: text
+
+  session_get:
+    description: "Retrieves or creates session for a domain with automatic expiration handling"
+    inputs:
+      url: text
+    produces:
+      session: session_object
+      is_expired: boolean
+
+  session_authenticate:
+    description: "Authenticates session with credentials and manages auth tokens"
+    inputs:
+      url: text
+      auth_data: dictionary
+    produces:
+      session: session_object
+      auth_token: text
+      is_authenticated: boolean
+
+  session_request:
+    description: "Makes HTTP request using session with automatic cookie and header management"
+    inputs:
+      method: text
+      url: text
+    produces:
+      response: dictionary
+      status: number
+      headers: dictionary
+
+  session_clear:
+    description: "Clears session for specific domain"
+    inputs:
+      url: text
+    produces:
+      success: boolean
+
+  session_stats:
+    description: "Retrieves statistics about active sessions and their states"
+    inputs: {}
+    produces:
+      total_sessions: number
+      active_sessions: number
+      authenticated_sessions: number
+      oldest_session: text
+      newest_session: text
+
+  # System Interaction Module capabilities
+  system_open_file:
+    description: "Opens a file with system default or specified application with error handling"
+    inputs:
+      file_path: text
+    produces:
+      success: boolean
+
+  system_list_processes:
+    description: "Gets list of running processes with CPU and memory usage details"
+    inputs: {}
+    produces:
+      processes: list  # List of dictionaries containing pid, name, cpu_percent, memory_percent
+
+  system_kill_process:
+    description: "Terminates a process by its PID with error handling"
+    inputs:
+      pid: number
+    produces:
+      success: boolean
+
+  # Trello Integration Module capabilities
+  trello_create_board:
+    description: "Creates a new Trello board with specified name"
+    inputs:
+      name: text
+    produces:
+      board: dictionary
+
+  trello_create_list:
+    description: "Creates a new list in a specified Trello board"
+    inputs:
+      board_id: text
+      name: text
+    produces:
+      list: dictionary
+
+  trello_create_card:
+    description: "Creates a new card in a specified Trello list"
+    inputs:
+      list_id: text
+      name: text
+    produces:
+      card: dictionary
+
+  trello_get_boards:
+    description: "Retrieves all Trello boards for the authenticated user"
+    inputs: {}
+    produces:
+      boards: list
+
+  trello_get_lists:
+    description: "Retrieves all lists in a specified Trello board"
+    inputs:
+      board_id: text
+    produces:
+      lists: list
+
+  # Web Scraper Module capabilities
+  scrape_content:
+    description: "Scrapes web content from single or multiple URLs using async operations with selector-based extraction"
+    inputs:
+      url: text  # Can be single URL or list of URLs
+      selectors: dictionary  # CSS selectors to extract content
+    produces:
+      scraped_data: dictionary  # Extracted content by URL and selector
+
+  # ... existing code ... 
