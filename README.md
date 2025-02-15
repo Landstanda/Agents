@@ -25,6 +25,41 @@ graph TD
     F -->|No| H
 ```
 
+### Service Template Format
+```yaml
+service_identifier:
+  name: "Service Name"
+  description: "Service Description"
+  identifier: "unique_identifier"
+  triggers:
+    - "trigger_word1"
+    - "trigger_word2"
+  required_entities:
+    - entity1
+    - entity2
+  optional_entities:
+    - optional_entity1
+  steps:
+    - name: "Step Name"
+      tool: tool_name
+      action: action_name
+      params:
+        param1: value1
+        param2: value2
+      on_success:
+        - condition: "response.get('success')"
+          next_step: next_step_id
+      on_error:
+        - action: "retry"
+          max_attempts: 3
+  success_criteria:
+    - "response.get('success')"
+  error_handling:
+    error_type:
+      message: "Error message template"
+      action: "action_to_take"
+```
+
 ### Core Components
 
 1. **NLP Analyzer** (`src/tools/nlp.py`)
@@ -179,80 +214,3 @@ cd ai-secretary
 ```bash
 pip install -r requirements.txt
 ```
-
-3. Configure environment variables
-```bash
-cp .env.example .env
-# Edit .env with your credentials
-```
-
-## Usage
-
-### Basic Request Flow
-
-1. Mention the bot in your Slack channel with a request:
-```
-@ai-secretary Schedule a meeting with John tomorrow at 2pm
-```
-
-2. The bot will either:
-   - Execute the request if all information is available
-   - Ask for additional information if needed
-   - Create a new service if the request is novel
-   - Inform you of any issues or constraints
-
-### Example Requests
-
-```
-@ai-secretary Schedule a team meeting for tomorrow at 3pm
-@ai-secretary Share the quarterly report with the marketing team
-@ai-secretary Create a task to review the new design proposal
-@ai-secretary Extract text from the attached PDF and email it to John
-```
-
-## Configuration
-
-### Service Definitions
-Services are defined in `src/services/services.yaml`. Each service includes:
-- Triggers for request matching
-- Required and optional entities
-- Execution steps and tools
-- Success criteria and error handling
-
-### Capabilities
-System capabilities are defined in `src/services/capacity_simple.yaml`, including:
-- Available tools and actions
-- Input/output specifications
-- Resource requirements
-
-## Development
-
-### Adding New Capabilities
-
-1. Define the capability in `capacity_simple.yaml`
-2. Implement the tool in `src/tools/`
-3. Update service definitions as needed
-
-### Testing
-
-Run the test suite:
-```bash
-pytest tests/
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
-
-## License
-
-[MIT License](LICENSE)
-
-## Acknowledgments
-
-- OpenAI for GPT models
-- Slack for communication platform

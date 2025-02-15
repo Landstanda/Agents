@@ -1,0 +1,358 @@
+================================================================================
+Session Started: 11:51:01 AM Feb 15, 2025
+================================================================================
+
+
+================================================================================
+[11:51:01 AM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 2
+services: [
+  "schedule_meeting",
+  "schedule_and_notify"
+]
+triggers_count: 19
+
+
+================================================================================
+[11:51:02 AM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[11:51:31 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for Feb 19th at 1:30 pm"
+channel: "C08CF2DPMH8"
+ts: "1739649091.197179"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739649091.197179",
+  "client_msg_id": "8ddcbf80-9f77-40a5-9b2b-e15b0752aaa1",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for Feb 19th at 1:30 pm",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "RZeNE",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for Feb 19th at 1:30 pm"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739649091.197179",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:51:31 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for Feb 19th at 1:30 pm"
+channel: "C08CF2DPMH8"
+ts: "1739649091.197179"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739649091.197179",
+  "client_msg_id": "8ddcbf80-9f77-40a5-9b2b-e15b0752aaa1",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for Feb 19th at 1:30 pm",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "RZeNE",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for Feb 19th at 1:30 pm"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739649091.197179"
+}
+
+
+================================================================================
+[11:51:31 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250215_115131"
+message: "schedule a lunch for Feb 19th at 1:30 pm"
+
+
+================================================================================
+[11:51:31 AM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250215_115131"
+service: "schedule_meeting"
+matched_triggers: [
+  "schedule",
+  "lunch"
+]
+match_percentage: 28.57142857142857
+
+
+================================================================================
+[11:51:32 AM] Agent - tools_loaded
+--------------------------------------------------------------------------------
+total_tools: 2
+available_tools: [
+  "google_calendar",
+  "google_auth"
+]
+
+
+================================================================================
+[11:51:32 AM] Agent - services_loaded
+--------------------------------------------------------------------------------
+services_count: 2
+
+
+================================================================================
+[11:51:34 AM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a lunch for Feb 19th at 1:30 pm"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250215_115131"
+
+
+================================================================================
+[11:51:35 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "The lunch event for Feb 19th at 1:30 pm has been successfully scheduled. You can view the event details and access the calendar link here: [Event Link](<https://www.google.com/calendar/event?eid=bnFubDlhdW80NDN1ODJjOTlndW1obTNjbWcgbWlycm9yLmFwaHJvZGl0ZS5jYUBt>)."
+channel: "C08CF2DPMH8"
+ts: "1739649094.673099"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739649094.673099",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "The lunch event for Feb 19th at 1:30 pm has been successfully scheduled. You can view the event details and access the calendar link here: [Event Link](<https://www.google.com/calendar/event?eid=bnFubDlhdW80NDN1ODJjOTlndW1obTNjbWcgbWlycm9yLmFwaHJvZGl0ZS5jYUBt>).",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "erN7",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "The lunch event for Feb 19th at 1:30 pm has been successfully scheduled. You can view the event details and access the calendar link here: [Event Link]("
+            },
+            {
+              "type": "link",
+              "url": "https://www.google.com/calendar/event?eid=bnFubDlhdW80NDN1ODJjOTlndW1obTNjbWcgbWlycm9yLmFwaHJvZGl0ZS5jYUBt"
+            },
+            {
+              "type": "text",
+              "text": ")."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739649094.673099",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:51:35 AM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+
+
+================================================================================
+[11:51:35 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: null
+text: null
+channel: "C08CF2DPMH8"
+ts: "1739649095.000300"
+thread_ts: null
+full_event: {
+  "type": "message",
+  "subtype": "message_changed",
+  "message": {
+    "user": "U08CFAH1H1Q",
+    "type": "message",
+    "bot_id": "B08D451MSAC",
+    "app_id": "A08CFA8P8V8",
+    "text": "The lunch event for Feb 19th at 1:30 pm has been successfully scheduled. You can view the event details and access the calendar link here: [Event Link](<https://www.google.com/calendar/event?eid=bnFubDlhdW80NDN1ODJjOTlndW1obTNjbWcgbWlycm9yLmFwaHJvZGl0ZS5jYUBt>).",
+    "team": "T08C0G5FA4F",
+    "bot_profile": {
+      "id": "B08D451MSAC",
+      "deleted": false,
+      "name": "AphroAgent",
+      "updated": 1739072535,
+      "app_id": "A08CFA8P8V8",
+      "icons": {
+        "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+        "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+        "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+      },
+      "team_id": "T08C0G5FA4F"
+    },
+    "attachments": [
+      {
+        "from_url": "https://www.google.com/calendar/event?eid=bnFubDlhdW80NDN1ODJjOTlndW1obTNjbWcgbWlycm9yLmFwaHJvZGl0ZS5jYUBt",
+        "service_icon": "https://workspace.google.com/lp/static/images/favicon.ico?fingerprint=913d48cd5d48ba34313131f246f99d6b",
+        "id": 1,
+        "original_url": "https://www.google.com/calendar/event?eid=bnFubDlhdW80NDN1ODJjOTlndW1obTNjbWcgbWlycm9yLmFwaHJvZGl0ZS5jYUBt",
+        "fallback": "Google Workspace: Google Calendar - Easier Time Management, Appointments &amp; Scheduling",
+        "text": "Learn how Google Calendar helps you stay on top of your plans - at home, at work and everywhere in between.",
+        "title": "Google Calendar - Easier Time Management, Appointments &amp; Scheduling",
+        "title_link": "https://www.google.com/calendar/event?eid=bnFubDlhdW80NDN1ODJjOTlndW1obTNjbWcgbWlycm9yLmFwaHJvZGl0ZS5jYUBt",
+        "service_name": "Google Workspace"
+      }
+    ],
+    "blocks": [
+      {
+        "type": "rich_text",
+        "block_id": "mkwBC",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "The lunch event for Feb 19th at 1:30 pm has been successfully scheduled. You can view the event details and access the calendar link here: [Event Link]("
+              },
+              {
+                "type": "link",
+                "url": "https://www.google.com/calendar/event?eid=bnFubDlhdW80NDN1ODJjOTlndW1obTNjbWcgbWlycm9yLmFwaHJvZGl0ZS5jYUBt"
+              },
+              {
+                "type": "text",
+                "text": ")."
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "ts": "1739649094.673099"
+  },
+  "previous_message": {
+    "user": "U08CFAH1H1Q",
+    "type": "message",
+    "ts": "1739649094.673099",
+    "bot_id": "B08D451MSAC",
+    "app_id": "A08CFA8P8V8",
+    "text": "The lunch event for Feb 19th at 1:30 pm has been successfully scheduled. You can view the event details and access the calendar link here: [Event Link](<https://www.google.com/calendar/event?eid=bnFubDlhdW80NDN1ODJjOTlndW1obTNjbWcgbWlycm9yLmFwaHJvZGl0ZS5jYUBt>).",
+    "team": "T08C0G5FA4F",
+    "bot_profile": {
+      "id": "B08D451MSAC",
+      "app_id": "A08CFA8P8V8",
+      "name": "AphroAgent",
+      "icons": {
+        "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+        "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+        "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+      },
+      "deleted": false,
+      "updated": 1739072535,
+      "team_id": "T08C0G5FA4F"
+    },
+    "blocks": [
+      {
+        "type": "rich_text",
+        "block_id": "BX7aE",
+        "elements": [
+          {
+            "type": "rich_text_section",
+            "elements": [
+              {
+                "type": "text",
+                "text": "The lunch event for Feb 19th at 1:30 pm has been successfully scheduled. You can view the event details and access the calendar link here: [Event Link]("
+              },
+              {
+                "type": "link",
+                "url": "https://www.google.com/calendar/event?eid=bnFubDlhdW80NDN1ODJjOTlndW1obTNjbWcgbWlycm9yLmFwaHJvZGl0ZS5jYUBt"
+              },
+              {
+                "type": "text",
+                "text": ")."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "channel": "C08CF2DPMH8",
+  "hidden": true,
+  "ts": "1739649095.000300",
+  "event_ts": "1739649095.000300",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:51:35 AM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: false
+subtype: "message_changed"
+bot_id: null
+user: null
+

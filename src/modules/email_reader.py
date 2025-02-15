@@ -10,6 +10,7 @@ import base64
 import email
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
+import asyncio
 
 logger = get_logger(__name__)
 
@@ -26,8 +27,13 @@ class EmailReaderModule(BaseModule):
             from .google_auth import GoogleAuthModule
             auth_module = GoogleAuthModule()
             auth_result = await auth_module.execute({})
+            if not auth_result.get('success'):
+                raise ValueError("Failed to authenticate with Google")
             credentials = auth_result['credentials']
-            self.service = build('gmail', 'v1', credentials=credentials)
+            # Build service in thread pool
+            self.service = await asyncio.to_thread(
+                build, 'gmail', 'v1', credentials=credentials
+            )
             
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute email reading operations"""
@@ -55,28 +61,36 @@ class EmailReaderModule(BaseModule):
     async def _get_recent_emails(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Get recent emails from Gmail"""
         try:
-            max_results = params.get('max_emails', 10)
+            max_results = params.get('max_emails', 1)  # Default to 1 email
             query = 'is:unread' if params.get('unread_only', True) else ''
             
-            # Get messages
-            messages = []
+            # Get messages in thread pool
             request = self.service.users().messages().list(
                 userId='me',
                 maxResults=max_results,
                 q=query
             )
-            response = request.execute()
+            response = await asyncio.to_thread(request.execute)
             
+            messages = []
             if 'messages' in response:
                 for msg in response['messages']:
                     email_data = await self._get_email_content({'message_id': msg['id']})
                     if email_data.get('success'):
-                        messages.append(email_data['email'])
+                        # Create a minimal summary with just sender and subject
+                        email = email_data['email']
+                        summary = {
+                            'from': email['from'].split('<')[0].strip(),  # Get just the name part
+                            'subject': email['subject']
+                        }
+                        messages.append(summary)
             
             return {
                 'success': True,
                 'emails': messages,
-                'timestamp': datetime.now().isoformat()
+                'count': len(messages),
+                'timestamp': datetime.now().isoformat(),
+                'summary': f"Found {len(messages)} new {'unread ' if params.get('unread_only', True) else ''}email{'s' if len(messages) != 1 else ''}."
             }
             
         except Exception as e:
@@ -93,12 +107,13 @@ class EmailReaderModule(BaseModule):
             if not message_id:
                 raise ValueError("Message ID required")
                 
-            # Get the email data
-            message = self.service.users().messages().get(
+            # Get the email data in thread pool
+            request = self.service.users().messages().get(
                 userId='me',
                 id=message_id,
                 format='full'
-            ).execute()
+            )
+            message = await asyncio.to_thread(request.execute)
             
             # Parse headers
             headers = {}
@@ -126,12 +141,13 @@ class EmailReaderModule(BaseModule):
             email_data = {
                 'id': message_id,
                 'thread_id': message['threadId'],
-                'subject': headers.get('subject', ''),
-                'from': headers.get('from', ''),
+                'subject': headers.get('subject', '(No Subject)'),
+                'from': headers.get('from', 'Unknown Sender'),
                 'to': headers.get('to', ''),
                 'date': headers.get('date', ''),
                 'body': body,
-                'labels': message['labelIds']
+                'labels': message['labelIds'],
+                'snippet': message.get('snippet', '')
             }
             
             return {
@@ -153,15 +169,18 @@ class EmailReaderModule(BaseModule):
             if not message_id:
                 raise ValueError("Message ID required")
                 
-            self.service.users().messages().modify(
+            # Execute in thread pool
+            request = self.service.users().messages().modify(
                 userId='me',
                 id=message_id,
                 body={'removeLabelIds': ['UNREAD']}
-            ).execute()
+            )
+            await asyncio.to_thread(request.execute)
             
             return {
                 'success': True,
-                'message_id': message_id
+                'message_id': message_id,
+                'action': 'marked_read'
             }
             
         except Exception as e:

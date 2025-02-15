@@ -1,0 +1,67 @@
+================================================================================
+Session Started: 11:45:00 AM Feb 15, 2025
+================================================================================
+
+
+================================================================================
+[11:45:00 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I encountered an error while processing your request to schedule a lunch for Feb 18th at 1 pm. Unfortunately, there was an issue with the information provided. Can you please provide more details or clarify the event type so I can assist you better? Thank you."
+channel: "C08CF2DPMH8"
+ts: "1739648699.748929"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739648699.748929",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I encountered an error while processing your request to schedule a lunch for Feb 18th at 1 pm. Unfortunately, there was an issue with the information provided. Can you please provide more details or clarify the event type so I can assist you better? Thank you.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "XMVG3",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I encountered an error while processing your request to schedule a lunch for Feb 18th at 1 pm. Unfortunately, there was an issue with the information provided. Can you please provide more details or clarify the event type so I can assist you better? Thank you."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739648699.748929",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:45:00 AM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

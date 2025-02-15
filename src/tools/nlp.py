@@ -537,5 +537,15 @@ class NLPAnalyzer:
             # Split and clean participant names
             participants = [p.strip() for p in participants_match.group(1).split(',')]
             entities['participants'] = participants
-        
+            
+        # Extract event type
+        event_types = ['lunch', 'meeting', 'appointment', 'call', 'discussion', 'review', 'interview', 'sync']
+        message_words = message.lower().split()
+        for word in message_words:
+            if word in event_types:
+                entities['event_type'] = word
+                break
+        if 'event_type' not in entities:
+            entities['event_type'] = 'meeting'  # default type
+            
         return entities 

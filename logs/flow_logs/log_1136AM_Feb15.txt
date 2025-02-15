@@ -1,0 +1,213 @@
+================================================================================
+Session Started: 11:36:15 AM Feb 15, 2025
+================================================================================
+
+
+================================================================================
+[11:36:15 AM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 2
+services: [
+  "schedule_meeting",
+  "schedule_and_notify"
+]
+triggers_count: 19
+
+
+================================================================================
+[11:36:16 AM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[11:36:22 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for Feb 18th at 1 pm"
+channel: "C08CF2DPMH8"
+ts: "1739648182.142449"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739648182.142449",
+  "client_msg_id": "1440838e-c5ad-4c91-b1e5-60b711b5de39",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for Feb 18th at 1 pm",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "SL/yK",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for Feb 18th at 1 pm"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739648182.142449",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:36:23 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for Feb 18th at 1 pm"
+channel: "C08CF2DPMH8"
+ts: "1739648182.142449"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739648182.142449",
+  "client_msg_id": "1440838e-c5ad-4c91-b1e5-60b711b5de39",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for Feb 18th at 1 pm",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "SL/yK",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for Feb 18th at 1 pm"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739648182.142449"
+}
+
+
+================================================================================
+[11:36:23 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250215_113623"
+message: "schedule a lunch for Feb 18th at 1 pm"
+
+
+================================================================================
+[11:36:23 AM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250215_113623"
+service: "schedule_meeting"
+matched_triggers: [
+  "schedule",
+  "lunch"
+]
+match_percentage: 28.57142857142857
+
+
+================================================================================
+[11:36:23 AM] Agent - tools_loaded
+--------------------------------------------------------------------------------
+total_tools: 2
+available_tools: [
+  "google_calendar",
+  "google_auth"
+]
+
+
+================================================================================
+[11:36:23 AM] Agent - services_loaded
+--------------------------------------------------------------------------------
+services_count: 2
+
+
+================================================================================
+[11:36:25 AM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a lunch for Feb 18th at 1 pm"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250215_113623"
+
+
+================================================================================
+[11:36:25 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I encountered an error while processing your request to schedule a lunch for Feb 18th at 1 pm. It seems there was an issue with the information provided. Can you please provide more details or clarify the intent of the meeting so I can assist you better? Thank you."
+channel: "C08CF2DPMH8"
+ts: "1739648184.945099"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739648184.945099",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I encountered an error while processing your request to schedule a lunch for Feb 18th at 1 pm. It seems there was an issue with the information provided. Can you please provide more details or clarify the intent of the meeting so I can assist you better? Thank you.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "XFV",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I encountered an error while processing your request to schedule a lunch for Feb 18th at 1 pm. It seems there was an issue with the information provided. Can you please provide more details or clarify the intent of the meeting so I can assist you better? Thank you."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739648184.945099",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:36:25 AM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+
