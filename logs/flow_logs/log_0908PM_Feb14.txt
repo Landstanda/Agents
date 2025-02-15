@@ -1,0 +1,208 @@
+================================================================================
+Session Started: 09:08:43 PM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[09:08:43 PM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 7
+services: [
+  "schedule_meeting",
+  "schedule_and_notify",
+  "share_document",
+  "create_task",
+  "extract_and_share",
+  "send_update",
+  "process_emails"
+]
+triggers_count: 42
+
+
+================================================================================
+[09:08:43 PM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[09:08:55 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+channel: "C08CF2DPMH8"
+ts: "1739596134.761769"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739596134.761769",
+  "client_msg_id": "7ad0f3b3-f478-4084-b53a-57872e36f7cf",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "QOlMZ",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for 1 pm on February 19th with Gabi & Lulu"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739596134.761769",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[09:08:55 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+channel: "C08CF2DPMH8"
+ts: "1739596134.761769"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739596134.761769",
+  "client_msg_id": "7ad0f3b3-f478-4084-b53a-57872e36f7cf",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "QOlMZ",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for 1 pm on February 19th with Gabi & Lulu"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739596134.761769"
+}
+
+
+================================================================================
+[09:08:55 PM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_210855"
+message: "schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+
+
+================================================================================
+[09:08:55 PM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_210855"
+service: "schedule_meeting"
+matched_triggers: [
+  "schedule",
+  "lunch"
+]
+match_percentage: 28.57142857142857
+
+
+================================================================================
+[09:08:56 PM] Agent - services_loaded
+--------------------------------------------------------------------------------
+services_count: 7
+
+
+================================================================================
+[09:08:58 PM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_210855"
+
+
+================================================================================
+[09:08:58 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I encountered an error while trying to schedule the lunch for 1 pm on February 19th with Gabi &amp; Lulu. The required tool 'google_auth' was not found, which prevented me from completing the task. If you can provide the necessary authentication tool, I'll be able to proceed with scheduling the lunch. Thank you for your understanding."
+channel: "C08CF2DPMH8"
+ts: "1739596138.385729"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739596138.385729",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I encountered an error while trying to schedule the lunch for 1 pm on February 19th with Gabi &amp; Lulu. The required tool 'google_auth' was not found, which prevented me from completing the task. If you can provide the necessary authentication tool, I'll be able to proceed with scheduling the lunch. Thank you for your understanding.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "JPlUV",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I encountered an error while trying to schedule the lunch for 1 pm on February 19th with Gabi & Lulu. The required tool 'google_auth' was not found, which prevented me from completing the task. If you can provide the necessary authentication tool, I'll be able to proceed with scheduling the lunch. Thank you for your understanding."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739596138.385729",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[09:08:58 PM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

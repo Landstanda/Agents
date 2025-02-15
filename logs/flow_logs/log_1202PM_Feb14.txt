@@ -1,0 +1,176 @@
+================================================================================
+Session Started: 12:02:37 PM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[12:02:37 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a meeting for february 17th at 11:11 pm"
+channel: "C08CF2DPMH8"
+ts: "1739563357.316349"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739563357.316349",
+  "client_msg_id": "3183ae73-12ae-4148-ae2c-1b95d4bfb2cb",
+  "text": "<@U08CFAH1H1Q> schedule a meeting for february 17th at 11:11 pm",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "Boxcg",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a meeting for february 17th at 11:11 pm"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739563357.316349",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[12:02:37 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a meeting for february 17th at 11:11 pm"
+channel: "C08CF2DPMH8"
+ts: "1739563357.316349"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739563357.316349",
+  "client_msg_id": "3183ae73-12ae-4148-ae2c-1b95d4bfb2cb",
+  "text": "<@U08CFAH1H1Q> schedule a meeting for february 17th at 11:11 pm",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "Boxcg",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a meeting for february 17th at 11:11 pm"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739563357.316349"
+}
+
+
+================================================================================
+[12:02:37 PM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_120237"
+message: "schedule a meeting for february 17th at 11:11 pm"
+
+
+================================================================================
+[12:02:37 PM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_120237"
+service: "schedule_meeting"
+intent: ""
+
+
+================================================================================
+[12:02:39 PM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a meeting for february 17th at 11:11 pm"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_120237"
+
+
+================================================================================
+[12:02:40 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "The meeting has been successfully scheduled for February 17th at 11:11 PM."
+channel: "C08CF2DPMH8"
+ts: "1739563359.678749"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739563359.678749",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "The meeting has been successfully scheduled for February 17th at 11:11 PM.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "QePTp",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "The meeting has been successfully scheduled for February 17th at 11:11 PM."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739563359.678749",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[12:02:40 PM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

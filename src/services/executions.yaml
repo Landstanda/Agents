@@ -1,63 +1,21 @@
 schedule_meeting:
-  executor_type: "calendar"
+  executor_type: calendar
   steps:
-    - name: "validate_time"
-      tool: "calendar"
-      action: "check_availability"
-      params:
-        time: "{time}"
-        date: "{date}"
-      on_failure:
-        action: "suggest_alternative_times"
-        max_retries: 3
-
-    - name: "check_attendees"
-      tool: "calendar"
-      action: "check_attendee_availability"
-      params:
-        attendees: "{participants}"
-        time: "{time}"
-        date: "{date}"
-      loop:
-        condition: "all_available"
-        max_iterations: 3
-        on_fail: "suggest_alternative_time"
-
-    - name: "create_event"
-      tool: "calendar"
-      action: "create_event"
-      params:
-        summary: "Meeting with {participants}"
-        start_time: "{time}"
-        date: "{date}"
-        attendees: "{participants}"
-        location: "{location}"
-        description: "{agenda}"
-
-    - name: "send_invites"
-      tool: "email"
-      action: "send_calendar_invites"
-      params:
-        to: "{participants}"
-        event_id: "{previous_step.result.event_id}"
-
-  response_templates:
-    success: "Meeting scheduled for {date} at {time} with {participants}"
-    error: "Unable to schedule meeting: {error_message}"
-    partial_success: "Meeting scheduled but {issue_description}"
-
-help:
-  executor_type: "static"
-  steps:
-    - name: "get_capabilities"
-      tool: "help_system"
-      action: "list_capabilities"
-      params:
-        format: "bullet_list"
-        include_examples: true
-
-  response_templates:
-    success: |
-      I can help you with:
-      {capabilities}
-    error: "Unable to retrieve help information: {error_message}" 
+  - action: check_availability
+    name: validate_time
+    params:
+      date: '{date}'
+      time: '{time}'
+      timezone: America/Los_Angeles
+    tool: calendar
+  - action: create_event
+    name: create_event
+    params:
+      attendees: '{participants}'
+      date: '{date}'
+      description: Scheduled via calendar integration test
+      duration: '60'
+      start_time: '{time}'
+      summary: Meeting with {participants}
+      timezone: America/Los_Angeles
+    tool: calendar

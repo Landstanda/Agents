@@ -1,0 +1,208 @@
+================================================================================
+Session Started: 09:34:22 PM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[09:34:22 PM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 7
+services: [
+  "schedule_meeting",
+  "schedule_and_notify",
+  "share_document",
+  "create_task",
+  "extract_and_share",
+  "send_update",
+  "process_emails"
+]
+triggers_count: 42
+
+
+================================================================================
+[09:34:23 PM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[09:34:32 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+channel: "C08CF2DPMH8"
+ts: "1739597671.293549"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739597671.293549",
+  "client_msg_id": "fd2575b3-4f87-4ecd-a340-4d5b23037e04",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "QOlMZ",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for 1 pm on February 19th with Gabi & Lulu"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739597671.293549",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[09:34:32 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+channel: "C08CF2DPMH8"
+ts: "1739597671.293549"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739597671.293549",
+  "client_msg_id": "fd2575b3-4f87-4ecd-a340-4d5b23037e04",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "QOlMZ",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for 1 pm on February 19th with Gabi & Lulu"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739597671.293549"
+}
+
+
+================================================================================
+[09:34:32 PM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_213432"
+message: "schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+
+
+================================================================================
+[09:34:32 PM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_213432"
+service: "schedule_meeting"
+matched_triggers: [
+  "schedule",
+  "lunch"
+]
+match_percentage: 28.57142857142857
+
+
+================================================================================
+[09:34:33 PM] Agent - services_loaded
+--------------------------------------------------------------------------------
+services_count: 7
+
+
+================================================================================
+[09:34:34 PM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_213432"
+
+
+================================================================================
+[09:34:35 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I encountered an error while trying to schedule the lunch for 1 pm on February 19th with Gabi &amp; Lulu. I apologize for the inconvenience. If you would like to try again or need assistance with something else, please let me know."
+channel: "C08CF2DPMH8"
+ts: "1739597674.891299"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739597674.891299",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I encountered an error while trying to schedule the lunch for 1 pm on February 19th with Gabi &amp; Lulu. I apologize for the inconvenience. If you would like to try again or need assistance with something else, please let me know.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "R3m2P",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I encountered an error while trying to schedule the lunch for 1 pm on February 19th with Gabi & Lulu. I apologize for the inconvenience. If you would like to try again or need assistance with something else, please let me know."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739597674.891299",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[09:34:35 PM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

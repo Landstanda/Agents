@@ -1,0 +1,183 @@
+================================================================================
+Session Started: 06:54:24 PM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[06:54:24 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a meeting for 2 pm Feb 16th 2025"
+channel: "C08CF2DPMH8"
+ts: "1739588064.385349"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739588064.385349",
+  "client_msg_id": "c34c25b6-9db6-45b9-8405-306f4bf66647",
+  "text": "<@U08CFAH1H1Q> schedule a meeting for 2 pm Feb 16th 2025",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "OjifV",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a meeting for 2 pm Feb 16th 2025"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739588064.385349",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[06:54:25 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a meeting for 2 pm Feb 16th 2025"
+channel: "C08CF2DPMH8"
+ts: "1739588064.385349"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739588064.385349",
+  "client_msg_id": "c34c25b6-9db6-45b9-8405-306f4bf66647",
+  "text": "<@U08CFAH1H1Q> schedule a meeting for 2 pm Feb 16th 2025",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "OjifV",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a meeting for 2 pm Feb 16th 2025"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739588064.385349"
+}
+
+
+================================================================================
+[06:54:25 PM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_185425"
+message: "schedule a meeting for 2 pm Feb 16th 2025"
+
+
+================================================================================
+[06:54:25 PM] NLPAnalyzer - incomplete_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_185425"
+service: "schedule_and_notify"
+missing_entities: [
+  "participants"
+]
+
+
+================================================================================
+[06:54:27 PM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a meeting for 2 pm Feb 16th 2025"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_185425"
+
+
+================================================================================
+[06:54:27 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "Sure, here's a message you can use to ask the user for the missing information:\n\n---\n**Friendly Message:**\nHi there! To proceed with scheduling the meeting for 2 pm on February 16th, 2025, could you please provide the list of participants who will be attending? Thank you! :blush:"
+channel: "C08CF2DPMH8"
+ts: "1739588067.241959"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739588067.241959",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "Sure, here's a message you can use to ask the user for the missing information:\n\n---\n**Friendly Message:**\nHi there! To proceed with scheduling the meeting for 2 pm on February 16th, 2025, could you please provide the list of participants who will be attending? Thank you! :blush:",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "miZ",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "Sure, here's a message you can use to ask the user for the missing information:\n\n---\n**Friendly Message:**\nHi there! To proceed with scheduling the meeting for 2 pm on February 16th, 2025, could you please provide the list of participants who will be attending? Thank you! "
+            },
+            {
+              "type": "emoji",
+              "name": "blush",
+              "unicode": "1f60a"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739588067.241959",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[06:54:27 PM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

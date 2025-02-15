@@ -1,34 +1,30 @@
 import logging
-import os
 from typing import Optional
 
-def get_logger(name: Optional[str] = None) -> logging.Logger:
-    """Configure and return a logger instance"""
-    logger = logging.getLogger(name or __name__)
+def get_logger(name: str, level: Optional[int] = None) -> logging.Logger:
+    """
+    Get a logger with consistent formatting.
     
-    if not logger.handlers:
-        # Create logs directory if it doesn't exist
-        log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'logs')
-        os.makedirs(log_dir, exist_ok=True)
+    Args:
+        name: Name for the logger (usually __name__)
+        level: Optional logging level (defaults to INFO if not set)
         
-        # File handler
-        file_handler = logging.FileHandler(os.path.join(log_dir, 'agent.log'))
-        file_formatter = logging.Formatter(
+    Returns:
+        Configured logger instance
+    """
+    logger = logging.getLogger(name)
+    
+    if not logger.handlers:  # Only add handler if none exists
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
-        file_handler.setFormatter(file_formatter)
-        logger.addHandler(file_handler)
-        
-        # Console handler
-        console_handler = logging.StreamHandler()
-        console_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        console_handler.setFormatter(console_formatter)
-        logger.addHandler(console_handler)
-        
-        # Set log level from environment variable or default to INFO
-        log_level = os.getenv('LOG_LEVEL', 'INFO').upper()
-        logger.setLevel(getattr(logging, log_level, logging.INFO))
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
     
+    if level is not None:
+        logger.setLevel(level)
+    elif not logger.level:  # Only set default level if not already set
+        logger.setLevel(logging.INFO)
+        
     return logger 

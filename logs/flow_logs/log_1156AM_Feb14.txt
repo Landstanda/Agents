@@ -1,0 +1,189 @@
+================================================================================
+Session Started: 11:56:09 AM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[11:56:09 AM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 6
+triggers_count: 29
+
+
+================================================================================
+[11:56:10 AM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[11:56:39 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> Schedule a meeting at 10:30 in the morning on  Feb 19th"
+channel: "C08CF2DPMH8"
+ts: "1739562999.102939"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739562999.102939",
+  "client_msg_id": "1bb35372-33a6-4680-83e3-68d3c45817c2",
+  "text": "<@U08CFAH1H1Q> Schedule a meeting at 10:30 in the morning on  Feb 19th",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "IaI8L",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " Schedule a meeting at 10:30 in the morning on  Feb 19th"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739562999.102939",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:56:39 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> Schedule a meeting at 10:30 in the morning on  Feb 19th"
+channel: "C08CF2DPMH8"
+ts: "1739562999.102939"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739562999.102939",
+  "client_msg_id": "1bb35372-33a6-4680-83e3-68d3c45817c2",
+  "text": "<@U08CFAH1H1Q> Schedule a meeting at 10:30 in the morning on  Feb 19th",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "IaI8L",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " Schedule a meeting at 10:30 in the morning on  Feb 19th"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739562999.102939"
+}
+
+
+================================================================================
+[11:56:39 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_115639"
+message: "Schedule a meeting at 10:30 in the morning on  Feb 19th"
+
+
+================================================================================
+[11:56:39 AM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_115639"
+service: "schedule_meeting"
+intent: ""
+
+
+================================================================================
+[11:56:41 AM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "Schedule a meeting at 10:30 in the morning on  Feb 19th"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_115639"
+
+
+================================================================================
+[11:56:41 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "The meeting has been scheduled for 10:30 in the morning on February 19th. Thank you!"
+channel: "C08CF2DPMH8"
+ts: "1739563000.960239"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739563000.960239",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "The meeting has been scheduled for 10:30 in the morning on February 19th. Thank you!",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "Dw=1",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "The meeting has been scheduled for 10:30 in the morning on February 19th. Thank you!"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739563000.960239",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:56:41 AM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

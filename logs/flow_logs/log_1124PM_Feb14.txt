@@ -1,0 +1,186 @@
+================================================================================
+Session Started: 11:24:04 PM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[11:24:04 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th 2025 with Gabi"
+channel: "C08CF2DPMH8"
+ts: "1739604243.961939"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739604243.961939",
+  "client_msg_id": "1863dbd8-ffcb-41ca-8cc4-ef72d4c0fede",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th 2025 with Gabi",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "WZ05l",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for 1 pm on February 19th 2025 with Gabi"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739604243.961939",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:24:04 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th 2025 with Gabi"
+channel: "C08CF2DPMH8"
+ts: "1739604243.961939"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739604243.961939",
+  "client_msg_id": "1863dbd8-ffcb-41ca-8cc4-ef72d4c0fede",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th 2025 with Gabi",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "WZ05l",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for 1 pm on February 19th 2025 with Gabi"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739604243.961939"
+}
+
+
+================================================================================
+[11:24:04 PM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_232404"
+message: "schedule a lunch for 1 pm on February 19th 2025 with Gabi"
+
+
+================================================================================
+[11:24:04 PM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_232404"
+service: "schedule_meeting"
+matched_triggers: [
+  "lunch",
+  "schedule"
+]
+match_percentage: 28.57142857142857
+
+
+================================================================================
+[11:24:04 PM] Agent - services_loaded
+--------------------------------------------------------------------------------
+services_count: 7
+
+
+================================================================================
+[11:24:06 PM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a lunch for 1 pm on February 19th 2025 with Gabi"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_232404"
+
+
+================================================================================
+[11:24:07 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I encountered an error while trying to schedule the lunch for 1 pm on February 19th, 2025 with Gabi. Unfortunately, the necessary actions couldn't be completed due to technical issues. If you have any other tasks or questions, feel free to let me know how I can assist you further."
+channel: "C08CF2DPMH8"
+ts: "1739604246.622619"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739604246.622619",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I encountered an error while trying to schedule the lunch for 1 pm on February 19th, 2025 with Gabi. Unfortunately, the necessary actions couldn't be completed due to technical issues. If you have any other tasks or questions, feel free to let me know how I can assist you further.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "BUuZY",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I encountered an error while trying to schedule the lunch for 1 pm on February 19th, 2025 with Gabi. Unfortunately, the necessary actions couldn't be completed due to technical issues. If you have any other tasks or questions, feel free to let me know how I can assist you further."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739604246.622619",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:24:07 PM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

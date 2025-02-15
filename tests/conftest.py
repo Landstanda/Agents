@@ -5,6 +5,17 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 from openai import AsyncOpenAI
 from slack_sdk.web.async_client import AsyncWebClient
+import sys
+
+# Add src directory to Python path
+src_path = str(Path(__file__).parent.parent / 'src')
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
+# Add tests directory to Python path
+tests_path = str(Path(__file__).parent)
+if tests_path not in sys.path:
+    sys.path.insert(0, tests_path)
 
 @pytest.fixture
 def mock_openai():

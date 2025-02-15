@@ -1,0 +1,43 @@
+================================================================================
+Session Started: 06:53:26 PM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[06:53:26 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "I have successfully scheduled a meeting with Gabi for 6 pm on February 15th, 2025."
+channel: "C08CF2DPMH8"
+ts: "1739588006.480309"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739588006.480309",
+  "client_msg_id": "f501ed45-cdfe-4fb6-b1c9-18533dc2dcff",
+  "text": "I have successfully scheduled a meeting with Gabi for 6 pm on February 15th, 2025.",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "eJalt",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I have successfully scheduled a meeting with Gabi for 6 pm on February 15th, 2025."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739588006.480309",
+  "channel_type": "channel"
+}
+

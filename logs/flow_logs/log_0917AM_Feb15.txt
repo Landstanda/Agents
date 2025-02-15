@@ -1,0 +1,203 @@
+================================================================================
+Session Started: 09:17:00 AM Feb 15, 2025
+================================================================================
+
+
+================================================================================
+[09:17:00 AM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 2
+services: [
+  "schedule_meeting",
+  "schedule_and_notify"
+]
+triggers_count: 19
+
+
+================================================================================
+[09:17:00 AM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[09:17:05 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a meeting for tomorrow at 2 pm"
+channel: "C08CF2DPMH8"
+ts: "1739639825.134559"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739639825.134559",
+  "client_msg_id": "da9591c9-4994-4a31-b7ae-3379ac468563",
+  "text": "<@U08CFAH1H1Q> schedule a meeting for tomorrow at 2 pm",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "eB02X",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a meeting for tomorrow at 2 pm"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739639825.134559",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[09:17:05 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a meeting for tomorrow at 2 pm"
+channel: "C08CF2DPMH8"
+ts: "1739639825.134559"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739639825.134559",
+  "client_msg_id": "da9591c9-4994-4a31-b7ae-3379ac468563",
+  "text": "<@U08CFAH1H1Q> schedule a meeting for tomorrow at 2 pm",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "eB02X",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a meeting for tomorrow at 2 pm"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739639825.134559"
+}
+
+
+================================================================================
+[09:17:05 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250215_091705"
+message: "schedule a meeting for tomorrow at 2 pm"
+
+
+================================================================================
+[09:17:05 AM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250215_091705"
+service: "schedule_meeting"
+matched_triggers: [
+  "schedule",
+  "meeting"
+]
+match_percentage: 28.57142857142857
+
+
+================================================================================
+[09:17:06 AM] Agent - services_loaded
+--------------------------------------------------------------------------------
+services_count: 2
+
+
+================================================================================
+[09:17:07 AM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a meeting for tomorrow at 2 pm"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250215_091705"
+
+
+================================================================================
+[09:17:08 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I encountered an error while trying to schedule the meeting. Unfortunately, the required functionality to complete this task is not implemented. If you need further assistance, please let me know how else I can help you."
+channel: "C08CF2DPMH8"
+ts: "1739639827.772099"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739639827.772099",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I encountered an error while trying to schedule the meeting. Unfortunately, the required functionality to complete this task is not implemented. If you need further assistance, please let me know how else I can help you.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "008uv",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I encountered an error while trying to schedule the meeting. Unfortunately, the required functionality to complete this task is not implemented. If you need further assistance, please let me know how else I can help you."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739639827.772099",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[09:17:08 AM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

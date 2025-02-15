@@ -1,0 +1,189 @@
+================================================================================
+Session Started: 11:35:24 AM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[11:35:24 AM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 6
+triggers_count: 29
+
+
+================================================================================
+[11:35:25 AM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[11:35:38 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> please schedule a meeting with bob on feb  20th at 9:14 am"
+channel: "C08CF2DPMH8"
+ts: "1739561738.106949"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739561738.106949",
+  "client_msg_id": "4c3e6367-3638-4964-8329-3c05b206a018",
+  "text": "<@U08CFAH1H1Q> please schedule a meeting with bob on feb  20th at 9:14 am",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "+EtnC",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " please schedule a meeting with bob on feb  20th at 9:14 am"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739561738.106949",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:35:38 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> please schedule a meeting with bob on feb  20th at 9:14 am"
+channel: "C08CF2DPMH8"
+ts: "1739561738.106949"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739561738.106949",
+  "client_msg_id": "4c3e6367-3638-4964-8329-3c05b206a018",
+  "text": "<@U08CFAH1H1Q> please schedule a meeting with bob on feb  20th at 9:14 am",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "+EtnC",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " please schedule a meeting with bob on feb  20th at 9:14 am"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739561738.106949"
+}
+
+
+================================================================================
+[11:35:38 AM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_113538"
+message: "please schedule a meeting with bob on feb  20th at 9:14 am"
+
+
+================================================================================
+[11:35:38 AM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_113538"
+service: "schedule_meeting"
+intent: ""
+
+
+================================================================================
+[11:35:40 AM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "please schedule a meeting with bob on feb  20th at 9:14 am"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_113538"
+
+
+================================================================================
+[11:35:40 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I will proceed with sending a message to the user regarding the scheduled meeting with Bob on February 20th at 9:14 AM. Thank you for providing the necessary details. I will update you once the message has been sent."
+channel: "C08CF2DPMH8"
+ts: "1739561740.343709"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739561740.343709",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I will proceed with sending a message to the user regarding the scheduled meeting with Bob on February 20th at 9:14 AM. Thank you for providing the necessary details. I will update you once the message has been sent.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "B12VB",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I will proceed with sending a message to the user regarding the scheduled meeting with Bob on February 20th at 9:14 AM. Thank you for providing the necessary details. I will update you once the message has been sent."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739561740.343709",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:35:40 AM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

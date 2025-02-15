@@ -5,260 +5,147 @@ schedule_meeting:
   description: "Schedule a meeting with specified participants"
   identifier: "schedule_meeting"
   triggers:
-    - "schedule a meeting"
-    - "set up a meeting"
-    - "book a meeting"
-    - "arrange a meeting"
-    - "plan a meeting"
-    - "organize a meeting"
+    - "schedule"
+    - "book"
+    - "plan"
+    - "arrange"
+    - "meeting"
+    - "lunch"
+    - "appointment"
   required_entities:
     - time
     - date
   optional_entities:
     - location
-    - duration
-    - agenda
     - participants
   steps:
-    - name: "Check Availability"
-      tool: calendar
-      action: check_availability
-      params:
-        start_time: "{time}"
-        end_time: "{calculated_end_time}"
-        attendees: "{participants}"
+    - name: "Authenticate"
+      tool: google_auth
+      action: execute
+      params: {}
+      on_success:
+        - condition: "response.get('success')"
+          next_step: create_event
+      on_error:
+        - action: "retry"
+          max_attempts: 3
     - name: "Create Event"
-      tool: calendar
-      action: create_event
+      tool: google_calendar
+      id: create_event
+      action: execute
       params:
-        summary: "Meeting: {agenda}"
-        start_time: "{time}"
-        end_time: "{calculated_end_time}"
-        location: "{location}"
-        attendees: "{participants}"
-    - name: "Send Notification"
-      tool: send_message
-      action: send_message
-      params:
-        recipient: "{participants}"
-        message: "Meeting scheduled for {date} at {time}"
+        operation: "create_event"
+        summary: "{entities.get('intent', 'Meeting')}{' with ' + ', '.join(participants) if participants and len(participants) > 0 else ''}"
+        description: "Scheduled meeting"
+        start_time: "{date}T{time}:00"
+        end_time: "{date}T{time[:2]}:{str(int(time[3:5]) + 60 if ':' in time else '00')}:00"
+        timezone: "America/Los_Angeles"
+        location: "{location if location else 'Virtual Meeting'}"
+        attendees: "{participants if participants else []}"
+      on_success:
+        - condition: "response.get('success') and response.get('event_id')"
+          next_step: complete
+      on_error:
+        - condition: "error.get('type') == 'time_conflict'"
+          action: "suggest_alternative"
+        - condition: "error.get('type') == 'auth_error'"
+          action: "retry"
+          next_step: "authenticate"
+        - action: "notify_error"
   success_criteria:
-    - "Event created successfully"
-    - "Notifications sent to all participants"
+    - "response.get('success')"
+    - "response.get('event_id')"
   error_handling:
     time_conflict:
       message: "There is a scheduling conflict at {time}"
       action: "suggest_alternative"
-    invalid_time:
-      message: "Please provide a valid time"
-      action: "prompt_user"
+    creation_error:
+      message: "Failed to create event: {error}"
+      action: "retry"
 
-share_document:
-  name: "Share Document"
-  description: "Upload and share a document with team members"
-  identifier: "share_document"
+schedule_and_notify:
+  name: "Schedule Meeting with Notifications"
+  description: "Schedule a meeting and send detailed notifications to participants"
+  identifier: "schedule_notify"
   triggers:
-    - "share document"
-    - "upload and share"
-    - "share file"
-    - "send document"
-    - "share this file"
+    - "schedule"
+    - "book"
+    - "plan"
+    - "arrange"
+    - "meeting"
+    - "lunch"
+    - "appointment"
+    - "notify"
+    - "remind"
+    - "email"
+    - "send"
+    - "alert"
   required_entities:
-    - file_path
-    - recipients
+    - time
+    - participants
   optional_entities:
+    - location
+    - duration
+    - reminder_time
     - message
-    - permission_level
+    - end_time
   steps:
-    - name: "Upload File"
-      tool: document
-      action: upload_file
+    - tool: google_auth
+      action: execute
+      params: {}
+      on_success:
+        - condition: "response.get('success')"
+          next_step: check_availability
+    - tool: google_calendar
+      id: check_availability
+      action: execute
       params:
-        file_path: "{file_path}"
-        destination: "shared_documents"
-    - name: "Send Share Notification"
-      tool: email
+        operation: "check_availability"
+        start_time: "{date}T{time}:00"
+        end_time: "{date}T{time[:2]}:{str(int(time[3:5]) + 60 if ':' in time else '00')}:00"
+        timezone: "America/Los_Angeles"
+        attendees: "{participants}"
+      on_success:
+        - condition: "response.get('success') and response.get('is_available')"
+          next_step: create_event
+        - condition: "not response.get('is_available')"
+          next_step: notify_conflict
+    - tool: google_calendar
+      id: create_event
+      action: execute
+      params:
+        operation: "create_event"
+        summary: "Meeting with {', '.join(participants)}"
+        description: "{message if message else 'Scheduled meeting'}"
+        start_time: "{date}T{time}:00"
+        end_time: "{date}T{time[:2]}:{str(int(time[3:5]) + 60 if ':' in time else '00')}:00"
+        timezone: "America/Los_Angeles"
+        location: "{location if location else ''}"
+        attendees: "{participants}"
+        reminders: {"useDefault": false, "overrides": [{"method": "email", "minutes": 30}]}
+      on_success:
+        - condition: "response.get('success')"
+          next_step: send_notification
+        - condition: "not response.get('success')"
+          next_step: notify_error
+    - tool: email
+      id: send_notification
       action: send_email
       params:
-        to_address: "{recipients}"
-        subject: "Document Shared: {filename}"
-        body: "A document has been shared with you: {url}"
+        to_address: "{participants}"
+        subject: "Meeting Scheduled: {summary}"
+        body: "A meeting has been scheduled for {time}.\nLocation: {location if location else 'Not specified'}\nLink: {response.get('html_link')}\n\n{message if message else ''}"
   success_criteria:
-    - "File uploaded successfully"
-    - "Share notification sent"
+    - "response.get('success')"
+    - "response.get('event_id')"
+    - "response.get('html_link')"
   error_handling:
-    upload_failed:
-      message: "Failed to upload file: {error}"
+    time_conflict:
+      message: "There is a scheduling conflict at {time}"
+      action: "suggest_alternative"
+    creation_error:
+      message: "Failed to create event: {error}"
       action: "retry"
-    invalid_file:
-      message: "Invalid file type or path"
-      action: "prompt_user"
-
-create_task:
-  name: "Create Task"
-  description: "Create a new task or to-do item with optional assignment"
-  identifier: "create_task"
-  triggers:
-    - "create task"
-    - "add todo"
-    - "new task"
-    - "assign task"
-    - "create todo item"
-  required_entities:
-    - title
-    - description
-  optional_entities:
-    - due_date
-    - assignee
-    - priority
-  steps:
-    - name: "Create Task Item"
-      tool: task
-      action: create_task
-      params:
-        title: "{title}"
-        description: "{description}"
-        due_date: "{due_date}"
-        assignee: "{assignee}"
-    - name: "Notify Assignee"
-      tool: send_message
-      action: send_message
-      params:
-        recipient: "{assignee}"
-        message: "New task assigned: {title}"
-  success_criteria:
-    - "Task created successfully"
-    - "Assignee notified if specified"
-  error_handling:
-    invalid_assignee:
-      message: "Could not find user {assignee}"
-      action: "prompt_user"
-    missing_details:
-      message: "Please provide more details for the task"
-      action: "prompt_user"
-
-extract_and_share:
-  name: "Extract and Share Document Content"
-  description: "Extract text from a document and share the content"
-  identifier: "extract_share"
-  triggers:
-    - "extract and share"
-    - "share document content"
-    - "extract text and send"
-    - "share file contents"
-  required_entities:
-    - file_path
-    - recipients
-  optional_entities:
-    - message
-    - format
-  steps:
-    - name: "Extract Content"
-      tool: file_processing
-      action: extract_text
-      params:
-        file_path: "{file_path}"
-    - name: "Create Summary Document"
-      tool: document
-      action: create_document
-      params:
-        title: "Content Summary: {filename}"
-        content: "{extracted_text}"
-        type: "doc"
-    - name: "Share Results"
-      tool: email
-      action: send_email
-      params:
-        to_address: "{recipients}"
-        subject: "Document Content: {filename}"
-        body: "The extracted content has been shared with you: {url}"
-  success_criteria:
-    - "Text extracted successfully"
-    - "Summary document created"
-    - "Content shared with recipients"
-  error_handling:
-    extraction_failed:
-      message: "Could not extract text from {file_path}"
+    notification_failed:
+      message: "Could not send notifications to {failed_recipients}"
       action: "retry"
-    unsupported_format:
-      message: "File format not supported"
-      action: "prompt_user"
-
-send_update:
-  name: "Send Team Update"
-  description: "Send a team update or announcement to multiple channels"
-  identifier: "send_update"
-  triggers:
-    - "send update"
-    - "send announcement"
-    - "team update"
-    - "broadcast message"
-    - "announce to team"
-  required_entities:
-    - message
-    - channels
-  optional_entities:
-    - priority
-    - attachments
-  steps:
-    - name: "Send Message"
-      tool: send_message
-      action: send_message
-      params:
-        recipient: "{channels}"
-        message: "{message}"
-        attachments: "{attachments}"
-    - name: "Send Email Backup"
-      tool: email
-      action: send_email
-      params:
-        to_address: "{team_email}"
-        subject: "Team Update: {timestamp}"
-        body: "{message}"
-  success_criteria:
-    - "Message sent to all channels"
-    - "Email backup sent"
-  error_handling:
-    channel_error:
-      message: "Could not send to channel {channel}"
-      action: "retry"
-    email_error:
-      message: "Email backup failed"
-      action: "log_only"
-
-process_emails:
-  name: "Process Recent Emails"
-  description: "Read and process recent emails, creating tasks for action items"
-  identifier: "process_emails"
-  triggers:
-    - "check emails"
-    - "process emails"
-    - "read my emails"
-    - "create tasks from emails"
-  required_entities: []  # No required entities as it processes recent emails
-  optional_entities:
-    - time_range
-    - labels
-  steps:
-    - name: "Get Recent Emails"
-      tool: email
-      action: read_email
-      params:
-        time_range: "{time_range}"
-    - name: "Create Tasks"
-      tool: task
-      action: create_task
-      params:
-        title: "Email: {email_subject}"
-        description: "Action required: {email_body}"
-        due_date: "{auto_due_date}"
-  success_criteria:
-    - "Emails retrieved successfully"
-    - "Tasks created for action items"
-  error_handling:
-    email_access_error:
-      message: "Could not access emails"
-      action: "retry"
-    task_creation_error:
-      message: "Failed to create some tasks"
-      action: "log_only"

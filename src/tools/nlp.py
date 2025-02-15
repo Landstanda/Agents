@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Set
 import re
 import logging
 import yaml
@@ -6,8 +6,11 @@ from pathlib import Path
 from src.utils.flow_logger import FlowLogger
 import asyncio
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
+import pytz
+from dateutil import parser
+from dateutil.relativedelta import relativedelta
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +158,45 @@ class Ticket:
         
         return ticket
 
+@dataclass
+class ServiceMatch:
+    """Represents a potential service match with scoring details"""
+    service_name: str
+    service_def: Dict[str, Any]
+    matched_triggers: Set[str] = field(default_factory=set)
+    matched_entities: Set[str] = field(default_factory=set)
+    
+    @property
+    def trigger_count(self) -> int:
+        """Number of triggers matched"""
+        return len(self.matched_triggers)
+    
+    @property
+    def total_triggers(self) -> int:
+        """Total number of triggers in service"""
+        return len(self.service_def.get('triggers', []))
+    
+    @property
+    def match_percentage(self) -> float:
+        """Percentage of service triggers matched"""
+        if self.total_triggers == 0:
+            return 0.0
+        return (self.trigger_count / self.total_triggers) * 100
+    
+    @property
+    def required_entities_present(self) -> bool:
+        """Check if all required entities are present"""
+        required = set(self.service_def.get('required_entities', []))
+        return required.issubset(self.matched_entities)
+    
+    def add_trigger_match(self, trigger: str):
+        """Add a matched trigger word"""
+        self.matched_triggers.add(trigger)
+    
+    def add_entity_match(self, entity: str):
+        """Add a matched entity"""
+        self.matched_entities.add(entity)
+
 class NLPAnalyzer:
     """
     Analyzes incoming Slack messages to identify intents and extract entities.
@@ -190,30 +232,27 @@ class NLPAnalyzer:
                 services = yaml.safe_load(f) or {}
                 
             self.lexicon = {}
-            for name, service in services.items():
-                # Add service name as intent
-                intent = service.get('intent', '').lower()
-                if intent:
-                    self.lexicon[intent] = {
-                        'service': name,
-                        'intent': intent,
-                        'required_entities': service.get('required_entities', []),
-                        'triggers': service.get('triggers', [])
-                    }
-                    
-                # Add triggers to lexicon
-                for trigger in service.get('triggers', []):
-                    self.lexicon[trigger.lower()] = {
-                        'service': name,
-                        'intent': intent,  # Store the actual intent
-                        'required_entities': service.get('required_entities', []),
-                        'triggers': service.get('triggers', [])
-                    }
+            # First pass: Create service entries
+            for service_id, service in services.items():
+                logger.debug(f"Loading service: {service_id}")
+                self.lexicon[service_id] = {
+                    'service': service_id,
+                    'intent': service.get('intent', '').lower(),
+                    'required_entities': service.get('required_entities', []),
+                    'optional_entities': service.get('optional_entities', []),
+                    'triggers': service.get('triggers', []),
+                    'description': service.get('description', '')
+                }
+                logger.debug(f"Service {service_id} loaded with {len(service.get('triggers', []))} triggers")
             
             await self.flow_logger.log_event(
                 "NLPAnalyzer",
                 "lexicon_refresh",
-                {"services_count": len(services), "triggers_count": sum(len(s.get('triggers', [])) for s in services.values())}
+                {
+                    "services_count": len(services),
+                    "services": list(self.lexicon.keys()),
+                    "triggers_count": sum(len(s.get('triggers', [])) for s in services.values())
+                }
             )
                     
         except Exception as e:
@@ -223,6 +262,91 @@ class NLPAnalyzer:
                 "lexicon_refresh_error",
                 {"error": str(e)}
             )
+    
+    def _score_services(self, message: str, entities: Dict[str, Any]) -> List[ServiceMatch]:
+        """
+        Score each service based on trigger matches and entities.
+        
+        Args:
+            message: The user's message
+            entities: Extracted entities from the message
+            
+        Returns:
+            List of ServiceMatch objects sorted by score
+        """
+        logger.debug(f"\n{'='*50}")
+        logger.debug(f"Starting service scoring for message: '{message}'")
+        logger.debug(f"Extracted entities: {entities}")
+        message_words = set(message.lower().split())
+        logger.debug(f"Message words: {message_words}")
+        service_matches: Dict[str, ServiceMatch] = {}
+        
+        # Initialize matches for each service
+        for service_id, service_def in self.lexicon.items():
+            logger.debug(f"\nScoring service: {service_id}")
+            logger.debug(f"Service triggers: {service_def.get('triggers', [])}")
+            logger.debug(f"Required entities: {service_def.get('required_entities', [])}")
+            service_matches[service_id] = ServiceMatch(
+                service_name=service_id,
+                service_def=service_def
+            )
+        
+        # Score trigger matches
+        logger.debug("\nScoring trigger matches:")
+        logger.debug("-" * 30)
+        for word in message_words:
+            logger.debug(f"\nChecking word: '{word}'")
+            for service_id, service_def in self.lexicon.items():
+                triggers = service_def.get('triggers', [])
+                logger.debug(f"Service {service_id} triggers: {triggers}")
+                for trigger in triggers:
+                    trigger_lower = trigger.lower()
+                    # Only match exact words, not partial matches
+                    if word == trigger_lower:
+                        logger.debug(f"✓ Exact match found: '{trigger}' for service '{service_id}'")
+                        service_matches[service_id].add_trigger_match(trigger)
+                    else:
+                        logger.debug(f"  ✗ No match: '{trigger}' vs '{word}'")
+        
+        # Log trigger match summary with simplified format
+        logger.debug("\nService Match Tallies:")
+        logger.debug("-" * 30)
+        for service_id, match in service_matches.items():
+            if match.matched_triggers:
+                logger.debug(f"\n{service_id}:")
+                logger.debug(f"  Total trigger words: {match.total_triggers}")
+                logger.debug(f"  Matched words tally: {match.trigger_count}")
+                logger.debug(f"  Matched triggers: {', '.join(match.matched_triggers)}")
+        
+        # Filter and sort matches
+        valid_matches = [
+            match for match in service_matches.values()
+            if match.trigger_count > 0  # Must have at least one trigger match
+        ]
+        
+        # Sort by:
+        # 1. Number of trigger matches (tallies) - highest first
+        # 2. Total trigger count - lowest first (for breaking ties)
+        sorted_matches = sorted(
+            valid_matches,
+            key=lambda m: (
+                m.trigger_count,
+                -m.total_triggers  # Negative because we want ascending order in case of tie
+            ),
+            reverse=True
+        )
+        
+        # Log final ranking
+        logger.debug("\nFinal Service Ranking:")
+        logger.debug("=" * 50)
+        for i, match in enumerate(sorted_matches, 1):
+            logger.debug(f"\n{i}. Service: {match.service_name}")
+            logger.debug(f"   Total trigger words: {match.total_triggers}")
+            logger.debug(f"   Matched words tally: {match.trigger_count}")
+            logger.debug(f"   Matched triggers: {', '.join(match.matched_triggers)}")
+        logger.debug("=" * 50)
+        
+        return sorted_matches
     
     async def analyze_message(self, message: str, user_info: Dict[str, Any], ticket: Optional[Ticket] = None) -> Ticket:
         """
@@ -236,7 +360,6 @@ class NLPAnalyzer:
         Returns:
             Ticket containing analysis results and history
         """
-        # Create new ticket or use existing
         current_ticket = ticket or Ticket(user_info=user_info, original_message=message)
         current_ticket.add_message(message, "user")
         
@@ -251,53 +374,28 @@ class NLPAnalyzer:
             current_ticket.add_error("Empty message", "validation_error")
             return current_ticket
             
-        # Clean and lowercase message for matching
-        clean_message = message.lower().strip()
-        
-        # Extract entities from the new message
-        new_entities = self._extract_entities(message)
-        
-        # Always update entities, even if no service is matched
-        current_ticket.entities.update(new_entities)
+        # Extract entities from the message
+        entities = self._extract_entities(message)
+        current_ticket.entities.update(entities)
         
         # If this is a follow-up message, merge with existing entities
-        if ticket and ticket.entities:
-            # Remove from missing_entities if we found them
-            current_ticket.missing_entities = [
-                entity for entity in current_ticket.missing_entities
-                if entity not in new_entities or not new_entities[entity]
-            ]
-            
-            # If we have all required entities, update status
-            if not current_ticket.missing_entities:
-                current_ticket.update_status(TicketStatus.EXECUTING)
+        if ticket and ticket.service:
+            if ticket.missing_entities:
+                # Remove from missing_entities if we found them
+                current_ticket.missing_entities = [
+                    entity for entity in current_ticket.missing_entities
+                    if entity not in entities or not entities[entity]
+                ]
+                
+                # If we have all required entities, update status
+                if not current_ticket.missing_entities:
+                    current_ticket.update_status(TicketStatus.EXECUTING)
             return current_ticket
             
-        # For new messages, try to match against lexicon
-        matched_service = None
-        matched_intent = None
-        required_entities = []
+        # Score services against the message
+        service_matches = self._score_services(message, entities)
         
-        # First try exact matches
-        for key, info in self.lexicon.items():
-            if key in clean_message:
-                matched_service = info['service']
-                matched_intent = info['intent']
-                required_entities = info['required_entities']
-                break
-                
-        # If no exact match, try fuzzy matching triggers
-        if not matched_service:
-            for key, info in self.lexicon.items():
-                key_words = set(key.split())
-                message_words = set(clean_message.split())
-                if key_words.issubset(message_words):
-                    matched_service = info['service']
-                    matched_intent = info['intent']
-                    required_entities = info['required_entities']
-                    break
-        
-        if not matched_service:
+        if not service_matches:
             current_ticket.update_status(TicketStatus.SERVICE_CREATION)
             await self.flow_logger.log_event(
                 "NLPAnalyzer",
@@ -306,13 +404,20 @@ class NLPAnalyzer:
             )
             return current_ticket
             
+        # Use the best match
+        best_match = service_matches[0]
+        service_def = best_match.service_def
+        
         # Update ticket with matched service
-        current_ticket.service = matched_service
-        current_ticket.intent = matched_intent
+        current_ticket.service = best_match.service_name
+        
+        # Set intent based on matched triggers from service definition
+        current_ticket.intent = next(iter(best_match.matched_triggers)) if best_match.matched_triggers else service_def.get('identifier')
+        current_ticket.entities['intent'] = current_ticket.intent
         
         # Check for missing required entities
         missing_entities = [
-            entity for entity in required_entities
+            entity for entity in service_def.get('required_entities', [])
             if entity not in current_ticket.entities or not current_ticket.entities[entity]
         ]
         
@@ -324,6 +429,7 @@ class NLPAnalyzer:
                 "incomplete_match",
                 {
                     "ticket_id": current_ticket.ticket_id,
+                    "service": best_match.service_name,
                     "missing_entities": missing_entities
                 }
             )
@@ -334,107 +440,102 @@ class NLPAnalyzer:
                 "successful_match",
                 {
                     "ticket_id": current_ticket.ticket_id,
-                    "service": matched_service,
-                    "intent": matched_intent
+                    "service": best_match.service_name,
+                    "matched_triggers": list(best_match.matched_triggers),
+                    "match_percentage": best_match.match_percentage
                 }
             )
             
         return current_ticket
     
     def _extract_entities(self, message: str) -> Dict[str, Any]:
-        """Extract entities from message."""
+        """Extract entities from the message."""
         entities = {}
         
-        # Extract time
+        # Time patterns
         time_patterns = [
-            r'\b(\d{1,2}(?::\d{2})?)\s*(?:am|pm|AM|PM)\b',
-            r'\b(\d{1,2}:\d{2})\b',
-            r'\b(morning|afternoon|evening|noon|midnight)\b',
-            r'\b(\d{1,2})\s*(?:am|pm|AM|PM)\b'  # Added pattern for "2pm" format
+            r'at\s+(\d{1,2}(?::\d{2})?)\s*(?:am|pm|AM|PM)',  # e.g., "at 3:30pm" or "at 3pm"
+            r'(\d{1,2}(?::\d{2})?)\s*(?:am|pm|AM|PM)',  # e.g., "3:30pm" or "3pm"
         ]
         
-        special_times = {
-            'morning': '09:00',
-            'afternoon': '14:00',
-            'evening': '18:00',
-            'noon': '12:00',
-            'midnight': '00:00'
-        }
-        
+        # Extract time
         for pattern in time_patterns:
-            match = re.search(pattern, message)  # Don't lowercase here
+            match = re.search(pattern, message.lower())
             if match:
                 time_str = match.group(1)
-                message_lower = message.lower()
-                
-                # Handle special time words
-                if time_str.lower() in special_times:
-                    time_str = special_times[time_str.lower()]
-                # Handle AM/PM times
-                elif "pm" in message_lower and ":" in time_str:
-                    hour, minute = map(int, time_str.split(":"))
-                    if hour < 12:
-                        hour += 12
-                    time_str = f"{hour:02d}:{minute:02d}"
-                elif "pm" in message_lower:
-                    hour = int(time_str)
-                    if hour < 12:
-                        hour += 12
-                    time_str = f"{hour:02d}:00"
-                elif ":" not in time_str and not any(word in time_str.lower() for word in special_times.keys()):
-                    # Handle AM times
-                    hour = int(time_str)
-                    if "am" in message_lower and hour == 12:
-                        hour = 0
-                    time_str = f"{hour:02d}:00"
-                
-                entities['time'] = time_str
-                break
-                
-        # Extract date
+                # Convert to 24-hour format
+                try:
+                    # Parse the time
+                    if ':' not in time_str:
+                        time_str += ':00'
+                    time_obj = datetime.strptime(time_str + ('am' if 'am' in message.lower() else 'pm'), '%I:%M%p')
+                    # Format as HH:mm
+                    entities['time'] = time_obj.strftime('%H:%M')
+                    break
+                except ValueError:
+                    continue
+
+        # Extract date using dateutil.parser
+        # First, try to find date-like patterns in the message
         date_patterns = [
-            r'\b(today|tomorrow|next week)\b',
-            r'\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',
-            r'\b(\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?))\b',
-            r'\b(tomorrow|next|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b',
-            r'\b(tonight|this morning|this afternoon|this evening)\b'  # Added pattern for time-based dates
+            # Common date formats
+            r'(?:on\s+)?(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?(?:\s*,?\s*\d{4})?',
+            r'(?:on\s+)?\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s*,?\s*\d{4})?',
+            r'(?:on\s+)?(?:this|next)?\s*(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)',
+            r'(?:on\s+)?today|tomorrow',
+            r'\d{4}-\d{2}-\d{2}'  # ISO format
         ]
-        
+
+        # Try to find a date in the message
+        date_str = None
         for pattern in date_patterns:
             match = re.search(pattern, message.lower())
             if match:
-                date_str = match.group(1)
-                if len(match.groups()) > 1 and match.group(2):
-                    date_str = f"{match.group(1)} {match.group(2)}"
-                # Convert time-based references to actual dates
-                if date_str in ['tonight', 'this evening']:
-                    date_str = 'today'
-                elif date_str in ['this morning', 'this afternoon']:
-                    date_str = 'today'
-                entities['date'] = date_str
+                date_str = match.group(0)
                 break
+
+        if date_str:
+            try:
+                # Clean up the date string
+                date_str = date_str.lower().replace('on ', '')
                 
-        # Extract location
-        location_patterns = [
-            r'\bin\s+([A-Z][a-zA-Z\s]*(?:Room|Hall|Office|Building|Floor)(?:\s+[A-Z])?)\b',
-            r'\bat\s+([A-Z][a-zA-Z\s]*(?:Room|Hall|Office|Building|Floor)(?:\s+[A-Z])?)\b',
-            r'\b(Room|Hall|Office|Building|Floor)\s+([A-Z][a-zA-Z0-9\s]*)\b'  # Added pattern for "Room 101" format
-        ]
+                # Handle relative dates
+                if date_str == 'today':
+                    date_obj = datetime.now()
+                elif date_str == 'tomorrow':
+                    date_obj = datetime.now() + timedelta(days=1)
+                elif any(day in date_str for day in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']):
+                    # Parse the weekday and calculate next occurrence
+                    date_obj = parser.parse(date_str)
+                    if date_obj.date() < datetime.now().date():
+                        date_obj += timedelta(days=7)
+                else:
+                    # Parse the date string
+                    date_obj = parser.parse(date_str, fuzzy=True)
+                    
+                    # If year is not specified, use current or next year
+                    if date_str.count(str(datetime.now().year)) == 0:
+                        if date_obj.date() < datetime.now().date():
+                            date_obj = date_obj.replace(year=datetime.now().year + 1)
+                        else:
+                            date_obj = date_obj.replace(year=datetime.now().year)
+                
+                # Format as YYYY-MM-DD
+                entities['date'] = date_obj.strftime('%Y-%m-%d')
+                logger.debug(f"Successfully parsed date: {date_str} -> {entities['date']}")
+            except (ValueError, parser.ParserError) as e:
+                logger.debug(f"Failed to parse date '{date_str}': {str(e)}")
+                
+        # Extract location (if present)
+        location_match = re.search(r'(?:at|in)\s+(.+?)(?:\s+(?:at|on|from|until|with)|$)', message)
+        if location_match:
+            entities['location'] = location_match.group(1).strip()
         
-        for pattern in location_patterns:
-            match = re.search(pattern, message)
-            if match:
-                entities['location'] = match.group(1)
-                break
-                
-        # Extract participants (names starting with capital letters, excluding location matches)
-        participant_pattern = r'\b(?:with\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b'  # Updated to handle "with John" format
-        participants = re.findall(participant_pattern, message)
-        if participants:
-            # Filter out location words and common words
-            location_words = {'Room', 'Hall', 'Office', 'Building', 'Floor', 'Conference', 'Schedule', 'Meeting'}
-            participants = [p for p in participants if p not in location_words]
-            if participants:
-                entities['participants'] = participants
-            
+        # Extract participants (if present)
+        participants_match = re.search(r'with\s+(.+?)(?:\s+(?:at|on|from|until|in)|$)', message)
+        if participants_match:
+            # Split and clean participant names
+            participants = [p.strip() for p in participants_match.group(1).split(',')]
+            entities['participants'] = participants
+        
         return entities 

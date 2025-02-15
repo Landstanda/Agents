@@ -1,0 +1,176 @@
+================================================================================
+Session Started: 01:37:11 PM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[01:37:11 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a meeting with gabi for 9 pm Feb 15th 2025"
+channel: "C08CF2DPMH8"
+ts: "1739569031.238569"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739569031.238569",
+  "client_msg_id": "aeb8b0c9-0cca-46a5-9689-c1d9f3895573",
+  "text": "<@U08CFAH1H1Q> schedule a meeting with gabi for 9 pm Feb 15th 2025",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "kMfqq",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a meeting with gabi for 9 pm Feb 15th 2025"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739569031.238569",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[01:37:11 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a meeting with gabi for 9 pm Feb 15th 2025"
+channel: "C08CF2DPMH8"
+ts: "1739569031.238569"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739569031.238569",
+  "client_msg_id": "aeb8b0c9-0cca-46a5-9689-c1d9f3895573",
+  "text": "<@U08CFAH1H1Q> schedule a meeting with gabi for 9 pm Feb 15th 2025",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "kMfqq",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a meeting with gabi for 9 pm Feb 15th 2025"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739569031.238569"
+}
+
+
+================================================================================
+[01:37:11 PM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_133711"
+message: "schedule a meeting with gabi for 9 pm Feb 15th 2025"
+
+
+================================================================================
+[01:37:11 PM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_133711"
+service: "schedule_meeting"
+intent: ""
+
+
+================================================================================
+[01:37:13 PM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a meeting with gabi for 9 pm Feb 15th 2025"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_133711"
+
+
+================================================================================
+[01:37:14 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I will send a message to the user regarding the scheduled meeting with Gabi for 9 pm on February 15th, 2025. Let me draft the message for you."
+channel: "C08CF2DPMH8"
+ts: "1739569033.697859"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739569033.697859",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I will send a message to the user regarding the scheduled meeting with Gabi for 9 pm on February 15th, 2025. Let me draft the message for you.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "4tzq",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I will send a message to the user regarding the scheduled meeting with Gabi for 9 pm on February 15th, 2025. Let me draft the message for you."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739569033.697859",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[01:37:14 PM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

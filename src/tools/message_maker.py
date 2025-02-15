@@ -50,10 +50,14 @@ class MessageMaker:
         - Professional but friendly
         - Focused on the current task
         - Free of technical jargon
-        - Formatted for Slack (can use basic markdown)
-        
-        You have access to the full context of the conversation and task execution.
-        Use this context to provide relevant and helpful responses.
+        - Only report on actions that were actually completed
+        - Do not suggest or imply actions that weren't taken
+
+        When reporting task completion:
+        - Be specific about what was done
+        - Don't mention actions that weren't performed
+        - Don't promise future actions
+        - If an error occurred, clearly state what went wrong
         """
     
     async def send_message(self, ticket: Ticket) -> None:
@@ -74,7 +78,7 @@ class MessageMaker:
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.7,
+                temperature=0.3,
                 max_tokens=150
             )
             

@@ -1,0 +1,145 @@
+================================================================================
+Session Started: 09:19:45 PM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[09:19:45 PM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 7
+services: [
+  "schedule_meeting",
+  "schedule_and_notify",
+  "share_document",
+  "create_task",
+  "extract_and_share",
+  "send_update",
+  "process_emails"
+]
+triggers_count: 42
+
+
+================================================================================
+[09:19:46 PM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[09:19:55 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+channel: "C08CF2DPMH8"
+ts: "1739596795.105569"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739596795.105569",
+  "client_msg_id": "76c9e0c9-b4e9-485e-97ba-ac7b78abe59d",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "QOlMZ",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for 1 pm on February 19th with Gabi & Lulu"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739596795.105569",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[09:19:56 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+channel: "C08CF2DPMH8"
+ts: "1739596795.105569"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739596795.105569",
+  "client_msg_id": "76c9e0c9-b4e9-485e-97ba-ac7b78abe59d",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "QOlMZ",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for 1 pm on February 19th with Gabi & Lulu"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739596795.105569"
+}
+
+
+================================================================================
+[09:19:56 PM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_211956"
+message: "schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+
+
+================================================================================
+[09:19:56 PM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_211956"
+service: "schedule_meeting"
+matched_triggers: [
+  "lunch",
+  "schedule"
+]
+match_percentage: 28.57142857142857
+
+
+================================================================================
+[09:19:57 PM] Agent - services_loaded
+--------------------------------------------------------------------------------
+services_count: 7
+
+
+================================================================================
+[09:19:58 PM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_211956"
+

@@ -52,29 +52,31 @@ Always maintain a helpful and solution-oriented attitude."""
         if len(history) > 11:
             history[1:] = history[-10:]
 
-    def generate_response(self, user_id: str, message: str) -> str:
-        """Generate a response using GPT"""
+    async def generate_response(self, template: str, context: Dict[str, Any]) -> str:
+        """Generate a response using GPT-3.5"""
         try:
-            # Add user message to history
-            self.add_to_history(user_id, "user", message)
+            # Format the prompt with context
+            prompt = template.format(**context)
             
-            # Get completion from GPT
-            completion = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",  # or "gpt-3.5-turbo" for a more economical option
-                messages=self.get_conversation_history(user_id),
-                max_tokens=500,
-                temperature=0.7
+            # Get response from GPT
+            response = await self.client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": self.system_prompt},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=150
             )
             
-            # Extract and store response
-            response = completion.choices[0].message.content
-            self.add_to_history(user_id, "assistant", response)
-            
-            return response
-            
+            if response.choices:
+                return response.choices[0].message.content.strip()
+            else:
+                raise ValueError("No response generated")
+                
         except Exception as e:
             logger.error(f"Error generating GPT response: {str(e)}")
-            return "❌ Sorry, I encountered an error while processing your request. Please try again."
+            raise
 
     def clear_history(self, user_id: str):
         """Clear conversation history for a user"""

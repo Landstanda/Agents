@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 from slack_bolt.async_app import AsyncApp
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.socket_mode.aiohttp import SocketModeClient
-from src.tools.nlp import NLPAnalyzer
+from src.tools.nlp import NLPAnalyzer, TicketStatus
 from src.tools.agent import Agent
 from src.tools.message_maker import MessageMaker
 from src.tools.service_maker import ServiceMaker
@@ -15,6 +15,7 @@ from slack_sdk.socket_mode.response import SocketModeResponse
 from datetime import datetime
 import traceback
 from dotenv import load_dotenv
+import signal
 
 # Load environment variables from .env file
 load_dotenv()
@@ -43,6 +44,7 @@ class OfficeAssistant:
         try:
             # Initialize flow logger first
             self.flow_logger = FlowLogger()
+            await self.flow_logger._setup_log_file()
             
             # Initialize NLP analyzer with flow logger
             self.nlp = await NLPAnalyzer.create(flow_logger=self.flow_logger)
@@ -66,23 +68,30 @@ class OfficeAssistant:
                 web_client=self.web_client
             )
             
-            # Register event handlers
-            self.socket_client.socket_mode_request_listeners.append(self.process_event)
+            # Register event handler
+            self.socket_client.socket_mode_request_listeners.append(self.handle_socket_mode_request)
             logger.info("Event handlers registered")
             
         except Exception as e:
             logger.error(f"Error during setup: {str(e)}")
             raise
             
-    async def process_event(self, client, req: SocketModeRequest):
-        """Process a Socket Mode request."""
+    async def handle_socket_mode_request(self, client: SocketModeClient, req: SocketModeRequest) -> None:
+        """Handle Socket Mode requests."""
         try:
-            # Extract event from request payload
-            event = req.payload.get("event", {})
-            
             # Acknowledge the request first
-            await self.socket_client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
+            await client.send_socket_mode_response(SocketModeResponse(envelope_id=req.envelope_id))
             
+            # Process the event if it exists
+            if req.payload and "event" in req.payload:
+                await self.process_event(req.payload["event"])
+                
+        except Exception as e:
+            logger.error(f"Error handling socket mode request: {str(e)}", exc_info=True)
+            
+    async def process_event(self, event: dict) -> None:
+        """Process a Slack event."""
+        try:
             # Log event details
             logger.info(f"Processing event: {event}")
             await self.flow_logger.log_event(
@@ -120,31 +129,10 @@ class OfficeAssistant:
                 )
                 return
 
-            # Only process app_mentions or direct messages
-            bot_mention = f"<@{self.bot_user_id}>"
-            is_bot_mentioned = bot_mention in event.get("text", "")
-            
-            if event.get("type") == "message" and not is_bot_mentioned:
-                # Skip regular messages that don't mention the bot
-                return
-            elif event.get("type") not in ["message", "app_mention"]:
-                # Skip other event types
+            # Only process app_mention events
+            if event.get("type") != "app_mention":
                 return
 
-            # Only process message events once (skip app_mention if we've seen the message)
-            if event.get("type") == "app_mention" and event.get("ts") in getattr(self, "_processed_messages", set()):
-                logger.info(f"Skipping duplicate app_mention event: {event.get('ts')}")
-                return
-                
-            # Track processed messages
-            if not hasattr(self, "_processed_messages"):
-                self._processed_messages = set()
-            self._processed_messages.add(event.get("ts"))
-            
-            # Keep set size manageable
-            if len(self._processed_messages) > 1000:
-                self._processed_messages = set(list(self._processed_messages)[-1000:])
-            
             message = event["text"]
             channel_id = event["channel"]
             user_info = {
@@ -155,6 +143,7 @@ class OfficeAssistant:
             }
             
             # Remove bot mention if present
+            bot_mention = f"<@{self.bot_user_id}>"
             if bot_mention in message:
                 message = message.replace(bot_mention, "").strip()
             
@@ -163,6 +152,19 @@ class OfficeAssistant:
             
             # Analyze the message
             ticket = await self.nlp.analyze_message(message, user_info)
+            
+            # Execute the service if one was matched
+            if ticket.status == TicketStatus.EXECUTING:
+                logger.debug(f"Executing service: {ticket.service}")
+                agent = Agent(flow_logger=self.flow_logger)
+                await agent.initialize()  # Initialize agent asynchronously
+                result = await agent.execute_service(ticket)
+                logger.debug(f"Service execution result: {result}")
+                
+                if result.get('status') == 'error':
+                    logger.error(f"Service execution failed: {result.get('error')}")
+                    ticket.update_status(TicketStatus.ERROR)
+                    ticket.add_error(result.get('error'), "execution_error")
             
             # Generate and send response
             await self.message_maker.send_message(ticket)
@@ -234,7 +236,10 @@ class OfficeAssistant:
                         "use_gpt": True
                     }
                 else:
-                    service_response = await self.agent.execute_service(nlp_result)
+                    # Initialize and set up agent
+                    agent = Agent(flow_logger=self.flow_logger)
+                    await agent.initialize()  # Initialize agent asynchronously
+                    service_response = await agent.execute_service(nlp_result)
                     response = {
                         "text": service_response.get("text", "Process the request and generate a friendly response"),
                         "params": service_response.get("params", {}),
@@ -256,9 +261,9 @@ class OfficeAssistant:
                         "params": {},
                         "use_gpt": True
                     }
-            elif nlp_result.get("status") == "unknown":
+            else:
                 response = {
-                    "text": "Inform the user that I don't understand their request and suggest using the help command",
+                    "text": "I'm not sure how to help with that request. Could you please rephrase it?",
                     "params": {},
                     "use_gpt": True
                 }
@@ -269,8 +274,7 @@ class OfficeAssistant:
                 "response_generation",
                 {
                     "original_message": message,
-                    "nlp_status": nlp_result.get("status"),
-                    "response_type": "direct" if nlp_result.get("status") == "matched" else "request_info",
+                    "response_type": nlp_result.get("status"),
                     "response": response
                 }
             )
@@ -279,24 +283,18 @@ class OfficeAssistant:
             
         except Exception as e:
             logger.error(f"Error processing message: {str(e)}")
-            error_response = {
-                "text": "Apologize to the user for encountering an error",
+            logger.error("Full exception details:", exc_info=True)
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "OfficeAssistant",
+                    "message_processing_error",
+                    {"error": str(e)}
+                )
+            return {
+                "text": "I encountered an error while processing your request. Please try again.",
                 "params": {},
                 "use_gpt": True
             }
-            
-            # Log error
-            await self.flow_logger.log_event(
-                "OfficeAssistant",
-                "processing_error",
-                {
-                    "error": str(e),
-                    "original_message": message,
-                    "response": error_response
-                }
-            )
-            
-            return error_response
             
     async def start(self):
         """Start the Socket Mode client."""
@@ -312,40 +310,80 @@ class OfficeAssistant:
             
     async def stop(self):
         """Stop the Socket Mode client."""
-        if self.socket_client:
-            await self.socket_client.close()
+        try:
+            if self.socket_client:
+                logger.info("Closing socket client...")
+                await self.socket_client.disconnect()
+                if hasattr(self.socket_client, 'client'):
+                    await self.socket_client.client.close()
+                self.socket_client = None
+            if self.web_client:
+                logger.info("Closing web client...")
+                await self.web_client.close()
+                self.web_client = None
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
             
 async def main():
-    """Main entry point."""
+    """Main entry point for the application."""
+    assistant = None
     try:
-        # Get tokens from environment variables
+        # Set up logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        
+        # Get environment variables
         slack_token = os.getenv("SLACK_BOT_TOKEN")
         app_token = os.getenv("SLACK_APP_TOKEN")
         
         if not slack_token or not app_token:
-            raise ValueError("Missing required environment variables SLACK_BOT_TOKEN or SLACK_APP_TOKEN")
+            raise ValueError("Missing required environment variables")
+            
+        # Initialize the assistant
+        assistant = OfficeAssistant(slack_token, app_token)
+        await assistant.setup()
         
-        assistant = OfficeAssistant(slack_token=slack_token, app_token=app_token)
-        await assistant.start()
-    except KeyboardInterrupt:
-        logger.info("Shutting down gracefully...")
+        # Start the socket mode client
+        await assistant.socket_client.connect()
+        logger.info("Socket Mode client connected")
+        
+        # Create an event to handle shutdown
+        shutdown_event = asyncio.Event()
+        
+        def signal_handler():
+            logger.info("Received shutdown signal")
+            shutdown_event.set()
+            
+        # Register signal handlers
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            asyncio.get_running_loop().add_signal_handler(sig, signal_handler)
+            
+        # Keep the program running until shutdown event
+        try:
+            await shutdown_event.wait()
+        except asyncio.CancelledError:
+            pass
+            
     except Exception as e:
-        logger.error(f"Error starting application: {str(e)}")
-        raise
+        logger.error(f"Application error: {str(e)}")
+        logger.error("Full exception details:", exc_info=True)
     finally:
-        # Keep the event loop running
-        while True:
-            try:
-                await asyncio.sleep(1)
-            except KeyboardInterrupt:
-                break
+        # Clean up signal handlers
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            asyncio.get_running_loop().remove_signal_handler(sig)
+            
+        if assistant:
+            logger.info("Cleaning up resources...")
+            await assistant.stop()
+            logger.info("Cleanup complete")
 
 if __name__ == "__main__":
-    # Set up logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
-    # Run the application
-    asyncio.run(main()) 
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Application stopped by user")
+    except Exception as e:
+        logger.error(f"Startup error: {e}")
+        raise 

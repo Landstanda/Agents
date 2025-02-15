@@ -1,0 +1,208 @@
+================================================================================
+Session Started: 07:19:34 PM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[07:19:35 PM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 7
+services: [
+  "schedule_meeting",
+  "schedule_and_notify",
+  "share_document",
+  "create_task",
+  "extract_and_share",
+  "send_update",
+  "process_emails"
+]
+triggers_count: 44
+
+
+================================================================================
+[07:19:35 PM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[07:19:54 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a meeting with Gabi for 9 pm Feb 16th 2025"
+channel: "C08CF2DPMH8"
+ts: "1739589593.705479"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739589593.705479",
+  "client_msg_id": "c8325a16-262a-4ce5-aaba-5c0c61ce6caf",
+  "text": "<@U08CFAH1H1Q> schedule a meeting with Gabi for 9 pm Feb 16th 2025",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "pgO9H",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a meeting with Gabi for 9 pm Feb 16th 2025"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739589593.705479",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[07:19:54 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a meeting with Gabi for 9 pm Feb 16th 2025"
+channel: "C08CF2DPMH8"
+ts: "1739589593.705479"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739589593.705479",
+  "client_msg_id": "c8325a16-262a-4ce5-aaba-5c0c61ce6caf",
+  "text": "<@U08CFAH1H1Q> schedule a meeting with Gabi for 9 pm Feb 16th 2025",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "pgO9H",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a meeting with Gabi for 9 pm Feb 16th 2025"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739589593.705479"
+}
+
+
+================================================================================
+[07:19:54 PM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_191954"
+message: "schedule a meeting with Gabi for 9 pm Feb 16th 2025"
+
+
+================================================================================
+[07:19:54 PM] NLPAnalyzer - successful_match
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_191954"
+service: "schedule_and_notify"
+matched_triggers: [
+  "email",
+  "alert",
+  "meeting",
+  "appointment",
+  "schedule",
+  "plan",
+  "call",
+  "arrange"
+]
+match_percentage: 61.53846153846154
+
+
+================================================================================
+[07:19:55 PM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a meeting with Gabi for 9 pm Feb 16th 2025"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_191954"
+
+
+================================================================================
+[07:19:56 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I have scheduled a meeting with Gabi for 9 pm on February 16th, 2025."
+channel: "C08CF2DPMH8"
+ts: "1739589595.893949"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739589595.893949",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I have scheduled a meeting with Gabi for 9 pm on February 16th, 2025.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "rpC",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I have scheduled a meeting with Gabi for 9 pm on February 16th, 2025."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739589595.893949",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[07:19:56 PM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

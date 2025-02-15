@@ -4,6 +4,7 @@ from typing import Optional, Dict
 import json
 from dotenv import load_dotenv
 import logging
+import aiofiles
 
 logger = logging.getLogger(__name__)
 
@@ -36,12 +37,12 @@ class CredentialManager:
         """Get the path for a specific service's token file"""
         return os.path.join(self.token_dir, f"{service_name}_token.pickle")
     
-    def validate_credentials_file(self) -> bool:
+    async def validate_credentials_file(self) -> bool:
         """Validate the credentials file format and content"""
         try:
             creds_path = self.get_credentials_path()
-            with open(creds_path, 'r') as f:
-                creds_data = json.load(f)
+            async with aiofiles.open(creds_path, 'r') as f:
+                creds_data = json.loads(await f.read())
                 
             required_fields = ['client_id', 'client_secret', 'auth_uri', 'token_uri']
             return all(field in creds_data.get('installed', {}) for field in required_fields)
@@ -53,20 +54,20 @@ class CredentialManager:
             logger.error(f"Error validating credentials: {str(e)}")
             return False
     
-    def secure_token_storage(self, token_data: bytes, service_name: str) -> None:
+    async def secure_token_storage(self, token_data: bytes, service_name: str) -> None:
         """Securely store token data"""
         token_path = self.get_token_path(service_name)
         
         # Write with secure permissions
-        with open(token_path, 'wb') as f:
+        async with aiofiles.open(token_path, 'wb') as f:
             os.chmod(token_path, 0o600)  # Read/write for owner only
-            f.write(token_data)
+            await f.write(token_data)
             
-    def load_token(self, service_name: str) -> Optional[bytes]:
+    async def load_token(self, service_name: str) -> Optional[bytes]:
         """Load token data if it exists"""
         token_path = self.get_token_path(service_name)
         
         if os.path.exists(token_path):
-            with open(token_path, 'rb') as f:
-                return f.read()
+            async with aiofiles.open(token_path, 'rb') as f:
+                return await f.read()
         return None 

@@ -1,0 +1,82 @@
+================================================================================
+Session Started: 09:28:00 PM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[09:28:00 PM] Agent - services_loaded
+--------------------------------------------------------------------------------
+services_count: 7
+
+
+================================================================================
+[09:28:02 PM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a lunch for 1 pm on February 19th with Gabi &amp; Lulu"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_212759"
+
+
+================================================================================
+[09:28:03 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I encountered an error while trying to schedule the lunch for 1 pm on February 19th with Gabi &amp; Lulu. The required tool 'google_auth' was not found, which prevented me from completing the task. If you can provide the necessary authentication tool, I'll be able to proceed with scheduling the lunch. Thank you for your understanding."
+channel: "C08CF2DPMH8"
+ts: "1739597282.679239"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739597282.679239",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I encountered an error while trying to schedule the lunch for 1 pm on February 19th with Gabi &amp; Lulu. The required tool 'google_auth' was not found, which prevented me from completing the task. If you can provide the necessary authentication tool, I'll be able to proceed with scheduling the lunch. Thank you for your understanding.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "ias23",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I encountered an error while trying to schedule the lunch for 1 pm on February 19th with Gabi & Lulu. The required tool 'google_auth' was not found, which prevented me from completing the task. If you can provide the necessary authentication tool, I'll be able to proceed with scheduling the lunch. Thank you for your understanding."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739597282.679239",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[09:28:03 PM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

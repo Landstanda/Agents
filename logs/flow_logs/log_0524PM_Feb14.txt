@@ -1,0 +1,211 @@
+================================================================================
+Session Started: 05:24:24 PM Feb 14, 2025
+================================================================================
+
+
+================================================================================
+[05:24:24 PM] NLPAnalyzer - lexicon_refresh
+--------------------------------------------------------------------------------
+services_count: 6
+triggers_count: 29
+
+
+================================================================================
+[05:24:25 PM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[05:24:31 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th"
+channel: "C08CF2DPMH8"
+ts: "1739582671.191749"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1739582671.191749",
+  "client_msg_id": "f2f1665e-bde6-44ac-97cd-ed9cc128eef8",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "cp7UY",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for 1 pm on February 19th"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739582671.191749",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[05:24:31 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th"
+channel: "C08CF2DPMH8"
+ts: "1739582671.191749"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1739582671.191749",
+  "client_msg_id": "f2f1665e-bde6-44ac-97cd-ed9cc128eef8",
+  "text": "<@U08CFAH1H1Q> schedule a lunch for 1 pm on February 19th",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "cp7UY",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " schedule a lunch for 1 pm on February 19th"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739582671.191749"
+}
+
+
+================================================================================
+[05:24:31 PM] NLPAnalyzer - message_received
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_172431"
+message: "schedule a lunch for 1 pm on February 19th"
+
+
+================================================================================
+[05:24:31 PM] NLPAnalyzer - no_match_found
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250214_172431"
+
+
+================================================================================
+[05:24:33 PM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "schedule a lunch for 1 pm on February 19th"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250214_172431"
+
+
+================================================================================
+[05:24:34 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: ":star2: **Exciting News! New Service Alert!** :star2:\n\nWe are thrilled to announce a new service that has just been created. Stay tuned for more details and how it can enhance your experience. Keep an eye out for updates! :rocket::sparkles:"
+channel: "C08CF2DPMH8"
+ts: "1739582673.675459"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1739582673.675459",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": ":star2: **Exciting News! New Service Alert!** :star2:\n\nWe are thrilled to announce a new service that has just been created. Stay tuned for more details and how it can enhance your experience. Keep an eye out for updates! :rocket::sparkles:",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "M9y7",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "emoji",
+              "name": "star2",
+              "unicode": "1f31f"
+            },
+            {
+              "type": "text",
+              "text": " **Exciting News! New Service Alert!** "
+            },
+            {
+              "type": "emoji",
+              "name": "star2",
+              "unicode": "1f31f"
+            },
+            {
+              "type": "text",
+              "text": "\n\nWe are thrilled to announce a new service that has just been created. Stay tuned for more details and how it can enhance your experience. Keep an eye out for updates! "
+            },
+            {
+              "type": "emoji",
+              "name": "rocket",
+              "unicode": "1f680"
+            },
+            {
+              "type": "emoji",
+              "name": "sparkles",
+              "unicode": "2728"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1739582673.675459",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[05:24:34 PM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

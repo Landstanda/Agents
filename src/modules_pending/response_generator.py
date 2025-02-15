@@ -13,7 +13,7 @@ class ResponseGeneratorModule(BaseModule):
     def __init__(self):
         self.gpt = GPTHandler()
         
-    def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Execute response generation operations"""
         try:
             operation = params.get('operation')
@@ -21,15 +21,48 @@ class ResponseGeneratorModule(BaseModule):
                 raise ValueError("No operation specified")
                 
             if operation == 'response_generate':
-                return self._generate_response(params)
+                return await self._generate_response(params)
             elif operation == 'review_response':
-                return self._review_response(params)
+                return await self._review_response(params)
             else:
                 raise ValueError(f"Unknown operation: {operation}")
                 
         except Exception as e:
             logger.error(f"Response generation error: {str(e)}")
-            raise
+            return {
+                'success': False,
+                'error': str(e)
+            }
+            
+    async def _generate_response(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate an appropriate email response"""
+        try:
+            # Extract required parameters
+            message_type = params.get('message_type')
+            context = params.get('context', {})
+            
+            if not message_type:
+                raise ValueError("Message type required")
+                
+            # Get response template based on message type
+            template = self._get_template(message_type)
+            if not template:
+                raise ValueError(f"No template found for message type: {message_type}")
+                
+            # Generate response using GPT
+            response = await self.gpt.generate_response(template, context)
+            
+            return {
+                'success': True,
+                'response': response
+            }
+            
+        except Exception as e:
+            logger.error(f"Error generating response: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
             
     def _generate_response(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Generate an appropriate email response"""
@@ -96,7 +129,7 @@ Format the response as JSON with this structure:
                 }
             }
             
-    def _review_response(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _review_response(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Review and suggest improvements for a draft response"""
         draft_response = params.get('draft_response')
         original_email = params.get('original_email')
