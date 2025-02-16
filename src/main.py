@@ -5,10 +5,10 @@ from typing import Dict, Any, Optional
 from slack_bolt.async_app import AsyncApp
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.socket_mode.aiohttp import SocketModeClient
-from src.tools.nlp import NLPAnalyzer, TicketStatus
+from src.models import Ticket, TicketStatus
 from src.tools.agent import Agent
 from src.tools.message_maker import MessageMaker
-from src.tools.service_maker import ServiceMaker
+from src.tools.service_analyzer import ServiceAnalyzer
 from src.utils.flow_logger import FlowLogger
 from slack_sdk.socket_mode.request import SocketModeRequest
 from slack_sdk.socket_mode.response import SocketModeResponse
@@ -34,7 +34,7 @@ class OfficeAssistant:
         self.app_token = app_token
         self.web_client = AsyncWebClient(token=slack_token)
         self.socket_client = None
-        self.nlp = None
+        self.service_analyzer = None
         self.message_maker = None
         self.flow_logger = None
         self.bot_user_id = None
@@ -46,8 +46,8 @@ class OfficeAssistant:
             self.flow_logger = FlowLogger()
             await self.flow_logger._setup_log_file()
             
-            # Initialize NLP analyzer with flow logger
-            self.nlp = await NLPAnalyzer.create(flow_logger=self.flow_logger)
+            # Initialize service analyzer with flow logger
+            self.service_analyzer = ServiceAnalyzer(flow_logger=self.flow_logger)
             
             # Initialize message maker with the slack token
             self.message_maker = MessageMaker(flow_logger=self.flow_logger, slack_token=self.slack_token)
@@ -112,8 +112,8 @@ class OfficeAssistant:
             if (
                 "text" not in event or
                 event.get("subtype") is not None or
-                event.get("bot_id") is not None or  # Skip bot messages
-                event.get("user") == self.bot_user_id  # Skip own messages
+                event.get("bot_id") is not None or
+                event.get("user") == self.bot_user_id
             ):
                 logger.info(f"Skipping event: has_text={'text' in event}, subtype={event.get('subtype')}, bot_id={event.get('bot_id')}")
                 await self.flow_logger.log_event(
@@ -150,21 +150,32 @@ class OfficeAssistant:
             logger.info(f"Processing message: {message}")
             logger.info(f"Channel ID: {channel_id}")
             
-            # Analyze the message
-            ticket = await self.nlp.analyze_message(message, user_info)
+            # Create ticket
+            ticket = Ticket(
+                user_info=user_info,
+                original_message=message,
+                channel_id=channel_id,
+                thread_ts=event.get("thread_ts")
+            )
             
-            # Execute the service if one was matched
+            # Analyze the request using service analyzer
+            ticket = await self.service_analyzer.analyze_request(ticket)
+            
+            # Execute the service if one was matched and all inputs are available
             if ticket.status == TicketStatus.EXECUTING:
-                logger.debug(f"Executing service: {ticket.service}")
+                logger.debug(f"Executing service plan: {ticket.execution_plan}")
                 agent = Agent(flow_logger=self.flow_logger)
-                await agent.initialize()  # Initialize agent asynchronously
-                result = await agent.execute_service(ticket)
-                logger.debug(f"Service execution result: {result}")
+                await agent.initialize()
                 
-                if result.get('status') == 'error':
-                    logger.error(f"Service execution failed: {result.get('error')}")
-                    ticket.update_status(TicketStatus.ERROR)
-                    ticket.add_error(result.get('error'), "execution_error")
+                # Execute each service in the plan
+                for step in ticket.execution_plan:
+                    result = await agent.execute_service(ticket)
+                    if result.get('status') == 'error':
+                        logger.error(f"Service execution failed: {result.get('error')}")
+                        ticket.update_status(TicketStatus.ERROR)
+                        ticket.add_error(result.get('error'), "execution_error")
+                        break
+                    ticket.execution_results.append(result)
             
             # Generate and send response
             await self.message_maker.send_message(ticket)
@@ -213,22 +224,22 @@ class OfficeAssistant:
             if bot_mention in message:
                 message = message.replace(bot_mention, "").strip()
             
-            # Process with NLP
-            nlp_result = await self.nlp.analyze_message(message, {"user_id": bot_user_id})
+            # Process with service analyzer
+            ticket = await self.service_analyzer.analyze_message(message, {"user_id": bot_user_id})
             
-            # Log NLP processing result
+            # Log service analyzer processing result
             await self.flow_logger.log_event(
                 "OfficeAssistant",
                 "message_analysis",
-                {"nlp_result": nlp_result}
+                {"ticket": ticket}
             )
             
             response = None
             
-            # Handle different NLP result statuses
-            if nlp_result.get("status") == "matched":
+            # Handle different ticket statuses
+            if ticket.status == TicketStatus.EXECUTING:
                 # Get the service
-                service_name = nlp_result.get("service")
+                service_name = ticket.service
                 if service_name == "help":
                     response = {
                         "text": "Show me what commands and capabilities are available",
@@ -238,16 +249,16 @@ class OfficeAssistant:
                 else:
                     # Initialize and set up agent
                     agent = Agent(flow_logger=self.flow_logger)
-                    await agent.initialize()  # Initialize agent asynchronously
-                    service_response = await agent.execute_service(nlp_result)
+                    await agent.initialize()
+                    service_response = await agent.execute_service(ticket)
                     response = {
                         "text": service_response.get("text", "Process the request and generate a friendly response"),
                         "params": service_response.get("params", {}),
                         "use_gpt": True
                     }
-            elif nlp_result.get("status") == "incomplete":
+            elif ticket.status == TicketStatus.INCOMPLETE:
                 # Format missing entities into a friendly request
-                missing = nlp_result.get("missing_entities", [])
+                missing = ticket.missing_entities
                 if missing:
                     missing_str = ", ".join(missing)
                     response = {
@@ -274,7 +285,7 @@ class OfficeAssistant:
                 "response_generation",
                 {
                     "original_message": message,
-                    "response_type": nlp_result.get("status"),
+                    "response_type": ticket.status,
                     "response": response
                 }
             )

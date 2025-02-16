@@ -3,7 +3,7 @@ import logging
 import os
 from openai import AsyncOpenAI
 from slack_sdk.web.async_client import AsyncWebClient
-from src.tools.nlp import Ticket, TicketStatus
+from src.models import Ticket, TicketStatus
 from src.utils.flow_logger import FlowLogger
 
 logger = logging.getLogger(__name__)

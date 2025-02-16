@@ -6,7 +6,7 @@ import importlib
 import inspect
 from src.utils.flow_logger import FlowLogger
 import re
-from src.tools.nlp import Ticket, TicketStatus
+from src.models import Ticket, TicketStatus
 from src.core.module_interface import BaseModule
 from datetime import datetime
 
@@ -18,7 +18,7 @@ class Agent:
     Follows service instructions to complete tasks.
     """
     
-    def __init__(self, services_path: str = "src/services/services.yaml",
+    def __init__(self, services_path: str = "src/services/service_definitions.yaml",
                  tools_path: str = "src/tools",
                  modules_path: str = "src/modules",
                  flow_logger: Optional[FlowLogger] = None):

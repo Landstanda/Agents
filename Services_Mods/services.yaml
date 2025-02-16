@@ -1,0 +1,129 @@
+# Core Business Services
+
+schedule_meeting:
+  name: "Schedule Meeting"
+  description: "Schedule a meeting with specified participants. Can handle both in-person and virtual meetings, with optional participant invitations."
+  
+  examples:
+    - "Schedule a team meeting tomorrow at 3pm"
+    - "Book a lunch with John on Friday at the cafe"
+    - "Set up a virtual call with marketing team next week"
+    - "Arrange a 1-hour meeting with the dev team at 2pm"
+  
+  required_entities:
+    - time
+    - date
+  
+  optional_entities:
+    - location
+    - participants
+    - duration
+    - description
+  
+  steps:
+    - name: "Authenticate"
+      tool: google_auth
+      action: execute
+      params: {}
+      on_success:
+        - condition: "response.get('success')"
+          next_step: create_event
+      on_error:
+        - action: "retry"
+          max_attempts: 3
+    
+    - name: "Create Event"
+      tool: google_calendar
+      id: create_event
+      action: execute
+      params:
+        operation: "create_event"
+        summary: "{event_type} Meeting"
+        description: "Scheduled via AI Secretary"
+        start_time: "{date}T{time}:00"
+        end_time: "{date}T{time[:2]}:{str(int(time[3:5]) + 60 if ':' in time else '00')}:00"
+        timezone: "America/Los_Angeles"
+        location: "{location if location else 'Virtual Meeting'}"
+        attendees: "{participants if participants else []}"
+      on_success:
+        - condition: "response.get('success') and response.get('event_id')"
+          next_step: complete
+      on_error:
+        - condition: "error.get('type') == 'time_conflict'"
+          action: "suggest_alternative"
+        - condition: "error.get('type') == 'auth_error'"
+          action: "retry"
+          next_step: "authenticate"
+        - action: "notify_error"
+  
+  success_criteria:
+    - "response.get('success')"
+    - "response.get('event_id')"
+  
+  error_handling:
+    time_conflict:
+      message: "There is a scheduling conflict at {time}"
+      action: "suggest_alternative"
+    creation_error:
+      message: "Failed to create event: {error}"
+      action: "retry"
+
+check_emails:
+  name: "Check New Emails"
+  description: "Check for new unread emails in Gmail inbox. Can filter by importance, sender, or show a specific number of recent emails."
+  
+  examples:
+    - "Check my new emails"
+    - "Show me my latest unread messages"
+    - "Get my last 5 emails"
+    - "Check for important emails"
+  
+  required_entities: []  # No required entities
+  
+  optional_entities:
+    - max_emails
+    - importance
+    - sender
+  
+  steps:
+    - name: "Authenticate Google"
+      tool: google_auth
+      action: execute
+      params: {}
+      on_success:
+        - condition: "response.get('success')"
+          next_step: fetch_emails
+      on_error:
+        - action: "retry"
+          max_attempts: 3
+    
+    - name: "Fetch Recent Emails"
+      id: fetch_emails
+      tool: email_reader
+      action: execute
+      params:
+        operation: "get_recent_emails"
+        max_emails: "{max_emails if max_emails else 1}"
+        unread_only: true
+        importance: "{importance if importance else None}"
+        sender: "{sender if sender else None}"
+      on_success:
+        - condition: "response.get('success') and response.get('emails')"
+          next_step: complete
+      on_error:
+        - condition: "error.get('type') == 'auth_error'"
+          action: "retry"
+          next_step: "authenticate"
+        - action: "notify_error"
+  
+  success_criteria:
+    - "response.get('success')"
+    - "response.get('emails')"
+  
+  error_handling:
+    auth_error:
+      message: "Failed to authenticate with Google: {error}"
+      action: "retry"
+    fetch_error:
+      message: "Failed to fetch emails: {error}"
+      action: "notify_error"
