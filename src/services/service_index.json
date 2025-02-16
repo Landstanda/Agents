@@ -1,0 +1,102 @@
+{
+    "schedule_meeting": {
+        "name": "Schedule Meeting",
+        "description": "Schedule an event in the calendar.",
+        "examples": [
+            "Schedule a team meeting tomorrow at 3pm",
+            "Book a date with Gabi Friday at eight at the Italian restaurant",
+            "Plan on a lunch with Todd at noon on the 17th",
+            "Arrange a 1-hour meeting with the dev team at 2pm on March 4th"
+        ],
+        "combination_examples": [
+            {
+                "request": "Email the team about our meeting next week",
+                "services": [
+                    {
+                        "schedule_meeting": "Create the calendar event"
+                    },
+                    {
+                        "check_emails": "Get team email addresses"
+                    },
+                    {
+                        "send_email": "Send meeting invitation"
+                    }
+                ]
+            },
+            {
+                "request": "Set up a meeting and prepare an agenda",
+                "services": [
+                    {
+                        "schedule_meeting": "Book the time slot"
+                    },
+                    {
+                        "create_document": "Create agenda document"
+                    },
+                    {
+                        "share_file": "Share agenda with attendees"
+                    }
+                ]
+            }
+        ],
+        "required_entities": [
+            "time",
+            "date"
+        ],
+        "optional_entities": [
+            "location",
+            "participants",
+            "duration",
+            "description"
+        ],
+        "outputs": [
+            "Calendar event created",
+            "Event ID for reference"
+        ]
+    },
+    "check_emails": {
+        "name": "Check New Emails",
+        "description": "Check for new unread emails and returns sender & subject.",
+        "examples": [
+            "Check my email",
+            "Show me my latest emails",
+            "Do I have any new emails?"
+        ],
+        "combination_examples": [
+            {
+                "request": "Check if I got a response from John about the meeting",
+                "services": [
+                    {
+                        "check_emails": "Search for emails from John"
+                    },
+                    {
+                        "analyze_content": "Check if email mentions meeting"
+                    }
+                ]
+            },
+            {
+                "request": "Forward any urgent emails to my phone",
+                "services": [
+                    {
+                        "check_emails": "Get new emails"
+                    },
+                    {
+                        "analyze_importance": "Filter urgent ones"
+                    },
+                    {
+                        "send_notification": "Forward to phone"
+                    }
+                ]
+            }
+        ],
+        "required_entities": [],
+        "optional_entities": [
+            "max_emails",
+            "importance",
+            "sender"
+        ],
+        "outputs": [
+            "List of unread emails",
+            "Email summaries"
+        ]
+    }
+} 

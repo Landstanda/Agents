@@ -43,55 +43,102 @@ The system consists of core components that work together to process and execute
 
 ### Service File Structure
 
-The system uses two separate YAML files for service definitions:
+The system uses two main files for service definitions:
 
-1. **Service Index** (`service_index.yaml`):
+1. **Service Index** (`src/services/service_index.json`):
    - Used by GPT for understanding and breaking down user requests
    - Contains high-level service information and examples
+   - Example format:
+```json
+{
+    "service_name": {
+        "name": "Human-Readable Name",
+        "description": "Detailed description of what the service does",
+        "examples": [
+            "Example request 1",
+            "Example request 2"
+        ],
+        "combination_examples": [
+            {
+                "request": "Complex request example",
+                "services": [
+                    {
+                        "service1": "Why this service is needed"
+                    },
+                    {
+                        "service2": "Purpose in this combination"
+                    }
+                ]
+            }
+        ],
+        "required_entities": [
+            "entity1",
+            "entity2"
+        ],
+        "optional_entities": [
+            "optional1",
+            "optional2"
+        ],
+        "outputs": [
+            "Output 1 description",
+            "Output 2 description"
+        ]
+    }
+}
+```
+
+2. **Service Definitions** (`src/services/service_definitions.yaml`):
+   - Used by Agent for executing services
+   - Contains technical implementation details and error handling
    - Example format:
 ```yaml
 service_name:
   name: "Human-Readable Name"
-  description: "Detailed description of what the service does"
-  examples:
-    - "Example request 1"
-    - "Example request 2"
-  combination_examples:
-    - request: "Complex request example"
-      services:
-        - service1: "Why this service is needed"
-        - service2: "Purpose in this combination"
   required_entities:
     - entity1
     - entity2
   optional_entities:
     - optional1
     - optional2
-  outputs:
-    - "Output 1 description"
-    - "Output 2 description"
-```
-
-2. **Service Definitions** (`service_definitions.yaml`):
-   - Used by Agent for executing services
-   - Contains technical implementation details and error handling
-   - Example format:
-```yaml
-service_name:
-  implementation:
-    type: "python_function"
-    module: "path.to.module"
-    function: "function_name"
-  parameters:
-    - name: "param1"
-      type: "string"
-      description: "Parameter description"
+  steps:
+    - name: "Step Name"
+      tool: tool_name
+      action: execute
+      params: {}
+      on_success:
+        - condition: "response.get('success')"
+          next_step: next_step_id
+      on_error:
+        - action: "retry"
+          max_attempts: 3
+    - name: "Another Step"
+      tool: another_tool
+      id: next_step_id
+      action: execute
+      params:
+        operation: "specific_operation"
+        param1: "{entity1}"
+        param2: "{entity2 if entity2 else default_value}"
+      on_success:
+        - condition: "response.get('success') and response.get('result_id')"
+          next_step: complete
+      on_error:
+        - condition: "error.get('type') == 'specific_error'"
+          action: "specific_action"
+        - condition: "error.get('type') == 'auth_error'"
+          action: "retry"
+          next_step: "authenticate"
+        - action: "notify_error"
+  success_criteria:
+    - "response.get('success')"
+    - "response.get('result_id')"
   error_handling:
-    retry_count: 3
-    fallback: "alternative_service"
-  constraints:
-    rate_limit: "10/minute"
-    timeout: 30
+    specific_error:
+      message: "Specific error occurred: {error}"
+      action: "specific_action"
+    general_error:
+      message: "Failed to execute: {error}"
+      action: "retry"
 ```
 
 ### Core Components
@@ -222,3 +269,5 @@ Current implementation limitations:
    - No parameter passing between steps
    - No dynamic parameter interpolation
    - Simple required/optional parameter validation
+
+### Adding a New Service

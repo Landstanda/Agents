@@ -17,7 +17,7 @@ class ServiceAnalyzer:
     """
     
     def __init__(self, 
-                 services_path: str = "src/services/service_index.yaml",
+                 services_path: str = "src/services/service_index.json",
                  flow_logger: Optional[FlowLogger] = None):
         """Initialize the service analyzer."""
         self.services_path = Path(services_path)
@@ -84,23 +84,13 @@ Return ONLY valid JSON matching this schema."""
                 raise FileNotFoundError(f"Services file not found: {self.services_path}")
                 
             with open(self.services_path, 'r') as f:
-                services = yaml.safe_load(f) or {}
+                services = json.load(f)
                 
             # Convert to a more GPT-friendly format
             schema = {
                 "version": "1.0",
-                "services": {}
+                "services": services
             }
-            
-            for service_id, service in services.items():
-                schema["services"][service_id] = {
-                    "name": service.get("name", service_id),
-                    "description": service.get("description", ""),
-                    "required_inputs": service.get("required_entities", []),
-                    "optional_inputs": service.get("optional_entities", []),
-                    "constraints": service.get("constraints", []),
-                    "examples": service.get("examples", []),
-                }
             
             return schema
             
