@@ -1,0 +1,216 @@
+{
+    "version": "1.0",
+    "categories": {
+        "urgent_response": {
+            "name": "Urgent Response Required",
+            "description": "Emails that need immediate attention or response",
+            "criteria": [
+                "Emergency situations",
+                "Publicity opportunities",
+                "Influencer outreach"
+            ],
+            "examples": [
+                "Server down notification from IT",
+                "Customer complaint about defective product",
+                "Meeting reschedule request for today",
+                "Urgent project deadline update"
+            ],
+            "actions": [
+                "flag_as_important",
+                "mark_for_immediate_response",
+                "notify_user",
+                "auto_respond_if_template_exists"
+            ],
+            "folder": "Urgent"
+        },
+        "customer_inquiry": {
+            "name": "Customer Inquiries",
+            "description": "Product, service, or general customer questions",
+            "criteria": [
+                "Product availability questions",
+                "Pricing inquiries",
+                "Service information requests",
+                "General product questions"
+            ],
+            "examples": [
+                "Question about product features",
+                "Request for pricing information",
+                "Shipping time inquiry",
+                "Product compatibility question"
+            ],
+            "actions": [
+                "auto_respond_if_standard",
+                "categorize_by_product"
+            ],
+            "folder": "Customer Support"
+        },
+        "sales_opportunity": {
+            "name": "Sales Opportunities",
+            "description": "Potential sales or business opportunities",
+            "criteria": [
+                "Interest in bulk purchases",
+                "Partnership proposals",
+                "Quote requests",
+                "Sales inquiries"
+            ],
+            "examples": [
+                "Request for bulk pricing",
+                "Interest in reseller program",
+                "Custom solution inquiry",
+                "Enterprise license question"
+            ],
+            "actions": [
+                "flag_as_important",
+                "route_to_sales_team",
+                "add_to_crm"
+            ],
+            "folder": "Sales Leads"
+        },
+        "support_request": {
+            "name": "Technical Support",
+            "description": "Technical issues or support requests",
+            "criteria": [
+                "Bug reports",
+                "Technical difficulties",
+                "Account issues",
+                "Setup problems"
+            ],
+            "examples": [
+                "Login not working",
+                "Error message report",
+                "Integration problem",
+                "Feature not functioning"
+            ],
+            "actions": [
+                "create_support_ticket",
+                "check_known_issues",
+                "route_to_technical_team"
+            ],
+            "folder": "Technical Support"
+        },
+        "feedback": {
+            "name": "Feedback and Suggestions",
+            "description": "Product feedback, suggestions, or reviews",
+            "criteria": [
+                "Feature suggestions",
+                "Product reviews",
+                "User experience feedback",
+                "General suggestions"
+            ],
+            "examples": [
+                "Feature request email",
+                "Product improvement suggestion",
+                "User interface feedback",
+                "Service quality review"
+            ],
+            "actions": [
+                "add_to_feedback_database",
+                "send_thank_you_response",
+                "route_to_product_team"
+            ],
+            "folder": "Feedback"
+        },
+        "administrative": {
+            "name": "Administrative",
+            "description": "Internal administrative or operational emails",
+            "criteria": [
+                "HR communications",
+                "Internal memos",
+                "Policy updates",
+                "Office management"
+            ],
+            "examples": [
+                "Office closure notification",
+                "Policy update announcement",
+                "Team meeting minutes",
+                "HR benefit information"
+            ],
+            "actions": [
+                "archive_after_reading",
+                "update_calendar_if_needed",
+                "add_to_knowledge_base"
+            ],
+            "folder": "Administrative"
+        },
+        "newsletter": {
+            "name": "Newsletters and Updates",
+            "description": "Subscribed newsletters, updates, and marketing",
+            "criteria": [
+                "Regular newsletters",
+                "Product updates",
+                "Marketing campaigns",
+                "Industry news"
+            ],
+            "examples": [
+                "Monthly company newsletter",
+                "Product update announcement",
+                "Industry news digest",
+                "Marketing promotion"
+            ],
+            "actions": [
+                "mark_as_read",
+                "archive_or_file",
+                "add_to_digest"
+            ],
+            "folder": "Newsletters"
+        },
+        "spam": {
+            "name": "Spam or Unwanted",
+            "description": "Unsolicited or suspicious emails",
+            "criteria": [
+                "Unsolicited marketing",
+                "Suspicious sender",
+                "Phishing attempts",
+                "Unknown source promotions"
+            ],
+            "examples": [
+                "Unknown sender offering deals",
+                "Suspicious attachment email",
+                "Unsolicited business proposal",
+                "Phishing attempt"
+            ],
+            "actions": [
+                "move_to_spam",
+                "add_to_filter",
+                "delete"
+            ],
+            "folder": "Spam"
+        }
+    },
+    "priority_levels": {
+        "immediate": {
+            "response_time": "Within 1 hour",
+            "notification": true,
+            "auto_response": true
+        },
+        "high": {
+            "response_time": "Within 4 hours",
+            "notification": true,
+            "auto_response": false
+        },
+        "medium": {
+            "response_time": "Within 24 hours",
+            "notification": false,
+            "auto_response": false
+        },
+        "low": {
+            "response_time": "Within 72 hours",
+            "notification": false,
+            "auto_response": false
+        }
+    },
+    "auto_response_triggers": {
+        "out_of_office": {
+            "conditions": ["sender_not_internal", "user_status_away"],
+            "template": "out_of_office"
+        },
+        "receipt_confirmation": {
+            "conditions": ["is_customer_inquiry", "during_business_hours"],
+            "template": "support_receipt"
+        },
+        "urgent_acknowledgment": {
+            "conditions": ["is_urgent", "requires_immediate_response"],
+            "template": "urgent_acknowledgment"
+        }
+    }
+} 

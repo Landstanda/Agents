@@ -22,7 +22,6 @@ schedule_meeting:
       on_error:
         - action: "retry"
           max_attempts: 3
-    
     - name: "Create Event"
       tool: google_calendar
       id: create_event
@@ -46,11 +45,9 @@ schedule_meeting:
           action: "retry"
           next_step: "authenticate"
         - action: "notify_error"
-  
   success_criteria:
     - "response.get('success')"
     - "response.get('event_id')"
-  
   error_handling:
     time_conflict:
       message: "There is a scheduling conflict at {time}"
@@ -66,7 +63,6 @@ check_emails:
     - max_emails
     - importance
     - sender
-  
   steps:
     - name: "Authenticate Google"
       tool: google_auth
@@ -78,7 +74,6 @@ check_emails:
       on_error:
         - action: "retry"
           max_attempts: 3
-    
     - name: "Fetch Recent Emails"
       id: fetch_emails
       tool: email_reader
@@ -97,15 +92,213 @@ check_emails:
           action: "retry"
           next_step: "authenticate"
         - action: "notify_error"
-  
   success_criteria:
     - "response.get('success')"
     - "response.get('emails')"
-  
   error_handling:
     auth_error:
       message: "Failed to authenticate with Google: {error}"
       action: "retry"
     fetch_error:
       message: "Failed to fetch emails: {error}"
-      action: "notify_error" 
+      action: "notify_error"
+
+email_composer:
+  name: "Email Composer"
+  required_entities:
+    - recipients
+    - subject
+    - content
+  optional_entities:
+    - cc
+    - bcc
+    - attachments
+    - importance
+    - original_email_id
+  steps:
+    - name: "Validate Recipients"
+      tool: email_reader
+      action: validate_addresses
+      params:
+        addresses: "{recipients}"
+        cc: "{cc if cc else []}"
+        bcc: "{bcc if bcc else []}"
+      on_success:
+        - condition: "response.get('all_valid')"
+          next_step: prepare_email
+      on_error:
+        - condition: "error.get('type') == 'invalid_address'"
+          action: "request_clarification"
+          message: "Some email addresses are invalid: {error.get('details')}"
+
+    - name: "Prepare Email"
+      id: prepare_email
+      tool: email_composer
+      action: prepare
+      params:
+        to: "{recipients}"
+        subject: "{subject}"
+        content: "{content}"
+        cc: "{cc if cc else []}"
+        bcc: "{bcc if bcc else []}"
+        importance: "{importance if importance else 'normal'}"
+        original_email_id: "{original_email_id if original_email_id else None}"
+      on_success:
+        - condition: "not attachments"
+          next_step: send_email
+        - condition: "attachments"
+          next_step: handle_attachments
+      on_error:
+        - action: "retry"
+          max_attempts: 3
+
+    - name: "Handle Attachments"
+      id: handle_attachments
+      tool: email_manager
+      action: prepare_attachments
+      params:
+        attachments: "{attachments}"
+      on_success:
+        - next_step: send_email
+      on_error:
+        - condition: "error.get('type') == 'file_not_found'"
+          action: "request_clarification"
+          message: "Could not find attachment: {error.get('file')}"
+        - action: "retry"
+          max_attempts: 2
+
+    - name: "Send Email"
+      id: send_email
+      tool: email_composer
+      action: send
+      params:
+        draft_id: "{response.draft_id}"
+      on_success:
+        - condition: "response.get('sent')"
+          next_step: complete
+      on_error:
+        - action: "retry"
+          max_attempts: 3
+          delay_seconds: 5
+
+  success_criteria:
+    - "response.get('sent')"
+    - "response.get('email_id')"
+  error_handling:
+    retry_count: 3
+    delay_seconds: 5
+    conditions:
+      network_error: true
+      rate_limit: true
+
+email_reader:
+  name: "Email Reader"
+  required_entities:
+    - filter_type
+  optional_entities:
+    - search_term
+    - date_range
+    - folder_name
+    - max_results
+    - include_attachments
+  steps:
+    - name: "Apply Search Filters"
+      tool: email_reader
+      action: search
+      params:
+        filter_type: "{filter_type}"
+        query: "{search_term if search_term else ''}"
+        date_range: "{date_range if date_range else 'today'}"
+        folder: "{folder_name if folder_name else 'INBOX'}"
+        max_results: "{max_results if max_results else 10}"
+      on_success:
+        - condition: "response.get('results')"
+          next_step: process_results
+        - condition: "not response.get('results')"
+          next_step: no_results
+      on_error:
+        - action: "retry"
+          max_attempts: 3
+
+    - name: "Process Results"
+      id: process_results
+      tool: email_reader
+      action: process_emails
+      params:
+        email_ids: "{response.get('email_ids', [])}"
+        include_attachments: "{include_attachments if include_attachments else False}"
+      on_success:
+        - next_step: complete
+      on_error:
+        - action: "retry"
+          max_attempts: 2
+
+    - name: "No Results Found"
+      id: no_results
+      tool: message_maker
+      action: create_message
+      params:
+        message_type: "no_results"
+        search_params: "{params}"
+      on_success:
+        - next_step: complete
+
+  success_criteria:
+    - "response.get('processed')"
+  error_handling:
+    retry_count: 3
+    delay_seconds: 2
+    conditions:
+      network_error: true
+      auth_error: true
+
+email_manager:
+  name: "Email Manager"
+  required_entities:
+    - action_type
+    - email_id
+  optional_entities:
+    - target_folder
+    - flag_type
+    - attachment_name
+    - new_status
+  steps:
+    - name: "Validate Email ID"
+      tool: email_reader
+      action: validate_email
+      params:
+        email_id: "{email_id}"
+      on_success:
+        - condition: "response.get('valid')"
+          next_step: perform_action
+      on_error:
+        - action: "request_clarification"
+          message: "Email not found or inaccessible"
+
+    - name: "Perform Action"
+      id: perform_action
+      tool: email_manager
+      action: "{action_type}"
+      params:
+        email_id: "{email_id}"
+        target_folder: "{target_folder if target_folder else None}"
+        flag_type: "{flag_type if flag_type else None}"
+        attachment_name: "{attachment_name if attachment_name else None}"
+        new_status: "{new_status if new_status else None}"
+      on_success:
+        - next_step: complete
+      on_error:
+        - condition: "error.get('type') == 'folder_not_found'"
+          action: "create_folder"
+          next_step: perform_action
+        - action: "retry"
+          max_attempts: 2
+
+  success_criteria:
+    - "response.get('action_completed')"
+  error_handling:
+    retry_count: 2
+    delay_seconds: 1
+    conditions:
+      network_error: true
+      permission_error: true 

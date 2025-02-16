@@ -1,10 +1,14 @@
 import os
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
 import json
 from dotenv import load_dotenv
 import logging
 import aiofiles
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+import pickle
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +22,13 @@ class CredentialManager:
         # Set up secure paths
         self.credentials_path = os.getenv('GOOGLE_CREDENTIALS_PATH')
         self.token_dir = os.getenv('GOOGLE_TOKEN_DIR', os.path.expanduser('~/.auth_tokens'))
+        
+        # Define scopes for different services
+        self.scopes = {
+            'gmail': ['https://www.googleapis.com/auth/gmail.modify'],
+            'calendar': ['https://www.googleapis.com/auth/calendar'],
+            'drive': ['https://www.googleapis.com/auth/drive.file']
+        }
         
         # Create token directory if it doesn't exist
         if not os.path.exists(self.token_dir):
@@ -70,4 +81,35 @@ class CredentialManager:
         if os.path.exists(token_path):
             async with aiofiles.open(token_path, 'rb') as f:
                 return await f.read()
-        return None 
+        return None
+
+    async def get_credentials(self, service_name: str) -> Credentials:
+        """Get valid credentials for a Google API service"""
+        if service_name not in self.scopes:
+            raise ValueError(f"Unknown service: {service_name}")
+            
+        creds = None
+        token_path = self.get_token_path(service_name)
+        
+        # Load existing token
+        if os.path.exists(token_path):
+            with open(token_path, 'rb') as token:
+                creds = pickle.load(token)
+        
+        # If no valid credentials available, refresh or get new ones
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                # Load client secrets
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    self.get_credentials_path(),
+                    self.scopes[service_name]
+                )
+                creds = flow.run_local_server(port=0)
+            
+            # Save the credentials for future use
+            with open(token_path, 'wb') as token:
+                pickle.dump(creds, token)
+        
+        return creds 

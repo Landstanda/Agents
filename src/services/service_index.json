@@ -98,5 +98,134 @@
             "List of unread emails",
             "Email summaries"
         ]
+    },
+    "email_composer": {
+        "name": "Email Composer",
+        "description": "Create, reply to, or forward emails with optional attachments",
+        "examples": [
+            "Send an email to the team about the project update",
+            "Reply to John's email about the meeting",
+            "Forward the budget report to finance",
+            "Send an email with the presentation attached"
+        ],
+        "combination_examples": [
+            {
+                "request": "Find John's email about the project and forward it to the team",
+                "services": [
+                    {
+                        "email_reader": "Find the specific email from John"
+                    },
+                    {
+                        "email_composer": "Forward the email to team members"
+                    }
+                ]
+            },
+            {
+                "request": "Reply to Sarah's email and attach the latest report",
+                "services": [
+                    {
+                        "email_reader": "Locate Sarah's email"
+                    },
+                    {
+                        "email_composer": "Compose and send reply with attachment"
+                    }
+                ]
+            }
+        ],
+        "required_entities": [
+            "recipients",
+            "subject",
+            "content"
+        ],
+        "optional_entities": [
+            "cc",
+            "bcc",
+            "attachments",
+            "importance",
+            "original_email_id"
+        ],
+        "outputs": [
+            "Email sent confirmation",
+            "Email ID for reference",
+            "Error details if failed"
+        ]
+    },
+    "email_reader": {
+        "name": "Email Reader",
+        "description": "Search, navigate, and read email content and attachments",
+        "examples": [
+            "Check my unread emails",
+            "Show me emails from Sarah",
+            "Find emails about the project meeting",
+            "Get the attachment from the last email"
+        ],
+        "combination_examples": [
+            {
+                "request": "Find John's email about the budget and download the attachment",
+                "services": [
+                    {
+                        "email_reader": "Search and retrieve email"
+                    },
+                    {
+                        "email_manager": "Download the attachment"
+                    }
+                ]
+            }
+        ],
+        "required_entities": [
+            "filter_type"
+        ],
+        "optional_entities": [
+            "search_term",
+            "date_range",
+            "folder_name",
+            "max_results",
+            "include_attachments"
+        ],
+        "outputs": [
+            "List of matching emails",
+            "Email content",
+            "Attachment information",
+            "Search result metadata"
+        ]
+    },
+    "email_manager": {
+        "name": "Email Manager",
+        "description": "Organize emails, handle attachments, and manage email status",
+        "examples": [
+            "Move this email to the Projects folder",
+            "Mark these emails as read",
+            "Download the attachment from John's email",
+            "Flag this email for follow-up"
+        ],
+        "combination_examples": [
+            {
+                "request": "Save the attachment from Sarah's email and mark it as read",
+                "services": [
+                    {
+                        "email_reader": "Find Sarah's email"
+                    },
+                    {
+                        "email_manager": "Save attachment and update status"
+                    }
+                ]
+            }
+        ],
+        "required_entities": [
+            "action_type",
+            "email_id"
+        ],
+        "optional_entities": [
+            "target_folder",
+            "flag_type",
+            "attachment_name",
+            "new_status"
+        ],
+        "outputs": [
+            "Action confirmation",
+            "Updated email status",
+            "New folder location",
+            "Attachment save location"
+        ]
     }
 } 
