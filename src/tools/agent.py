@@ -9,6 +9,7 @@ import re
 from src.models import Ticket, TicketStatus
 from src.core.module_interface import BaseModule
 from datetime import datetime
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -178,175 +179,141 @@ class Agent:
             )
     
     async def execute_service(self, ticket: Ticket) -> Dict[str, Any]:
-        """
-        Execute a service with the given ticket.
-        
-        Args:
-            ticket: Ticket containing service and context information
-            
-        Returns:
-            Dict containing execution results
-        """
+        """Execute a service with the given ticket."""
         logger.debug(f"\n{'='*50}\nStarting service execution for ticket {ticket.ticket_id}")
-        logger.debug(f"Service: {ticket.service}")
-        logger.debug(f"Entities: {ticket.entities}")
-        logger.debug(f"Current Status: {ticket.status}")
         
         if self.is_busy:
             logger.warning("⚠️ Agent is busy with another service")
             ticket.update_status(TicketStatus.ERROR)
             ticket.add_error("Agent is busy with another service", "execution_error")
-            return {
-                'status': 'error',
-                'error': 'Agent is busy with another service'
-            }
-            
+            return {'status': 'error', 'error': 'Agent is busy with another service'}
+        
         try:
             self.is_busy = True
             
-            # Load service definition
-            if not self.services_path.exists():
-                logger.error(f"❌ Services file not found: {self.services_path}")
-                raise ValueError(f"Services file not found: {self.services_path}")
-                
-            with open(self.services_path, 'r') as f:
-                services = yaml.safe_load(f) or {}
-                logger.debug(f"Loaded services: {list(services.keys())}")
+            # Load service definitions
+            services = await self._load_service_definitions()
             
-            # Get service definition and execution plan
-            if ticket.service not in services:
-                logger.debug(f"Service {ticket.service} not found in services file")
-                # Check if this is a new service from created_services
-                new_service = next((service for service in ticket.created_services 
-                                  if service['name'] == ticket.service), None)
-                if new_service:
-                    logger.debug(f"✓ Found new service definition in ticket")
-                    # Use the new service definition directly
-                    service_def = new_service
-                else:
-                    logger.error(f"❌ No service definition found for: {ticket.service}")
-                    ticket.update_status(TicketStatus.ERROR)
-                    ticket.add_error(f"No service definition found for: {ticket.service}", "execution_error")
-                    return {
-                        'status': 'error',
-                        'error': f'No service definition found for: {ticket.service}'
-                    }
-            else:
-                logger.debug(f"✓ Found existing service definition for {ticket.service}")
-                service_def = services[ticket.service]
-                new_service = None  # Not a new service
-
-            # Get steps from service definition
-            steps = service_def.get('steps', [])
-            logger.debug(f"\nService steps to execute:")
-            for i, step in enumerate(steps, 1):
-                logger.debug(f"{i}. {step.get('name', 'unnamed_step')} - {step.get('tool')}.{step.get('action')}")
-            
-            if not steps:
-                logger.error(f"❌ No steps defined for service: {ticket.service}")
-                ticket.update_status(TicketStatus.ERROR)
-                ticket.add_error(f"No steps defined for service: {ticket.service}", "execution_error")
-                return {
-                    'status': 'error',
-                    'error': f'No steps defined for service: {ticket.service}'
-                }
-
+            # Initialize execution state
             results = []
             
-            # Execute each step in sequence
-            for i, step in enumerate(steps, 1):
-                step_name = step.get('name', 'unnamed_step')
-                logger.debug(f"\n{'='*30}")
-                logger.debug(f"🔄 Starting step {i}/{len(steps)}: {step_name}")
-                logger.debug(f"Tool: {step.get('tool')}, Action: {step.get('action')}")
-                logger.debug(f"Parameters: {step.get('params')}")
+            # Execute steps sequentially
+            while True:
+                next_step = ticket.get_next_step()
+                if not next_step:
+                    break  # All steps completed
                 
-                # Verify tool availability
-                tool_name = step.get('tool', '').lower()
-                if tool_name not in self.tools:
-                    error_msg = f"❌ Required tool '{tool_name}' not found"
-                    logger.error(error_msg)
-                    ticket.update_status(TicketStatus.ERROR)
-                    ticket.add_error(error_msg, "missing_tool_error")
+                # Execute step with retry from service definition
+                result = await self._execute_step_with_retry(next_step, ticket, services)
+                
+                # Store result
+                ticket.store_step_result(next_step['step_number'], result)
+                
+                if result['status'] == 'error':
                     return {
                         'status': 'error',
-                        'error': error_msg
-                    }
-                
-                ticket.current_step = step_name
-                step_result = await self._execute_step(step, ticket.entities)
-                
-                logger.debug(f"Step {step_name} result: {step_result}")
-                
-                # Record step execution
-                ticket.add_step(
-                    step_name=step_name,
-                    tool=step.get('tool', ''),
-                    action=step.get('action', ''),
-                    params=step.get('params', {}),
-                    result=step_result
-                )
-                
-                results.append(step_result)
-                
-                if step_result['status'] == 'error':
-                    logger.error(f"❌ Step {step_name} failed: {step_result['error']}")
-                    ticket.update_status(TicketStatus.ERROR)
-                    ticket.add_error(step_result['error'], "step_execution_error", step_name)
-                    return {
-                        'status': 'error',
-                        'error': step_result['error'],
+                        'error': result['error'],
                         'partial_results': results
                     }
-                else:
-                    logger.debug(f"✓ Step {step_name} completed successfully")
                 
-                # Handle conditional next steps if defined
-                on_success = step.get('on_success', [])
-                if on_success:
-                    logger.debug(f"Processing conditional next steps for {step_name}")
-                    for condition in on_success:
-                        logger.debug(f"Evaluating condition: {condition['condition']}")
-                        if self._evaluate_condition(condition['condition'], step_result):
-                            next_step_id = condition['next_step']
-                            logger.debug(f"✓ Condition true, queueing next step: {next_step_id}")
-                            # Find and queue the next step
-                            next_step = next((s for s in steps if s.get('id') == next_step_id), None)
-                            if next_step:
-                                steps.insert(steps.index(step) + 1, next_step)
-                                logger.debug(f"✓ Queued next step: {next_step.get('name')}")
+                results.append(result)
             
-            # Update ticket status
-            logger.debug("\n✓ Service execution completed successfully")
+            # All steps completed successfully
             ticket.update_status(TicketStatus.COMPLETED)
             ticket.execution_results = results
-
-            # If this was a new service and execution was successful, save it
-            if new_service and self._check_success_criteria(new_service, results):
-                logger.debug("Saving new service definition")
-                await self._save_new_service(new_service)
-                logger.info(f"✓ Successfully saved new service: {new_service['name']}")
             
             return {
                 'status': 'success',
-                'results': results,
-                'text': self._format_response(service_def, results, ticket.entities),
-                'is_new_service': bool(new_service)
+                'results': results
             }
             
         except Exception as e:
-            logger.error(f"❌ Error executing service: {str(e)}", exc_info=True)
+            logger.error(f"Error executing service: {str(e)}", exc_info=True)
             ticket.update_status(TicketStatus.ERROR)
             ticket.add_error(str(e), "execution_error")
-            return {
-                'status': 'error',
-                'error': str(e)
-            }
+            return {'status': 'error', 'error': str(e)}
             
         finally:
             self.is_busy = False
-            ticket.current_step = None
     
+    async def _execute_step_with_retry(self, step: Dict[str, Any], ticket: Ticket, services: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute a single step with retry logic from service definition."""
+        service_def = services.get(step['service_id'], {})
+        max_attempts = service_def.get('error_handling', {}).get('retry_count', 3)
+        
+        attempt = 0
+        while attempt < max_attempts:
+            attempt += 1
+            try:
+                result = await self._execute_step(step, ticket.entities)
+                
+                if result['status'] == 'success':
+                    return result
+                
+                if attempt < max_attempts:
+                    logger.warning(f"Step {step['step_number']} failed, attempt {attempt}/{max_attempts}")
+                    await asyncio.sleep(5)  # Simple delay between retries
+                    continue
+                
+                return result
+                
+            except Exception as e:
+                if attempt < max_attempts:
+                    logger.error(f"Step {step['step_number']} failed with error: {str(e)}")
+                    await asyncio.sleep(5)
+                    continue
+                return {
+                    'status': 'error',
+                    'error': str(e),
+                    'tool': step.get('tool', ''),
+                    'action': step.get('action', '')
+                }
+        
+        return {
+            'status': 'error',
+            'error': f'Step {step["step_number"]} failed after {max_attempts} attempts',
+            'tool': step.get('tool', ''),
+            'action': step.get('action', '')
+        }
+    
+    def _categorize_error(self, error: str) -> str:
+        """Categorize an error message into a known error type."""
+        error = error.lower()
+        if 'network' in error or 'connection' in error:
+            return 'network_error'
+        elif 'rate' in error and 'limit' in error:
+            return 'rate_limit'
+        elif 'auth' in error or 'unauthorized' in error:
+            return 'auth_error'
+        elif 'not found' in error:
+            return 'not_found'
+        else:
+            return 'unknown_error'
+    
+    def _get_fallback_strategy(self, error: str, ticket: Ticket) -> Optional[Dict[str, Any]]:
+        """Get appropriate fallback strategy for an error."""
+        error_type = self._categorize_error(error)
+        for strategy in ticket.fallback_strategies:
+            if strategy['condition'] == error_type:
+                return strategy
+        return None
+    
+    def _create_alternative_step(self, failed_step: Dict[str, Any], alternative_service: str) -> Dict[str, Any]:
+        """Create an alternative step to replace a failed step."""
+        return {
+            'step_number': failed_step['step_number'],
+            'service_id': alternative_service,
+            'description': f"Alternative for failed step {failed_step['step_number']}",
+            'depends_on': failed_step['depends_on'],
+            'required_params': failed_step['required_params'],
+            'optional_params': failed_step['optional_params'],
+            'retry_config': {
+                'max_attempts': 2,
+                'delay_seconds': 5,
+                'conditions': {'network_error': True, 'rate_limit': True}
+            }
+        }
+
     async def _execute_step(self, step: Dict[str, Any], entities: Dict[str, Any]) -> Dict[str, Any]:
         """Execute a single step of a service."""
         try:

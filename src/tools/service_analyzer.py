@@ -26,24 +26,20 @@ class ServiceAnalyzer:
         self.services_schema = self._load_services_schema()
         
         # System prompt for GPT
-        self.system_prompt = """You are an expert system analyzer.
-        Your task is to analyze user requests and create execution plans using available services.
+        self.system_prompt = """You are an expert system analyzer that breaks down user requests into executable steps.
+        Your task is to analyze requests and create detailed execution plans using available services.
         
-        Follow these steps:
+        You must:
         1. Understand the user's request and desired outcome
-        2. Break down the request into discrete steps
-        3. Look for similar patterns in service combination examples
-        4. Match each step to available services
-        5. Validate that all required inputs are available
-        6. Create a structured execution plan
+        2. Break down complex requests into discrete steps
+        3. Match steps to available services
+        4. Validate all required inputs are available
         
         Rules:
-        1. Only use services defined in the provided schema
-        2. Use combination examples as templates when possible
-        3. Ensure all required inputs are specified
-        4. Follow service constraints and limitations
-        5. If a request cannot be fulfilled with available services, explain why
-        6. Return results in the exact JSON format specified
+        1. Only use services defined in the schema
+        2. Ensure all required parameters are specified
+        3. If a request cannot be fulfilled, explain why
+        4. Return results in exact JSON format
         """
         
         # Analysis prompt template
@@ -54,29 +50,29 @@ Available services and their combinations:
 
 Required output format:
 {{
-    "understood_request": string,  # Brief description of understood request
+    "understood_request": string,  # Clear description of the understood request
     "confidence": float,  # 0.0-1.0 confidence in analysis
-    "execution_plan": [  # List of services to execute in order
+    "execution_steps": [  # Ordered list of steps to execute
         {{
-            "service": string,  # Service name
-            "inputs": {{  # Required inputs
-                "key": "value"
+            "step_number": int,
+            "service_id": string,
+            "description": string,
+            "required_params": {{  # Parameters required for this step
+                "param_name": string
             }},
-            "step_number": int,  # Execution order
-            "description": string,  # Why this step is needed
-            "depends_on": [  # List of step numbers this step depends on
-                int
-            ]
+            "optional_params": {{
+                "param_name": string
+            }}
         }}
     ],
-    "missing_inputs": [  # List of required inputs not found
+    "missing_information": [  # List of missing required information
         {{
-            "input": string,  # Input name
-            "service": string,  # Service requiring it
-            "description": string  # Why it's needed
+            "param": string,
+            "service": string,
+            "description": string,
+            "step_number": int
         }}
-    ],
-    "error": string | null  # Error message if request cannot be fulfilled
+    ]
 }}
 
 Return ONLY valid JSON matching this schema."""
@@ -170,8 +166,8 @@ Return ONLY valid JSON matching this schema."""
                     {
                         "ticket_id": ticket.ticket_id,
                         "confidence": analysis.get("confidence"),
-                        "execution_plan": analysis.get("execution_plan"),
-                        "missing_inputs": analysis.get("missing_inputs")
+                        "execution_plan": analysis.get("execution_steps"),
+                        "missing_inputs": analysis.get("missing_information")
                     }
                 )
             
@@ -195,8 +191,8 @@ Return ONLY valid JSON matching this schema."""
         required_fields = {
             "understood_request": str,
             "confidence": float,
-            "execution_plan": list,
-            "missing_inputs": list
+            "execution_steps": list,
+            "missing_information": list
         }
         
         try:
@@ -215,8 +211,8 @@ Return ONLY valid JSON matching this schema."""
                 return False
             
             # Validate execution plan
-            for step in analysis["execution_plan"]:
-                if not all(k in step for k in ["service", "inputs", "step_number", "description"]):
+            for step in analysis["execution_steps"]:
+                if not all(k in step for k in ["step_number", "service_id", "description", "required_params", "optional_params"]):
                     logger.error("Invalid step structure")
                     return False
                 
@@ -232,21 +228,21 @@ Return ONLY valid JSON matching this schema."""
         if analysis.get("error"):
             ticket.update_status(TicketStatus.ERROR)
             ticket.add_error(analysis["error"], "analysis_error")
-        elif analysis.get("missing_inputs"):
+        elif analysis.get("missing_information"):
             ticket.update_status(TicketStatus.WAITING_INPUT)
-            ticket.missing_entities = [input_info["input"] for input_info in analysis["missing_inputs"]]
+            ticket.missing_entities = [input_info["param"] for input_info in analysis["missing_information"]]
         else:
             ticket.update_status(TicketStatus.EXECUTING)
         
         # Update ticket with execution plan
-        if analysis.get("execution_plan"):
+        if analysis.get("execution_steps"):
             # Sort services by step number and dependencies
-            execution_plan = self._sort_execution_plan(analysis["execution_plan"])
+            execution_plan = self._sort_execution_plan(analysis["execution_steps"])
             ticket.execution_plan = execution_plan
             
             # Use first service as primary for backward compatibility
-            ticket.service = execution_plan[0]["service"]
-            ticket.entities.update(execution_plan[0]["inputs"])
+            ticket.service = execution_plan[0]["service_id"]
+            ticket.entities.update(execution_plan[0]["required_params"])
         
         return ticket
         

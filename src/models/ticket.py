@@ -93,6 +93,10 @@ class Ticket:
     execution_results: List[Dict[str, Any]] = field(default_factory=list)
     final_response: Optional[str] = None
 
+    # Execution tracking
+    execution_steps: List[Dict[str, Any]] = field(default_factory=list)
+    step_results: Dict[int, Any] = field(default_factory=dict)
+
     def __post_init__(self):
         """Called after dataclass initialization to set up initial state."""
         if self.original_message:
@@ -244,3 +248,22 @@ class Ticket:
         ticket.final_response = data.get("final_response")
         
         return ticket 
+
+    def add_execution_step(self, step: Dict[str, Any]):
+        """Add a step to the execution plan."""
+        step_number = len(self.execution_steps) + 1
+        step['step_number'] = step_number
+        self.execution_steps.append(step)
+        return step_number
+    
+    def store_step_result(self, step_number: int, result: Any):
+        """Store the result of a step execution."""
+        self.step_results[step_number] = result
+    
+    def get_next_step(self) -> Optional[Dict[str, Any]]:
+        """Get the next step that hasn't been executed yet."""
+        executed_steps = set(self.step_results.keys())
+        for step in self.execution_steps:
+            if step['step_number'] not in executed_steps:
+                return step
+        return None 
