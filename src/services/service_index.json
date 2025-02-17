@@ -16,10 +16,7 @@
                         "schedule_meeting": "Create the calendar event"
                     },
                     {
-                        "check_emails": "Get team email addresses"
-                    },
-                    {
-                        "send_email": "Send meeting invitation"
+                        "email_composer": "Send meeting invitation"
                     }
                 ]
             },
@@ -30,10 +27,7 @@
                         "schedule_meeting": "Book the time slot"
                     },
                     {
-                        "create_document": "Create agenda document"
-                    },
-                    {
-                        "share_file": "Share agenda with attendees"
+                        "email_composer": "Send agenda to attendees"
                     }
                 ]
             }
@@ -51,52 +45,6 @@
         "outputs": [
             "Calendar event created",
             "Event ID for reference"
-        ]
-    },
-    "check_emails": {
-        "name": "Check New Emails",
-        "description": "Check for new unread emails and returns sender & subject.",
-        "examples": [
-            "Check my email",
-            "Show me my latest emails",
-            "Do I have any new emails?"
-        ],
-        "combination_examples": [
-            {
-                "request": "Check if I got a response from John about the meeting",
-                "services": [
-                    {
-                        "check_emails": "Search for emails from John"
-                    },
-                    {
-                        "analyze_content": "Check if email mentions meeting"
-                    }
-                ]
-            },
-            {
-                "request": "Forward any urgent emails to my phone",
-                "services": [
-                    {
-                        "check_emails": "Get new emails"
-                    },
-                    {
-                        "analyze_importance": "Filter urgent ones"
-                    },
-                    {
-                        "send_notification": "Forward to phone"
-                    }
-                ]
-            }
-        ],
-        "required_entities": [],
-        "optional_entities": [
-            "max_emails",
-            "importance",
-            "sender"
-        ],
-        "outputs": [
-            "List of unread emails",
-            "Email summaries"
         ]
     },
     "email_composer": {
@@ -134,15 +82,18 @@
         ],
         "required_entities": [
             "recipients",
-            "subject",
-            "content"
+            "purpose"
         ],
         "optional_entities": [
+            "subject",
+            "context",
+            "original_email",
+            "response_type",
+            "key_points",
+            "tone",
             "cc",
             "bcc",
-            "attachments",
-            "importance",
-            "original_email_id"
+            "attachments"
         ],
         "outputs": [
             "Email sent confirmation",
@@ -154,10 +105,10 @@
         "name": "Email Reader",
         "description": "Search, navigate, and read email content and attachments",
         "examples": [
-            "Check my unread emails",
-            "Show me emails from Sarah",
-            "Find emails about the project meeting",
-            "Get the attachment from the last email"
+            "Find emails from Sarah about the project",
+            "Show me my unread emails",
+            "Search for emails about the budget meeting",
+            "Get the attachment from John's last email"
         ],
         "combination_examples": [
             {
@@ -196,7 +147,8 @@
             "Move this email to the Projects folder",
             "Mark these emails as read",
             "Download the attachment from John's email",
-            "Flag this email for follow-up"
+            "Flag this email for follow-up",
+            "Classify this email and take appropriate action"
         ],
         "combination_examples": [
             {
@@ -219,13 +171,53 @@
             "target_folder",
             "flag_type",
             "attachment_name",
-            "new_status"
+            "new_status",
+            "classification_schema"
         ],
         "outputs": [
             "Action confirmation",
             "Updated email status",
             "New folder location",
-            "Attachment save location"
+            "Attachment save location",
+            "Classification results"
+        ]
+    },
+    "conditions": {
+        "name": "Condition Handler",
+        "description": "Handles conditional logic and control flow in service execution",
+        "examples": [
+            "Check if email contains specific content",
+            "Verify if there are more items to process",
+            "Evaluate complex conditions with AND/OR logic",
+            "Control loop execution based on conditions"
+        ],
+        "combination_examples": [
+            {
+                "request": "Process all emails from January and flag important ones",
+                "services": [
+                    {
+                        "email_reader": "Get January emails"
+                    },
+                    {
+                        "conditions": "Check if email is important"
+                    },
+                    {
+                        "email_manager": "Flag important emails"
+                    }
+                ]
+            }
+        ],
+        "required_entities": [
+            "conditions"
+        ],
+        "optional_entities": [
+            "context",
+            "loop_check"
+        ],
+        "outputs": [
+            "Condition evaluation result",
+            "Next step to execute",
+            "Loop continuation status"
         ]
     }
 } 

@@ -10,6 +10,7 @@ import logging
 from googleapiclient.discovery import build
 from src.utils.credential_manager import CredentialManager
 from .gpt_handler import GPTHandler
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -29,26 +30,18 @@ class EmailComposer(BaseModule):
             self.service = build('gmail', 'v1', credentials=credentials)
             
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute email composition and sending operations"""
+        """Execute email composition operations"""
         try:
-            await self._initialize_service()
-            
             action = params.get('action')
             if not action:
                 raise ValueError("No action specified")
                 
-            actions = {
-                'validate_addresses': self._validate_addresses,
-                'generate_content': self._generate_content,
-                'prepare': self._prepare_email,
-                'prepare_attachments': self._prepare_attachments,
-                'send': self._send_email
-            }
-            
-            if action not in actions:
+            if action == 'compose':
+                if not params.get('params'):
+                    raise ValueError("No composition parameters provided")
+                return await self._generate_content(params['params'])
+            else:
                 raise ValueError(f"Unknown action: {action}")
-                
-            return await actions[action](params)
                 
         except Exception as e:
             logger.error(f"Email composer error: {str(e)}")
@@ -79,27 +72,113 @@ class EmailComposer(BaseModule):
     async def _generate_content(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Generate email content using GPT"""
         try:
+            # Prepare the system message and prompt based on email type
             if params.get('original_email'):
                 # This is a reply
-                return await self.gpt_handler.execute({
-                    'action': 'compose_reply',
-                    'original_email': params['original_email'],
-                    'response_type': params.get('response_type', 'standard'),
-                    'key_points': params.get('key_points', []),
-                    'context': params.get('context', ''),
-                    'tone': params.get('tone', 'professional')
-                })
+                system_message = """You are an email composition assistant. Your task is to generate professional and appropriate email replies.
+Your response must be a JSON object with the following structure:
+{
+    "subject": "The email subject line (include 'Re: ' for replies)",
+    "body": "The complete email body with proper formatting"
+}
+
+The email body must:
+1. Use proper line breaks between sections (greeting, content, closing)
+2. Include appropriate spacing for readability
+3. Follow standard email format:
+   - Greeting on its own line
+   - Content paragraphs separated by line breaks
+   - Closing on its own line
+   - Signature on its own line
+
+Follow these guidelines:
+1. Maintain a professional and courteous tone
+2. Address all points from the original email
+3. Be clear and concise
+4. Include appropriate greeting and closing
+5. Format the response for clarity"""
+
+                prompt = f"""Generate a reply to this email:
+
+Original Email:
+{params['original_email']}
+
+Response Type: {params.get('response_type', 'standard')}
+Key Points to Address: {params.get('key_points', [])}
+Additional Context: {params.get('context', '')}
+Tone: {params.get('tone', 'professional')}
+
+Return a JSON object with the email subject and body (with proper line breaks)."""
+
             else:
                 # This is a new email
-                return await self.gpt_handler.execute({
-                    'action': 'compose_email',
-                    'subject': params['subject'],
-                    'purpose': params['purpose'],
-                    'recipients': params['to'],
-                    'context': params.get('context', ''),
-                    'tone': params.get('tone', 'professional')
-                })
-                
+                system_message = """You are an email composition assistant. Your task is to generate professional and effective emails.
+Your response must be a JSON object with the following structure:
+{
+    "subject": "The email subject line",
+    "body": "The complete email body with proper formatting"
+}
+
+The email body must:
+1. Use proper line breaks between sections (greeting, content, closing)
+2. Include appropriate spacing for readability
+3. Follow standard email format:
+   - Greeting on its own line
+   - Content paragraphs separated by line breaks
+   - Closing on its own line
+   - Signature on its own line
+
+Follow these guidelines:
+1. Create clear and purposeful content
+2. Use appropriate business language
+3. Include proper greeting and closing
+4. Format for readability
+5. Be concise yet complete"""
+
+                prompt = f"""Generate a new email with the following parameters:
+
+Subject: {params['subject']}
+Purpose: {params['purpose']}
+Recipients: {params['to']}
+Additional Context: {params.get('context', '')}
+Tone: {params.get('tone', 'professional')}
+
+Return a JSON object with the email subject and body (with proper line breaks)."""
+
+            # Define validation schema for GPT response
+            validation_schema = {
+                'required_fields': ['subject', 'body'],
+                'field_types': {
+                    'subject': 'str',
+                    'body': 'str'
+                }
+            }
+
+            # Call GPT handler
+            gpt_result = await self.gpt_handler.execute({
+                'prompt': prompt,
+                'system_message': system_message,
+                'response_format': 'json',
+                'validation_schema': validation_schema,
+                'temperature': 0.7  # Slightly higher for more creative responses
+            })
+
+            if gpt_result['status'] != 'success':
+                raise ValueError(f"Failed to generate content: {gpt_result.get('error')}")
+
+            # Parse the GPT response
+            email_content = json.loads(gpt_result['content'])
+            
+            # Ensure proper line breaks in the body
+            email_content['body'] = email_content['body'].replace('\\n', '\n')
+            
+            return {
+                'status': 'success',
+                'content': email_content['body'],
+                'subject': email_content['subject'],
+                'raw_response': gpt_result['content']  # Include raw response for debugging
+            }
+
         except Exception as e:
             logger.error(f"Failed to generate content: {str(e)}")
             return {

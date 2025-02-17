@@ -35,84 +35,92 @@ Sarah Johnson
     }
 
 class TestEmailComposer:
-    """Test suite for EmailComposer with real GPT and Gmail integration"""
+    """Test suite for EmailComposer"""
 
     @pytest.mark.asyncio
-    async def test_product_inquiry_reply(self, email_composer, mock_customer_email):
-        """
-        Test composing and sending a reply to a product inquiry.
-        Uses real GPT for content generation and real Gmail for sending.
-        """
-        print("\n=== Testing Product Inquiry Reply ===")
+    async def test_new_email_composition(self, email_composer):
+        """Test composing a new email"""
+        print("\n=== Testing New Email Composition ===")
         
-        # Prepare reply parameters
-        reply_params = {
-            'to': ['11jeff11@gmail.com'],  # The actual recipient
-            'subject': f"Re: {mock_customer_email['subject']}",
-            'purpose': 'Respond to product availability inquiry',
-            'original_email': mock_customer_email['content'],
-            'response_type': 'product_inquiry',
-            'context': {
-                'product_status': 'in stock',
-                'shipping_time': '3 days',
-                'product_details': {
-                    'name': 'Luxury Face Cream',
-                    'sizes': ['30ml', '50ml', '100ml'],
-                    'prices': {'30ml': '$29.99', '50ml': '$49.99', '100ml': '$89.99'}
-                }
-            },
-            'key_points': [
-                'Confirm product is in stock',
-                'Specify 3-day shipping timeframe',
-                'List available sizes and prices',
-                'Express appreciation for interest'
-            ],
-            'tone': 'professional and helpful'
+        # Test parameters
+        params = {
+            'subject': 'Project Update Meeting',
+            'purpose': 'Schedule a team meeting to discuss project progress',
+            'to': ['team@company.com'],
+            'context': 'We need to review Q1 goals and plan for Q2',
+            'tone': 'professional'
         }
+        
+        # Generate email content
+        result = await email_composer.execute({
+            'action': 'compose',
+            'params': params
+        })
+        
+        # Verify response
+        assert result['status'] == 'success', \
+            f"Email composition failed: {result.get('error')}"
+            
+        print("\nGPT Response Details:")
+        print(f"Subject: {result['subject']}")
+        print("\nGenerated Email Content:")
+        print(result['content'])
+        print("\nRaw GPT Response:")
+        print(result['raw_response'])
+        
+        # Basic content checks
+        assert 'Project Update Meeting' in result['subject'], "Subject not properly set"
+        assert 'team' in result['content'].lower(), "Recipient reference not found"
+        assert len(result['content'].split('\n')) > 3, "Email too short"
+        
+    @pytest.mark.asyncio
+    async def test_email_reply(self, email_composer):
+        """Test composing an email reply"""
+        print("\n=== Testing Email Reply ===")
+        
+        # Original email
+        original_email = """
+Dear Team,
 
-        try:
-            # Initialize services
-            await email_composer._initialize_service()
+I hope this email finds you well. I wanted to follow up on the project timeline 
+discussion from last week. Could we schedule a meeting to review the current 
+status and address any potential delays?
+
+Best regards,
+John"""
+        
+        # Test parameters
+        params = {
+            'original_email': original_email,
+            'response_type': 'agreement',
+            'key_points': ['Confirm meeting', 'Suggest time slots', 'Mention prepared status update'],
+            'context': 'We have a status report ready to present',
+            'tone': 'professional'
+        }
+        
+        # Generate reply
+        result = await email_composer.execute({
+            'action': 'compose',
+            'params': params
+        })
+        
+        # Verify response
+        assert result['status'] == 'success', \
+            f"Reply composition failed: {result.get('error')}"
             
-            # Step 1: Generate content using GPT
-            print("\nGenerating email content...")
-            content_result = await email_composer.execute({
-                'action': 'generate_content',
-                **reply_params
-            })
-            
-            assert content_result['status'] == 'success', f"Content generation failed: {content_result.get('error')}"
-            print("\nGenerated content:")
-            print(content_result['content'])
-            
-            # Step 2: Prepare the email with the generated content
-            print("\nPreparing email...")
-            email_result = await email_composer.execute({
-                'action': 'prepare',
-                **reply_params,
-                'content': content_result['content']
-            })
-            
-            assert email_result['status'] == 'success', f"Email preparation failed: {email_result.get('error')}"
-            print(f"\nEmail prepared with draft ID: {email_result['draft_id']}")
-            
-            # Step 3: Send the email
-            print("\nSending email...")
-            send_result = await email_composer.execute({
-                'action': 'send',
-                'draft_id': email_result['draft_id']
-            })
-            
-            assert send_result['status'] == 'success', f"Email sending failed: {send_result.get('error')}"
-            print(f"\nEmail sent successfully with message ID: {send_result.get('message_id')}")
-            
-            # Verify the results
-            assert send_result.get('sent') == True, "Email was not sent"
-            assert send_result.get('thread_id') is not None, "No thread ID returned"
-            assert send_result.get('timestamp') is not None, "No timestamp returned"
-            
-        except Exception as e:
-            pytest.fail(f"Test failed with error: {str(e)}")
+        print("\nGPT Response Details:")
+        print(f"Subject: {result['subject']}")
+        print("\nGenerated Email Content:")
+        print(result['content'])
+        print("\nRaw GPT Response:")
+        print(result['raw_response'])
+        
+        # Basic content checks
+        assert result['subject'].startswith('Re:'), "Reply subject should start with 'Re:'"
+        assert 'Dear' in result['content'], "No greeting found"
+        assert 'meeting' in result['content'].lower(), "No meeting reference found"
+        assert 'status' in result['content'].lower(), "No status reference found"
+        assert len(result['content'].split('\n')) > 3, "Reply too short"
 
 if __name__ == "__main__":
     pytest.main(["-v", __file__]) 
