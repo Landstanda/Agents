@@ -367,40 +367,63 @@ conditions:
       params:
         conditions: "{conditions}"
         context: "{context if context else {}}"
+        loop_check: "{loop_check if loop_check else None}"
       on_success:
-        - condition: "response.get('status') == 'success'"
-          next_step: handle_result
+        - condition: "response.get('status') == 'success' and response.get('result') is not None"
+          next_step: process_result
+        - condition: "response.get('status') == 'success' and response.get('continue_loop') is not None"
+          next_step: process_loop
       on_error:
+        - condition: "error.get('type') == 'invalid_field'"
+          action: "notify_error"
+          message: "Invalid field path specified"
+        - condition: "error.get('type') == 'invalid_condition'"
+          action: "notify_error"
+          message: "Invalid condition format"
         - action: "retry"
           max_attempts: 2
 
-    - name: "Handle Result"
-      id: handle_result
+    - name: "Process Result"
+      id: process_result
       tool: conditions
       action: execute
       params:
         conditions:
-          - if:
-              field: "response.result"
-              equals: true
-            then_step: "{response.get('next_step', 'complete')}"
-          - if:
-              field: "response.continue_loop"
-              equals: true
-            then_step: "{response.get('next_step', 1)}"
-            else_step: "complete"
+          field: "response.result"
+          equals: true
       on_success:
-        - next_step: complete
+        - condition: "response.get('result')"
+          next_step: "{response.get('next_step', 'complete')}"
+        - condition: "not response.get('result')"
+          next_step: "{response.get('else_step', 'complete')}"
       on_error:
-        - action: "retry"
-          max_attempts: 2
+        - action: "notify_error"
+          message: "Failed to process condition result"
+
+    - name: "Process Loop"
+      id: process_loop
+      tool: conditions
+      action: execute
+      params:
+        conditions:
+          field: "response.continue_loop"
+          equals: true
+      on_success:
+        - condition: "response.get('result')"
+          next_step: "{response.get('next_step', 1)}"
+        - condition: "not response.get('result')"
+          next_step: "{response.get('else_step', 'complete')}"
+      on_error:
+        - action: "notify_error"
+          message: "Failed to process loop condition"
 
   success_criteria:
     - "response.get('status') == 'success'"
-    - "response.get('next_step') is not None"
+    - "response.get('result') is not None or response.get('continue_loop') is not None"
   error_handling:
     retry_count: 2
     delay_seconds: 1
     conditions:
-      evaluation_error: true
-      invalid_condition: true 
+      invalid_field: true
+      invalid_condition: true
+      evaluation_error: true 

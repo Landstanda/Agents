@@ -49,7 +49,7 @@
     },
     "email_composer": {
         "name": "Email Composer",
-        "description": "Create, reply to, or forward emails with optional attachments",
+        "description": "Create, reply to, or forward emails with optional attachment handling",
         "examples": [
             "Send an email to the team about the project update",
             "Reply to John's email about the meeting",
@@ -184,25 +184,40 @@
     },
     "conditions": {
         "name": "Condition Handler",
-        "description": "Handles conditional logic and control flow in service execution",
+        "description": "Evaluates complex conditional logic and control flow including field comparisons, logical operations (AND/OR), existence checks, and loop control",
         "examples": [
-            "Check if email contains specific content",
-            "Verify if there are more items to process",
-            "Evaluate complex conditions with AND/OR logic",
-            "Control loop execution based on conditions"
+            "Check if email.priority equals high",
+            "Verify if remaining_tasks is greater than 0",
+            "Check if user.preferences.notifications exists",
+            "Continue processing while items_remaining is true",
+            "Evaluate if email.category equals work AND email.flags.important is true"
         ],
         "combination_examples": [
             {
-                "request": "Process all emails from January and flag important ones",
+                "request": "Process all unread emails and flag important ones",
                 "services": [
                     {
-                        "email_reader": "Get January emails"
+                        "email_reader": "Get unread emails"
                     },
                     {
-                        "conditions": "Check if email is important"
+                        "conditions": "Check each email against importance criteria using AND/OR logic"
                     },
                     {
-                        "email_manager": "Flag important emails"
+                        "email_manager": "Flag emails that meet the criteria"
+                    }
+                ]
+            },
+            {
+                "request": "Download attachments from emails if they're from the finance team",
+                "services": [
+                    {
+                        "email_reader": "Get emails with attachments"
+                    },
+                    {
+                        "conditions": "Check sender domain and department conditions"
+                    },
+                    {
+                        "email_manager": "Download attachments for matching emails"
                     }
                 ]
             }
@@ -215,9 +230,10 @@
             "loop_check"
         ],
         "outputs": [
-            "Condition evaluation result",
-            "Next step to execute",
-            "Loop continuation status"
+            "Condition evaluation result (true/false)",
+            "Next step identifier for execution flow",
+            "Loop continuation status for iterative processes",
+            "Error details if evaluation fails"
         ]
     }
 } 

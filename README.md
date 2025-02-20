@@ -8,7 +8,7 @@ AI Secretary is a sophisticated system that processes natural language requests 
 
 ## Architecture
 
-The system consists of core components that work together to process and execute user requests:
+The system consists of core components that work together to process and execute user requests. A Ticket is created upon a request via Slack message and passed along the chain of components until the request is fulfilled. Here is the flow a successful request:
 
 ```
                                     +----------------+
@@ -93,13 +93,15 @@ The system uses two main files for service definitions:
    - Example format:
 ```yaml
 service_name:
-  name: "Human-Readable Name"
+  name: "Service Name"
   required_entities:
     - entity1
     - entity2
   optional_entities:
     - optional1
     - optional2
+    - optional3
+    - optional4
   steps:
     - name: "Step Name"
       tool: tool_name
@@ -111,16 +113,17 @@ service_name:
       on_error:
         - action: "retry"
           max_attempts: 3
-    - name: "Another Step"
+
+    - name: "Next Step"
       tool: another_tool
       id: next_step_id
       action: execute
       params:
-        operation: "specific_operation"
+        operation: "operation_name"
         param1: "{entity1}"
-        param2: "{entity2 if entity2 else default_value}"
+        param2: "{entity2 if entity2 else 'default'}"
       on_success:
-        - condition: "response.get('success') and response.get('result_id')"
+        - condition: "response.get('success') and response.get('data')"
           next_step: complete
       on_error:
         - condition: "error.get('type') == 'specific_error'"
@@ -129,16 +132,16 @@ service_name:
           action: "retry"
           next_step: "authenticate"
         - action: "notify_error"
+
   success_criteria:
     - "response.get('success')"
-    - "response.get('result_id')"
+    - "response.get('data')"
   error_handling:
-    specific_error:
-      message: "Specific error occurred: {error}"
-      action: "specific_action"
-    general_error:
-      message: "Failed to execute: {error}"
-      action: "retry"
+    retry_count: 3
+    delay_seconds: 5
+    conditions:
+      network_error: true
+      rate_limit: true
 ```
 
 ### Core Components
@@ -165,6 +168,93 @@ service_name:
    - Handles error messages
    - Requests missing information from users
 
+### Ticket System
+
+The Ticket system (`src/models/ticket.py`) is a fundamental component that acts as the central state manager for request processing. It maintains the complete lifecycle of a user request from initial message to final response.
+
+#### Ticket Structure
+1. **Core Identification**
+   - Unique ticket ID
+   - Creation timestamp
+   - User and channel information
+   - Thread tracking for multi-message conversations
+
+2. **Request Processing State**
+   - Original message
+   - Identified intent
+   - Selected service
+   - Required and provided entities (parameters)
+   - Missing entity tracking
+   - Current status (CREATED, ANALYZING, EXECUTING, etc.)
+
+3. **Conversation Management**
+   - Tracks both incoming (user) and outgoing (assistant) messages
+   - Maintains conversation history with timestamps
+   - Stores message metadata and context
+
+4. **Execution Tracking**
+   - Complete execution plan with ordered steps
+   - Step-by-step results
+   - Error history with types and descriptions
+   - Created service records
+   - Final execution results
+
+#### Status Lifecycle
+```
+CREATED → ANALYZING → EXECUTING → COMPLETED
+                   ↘ WAITING_INPUT ↗
+                   ↘ SERVICE_CREATION ↗
+                   ↘ ERROR
+```
+
+#### Key Features
+1. **State Management**
+   - Maintains consistent state across all system components
+   - Tracks progress through the execution pipeline
+   - Records all state changes and events
+
+2. **Error Handling**
+   - Captures and categorizes errors
+   - Maintains error history
+   - Supports retry mechanisms
+   - Tracks failed services and steps
+
+3. **Multi-Message Support**
+   - Handles conversation threads
+   - Maintains context across multiple messages
+   - Supports incremental information gathering
+
+4. **Data Persistence**
+   - Serializable to/from dictionary format
+   - Supports ticket reconstruction
+   - Maintains complete audit trail
+
+5. **Component Integration**
+   - Provides interfaces for each system component
+   - Ensures data consistency
+   - Facilitates component communication
+   - Controls access to ticket data
+
+#### Usage Example
+```python
+# Ticket lifecycle example
+ticket = Ticket(
+    user_info={"user_id": "U123", "channel_id": "C456"},
+    original_message="Schedule a meeting with John tomorrow"
+)
+
+# Status updates as request processes
+ticket.update_status(TicketStatus.ANALYZING)
+ticket.add_incoming_message("What time should I schedule it for?")
+ticket.update_status(TicketStatus.WAITING_INPUT)
+ticket.add_outgoing_message("What time would you like the meeting?")
+ticket.add_incoming_message("3 PM")
+ticket.update_status(TicketStatus.EXECUTING)
+ticket.add_execution_step({"step": "create_calendar_event", ...})
+ticket.store_step_result(1, {"status": "success", ...})
+ticket.update_status(TicketStatus.COMPLETED)
+```
+
 ### System Flows
 
 1. Basic Request Flow:
@@ -187,8 +277,12 @@ User → Service Analyzer → GPT → Message Maker → User
 
 3. Error Recovery Flow:
 ```
-Step Execution → Error → Check Service Definition → Retry/Report
-              └── Fail  └── Retry Count/Actions   └── Continue/Stop
+Step Execution → Error → Check Service Definition → Analyzer GPT w/ Steps/Errors
+              └── Fail  └── Retry Count/Actions   └── New Chain or Stop
+                                                       ↓
+                                                  Message Maker
+                                                     ↓
+                                                 User Update
 ```
 
 ## Setup
@@ -269,5 +363,3 @@ Current implementation limitations:
    - No parameter passing between steps
    - No dynamic parameter interpolation
    - Simple required/optional parameter validation
-
-### Adding a New Service
