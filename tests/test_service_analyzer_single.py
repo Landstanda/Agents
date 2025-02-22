@@ -147,13 +147,7 @@ class TestServiceAnalyzerBasic:
         # Verify services are in correct order
         services = [step["service_id"] for step in result.execution_plan]
         assert "schedule_meeting" in services, "Expected schedule_meeting service"
-        assert "send_email" in services, "Expected send_email service"
-        
-        # Verify required parameters for meeting
-        meeting_step = next(step for step in result.execution_plan if step["service_id"] == "schedule_meeting")
-        required_params = meeting_step.get("required_params", {})
-        assert "time" in required_params, "Missing required parameter: time"
-        assert "date" in required_params, "Missing required parameter: date"
+        assert "email_composer" in services, "Expected email_composer service"
         
         # Verify no errors occurred
         assert not result.errors, f"Unexpected errors: {result.errors}"

@@ -1,0 +1,196 @@
+================================================================================
+Session Started: 08:13:03 PM Feb 21, 2025
+================================================================================
+
+
+================================================================================
+[08:13:03 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> Please schedule dinner with Gabi tomorrow night at 7"
+channel: "C08CF2DPMH8"
+ts: "1740197582.106069"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1740197582.106069",
+  "client_msg_id": "a62beed2-eae3-427c-855f-a834d6b31213",
+  "text": "<@U08CFAH1H1Q> Please schedule dinner with Gabi tomorrow night at 7",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "IhfGk",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " Please schedule dinner with Gabi tomorrow night at 7"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1740197582.106069",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[08:13:03 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> Please schedule dinner with Gabi tomorrow night at 7"
+channel: "C08CF2DPMH8"
+ts: "1740197582.106069"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1740197582.106069",
+  "client_msg_id": "a62beed2-eae3-427c-855f-a834d6b31213",
+  "text": "<@U08CFAH1H1Q> Please schedule dinner with Gabi tomorrow night at 7",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "IhfGk",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " Please schedule dinner with Gabi tomorrow night at 7"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1740197582.106069"
+}
+
+
+================================================================================
+[08:13:07 PM] ServiceAnalyzer - request_analyzed
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250221_201303"
+confidence: 1.0
+execution_plan: [
+  {
+    "step_number": 1,
+    "service_id": "schedule_meeting",
+    "description": "Schedule a dinner with Gabi tomorrow night at 7",
+    "required_params": {
+      "time": "7pm",
+      "date": "tomorrow"
+    },
+    "optional_params": {
+      "participants": "Gabi",
+      "description": "Dinner"
+    }
+  }
+]
+missing_inputs: []
+
+
+================================================================================
+[08:13:08 PM] Agent - tools_loaded
+--------------------------------------------------------------------------------
+total_tools: 7
+available_tools: [
+  "gpt_handler",
+  "email_manager",
+  "google_calendar",
+  "email_reader",
+  "email_composer",
+  "google_auth",
+  "conditions"
+]
+
+
+================================================================================
+[08:13:08 PM] Agent - services_loaded
+--------------------------------------------------------------------------------
+services_count: 5
+
+
+================================================================================
+[08:13:09 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I'm working on scheduling your dinner with Gabi. Let me take care of that for you."
+channel: "C08CF2DPMH8"
+ts: "1740197588.459369"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1740197588.459369",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I'm working on scheduling your dinner with Gabi. Let me take care of that for you.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "NK7t",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I'm working on scheduling your dinner with Gabi. Let me take care of that for you."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1740197588.459369",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[08:13:09 PM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

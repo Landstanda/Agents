@@ -4,7 +4,11 @@ An intelligent AI-powered secretary that can automate any computer-based task th
 
 ## Overview
 
-AI Secretary is a sophisticated system that processes natural language requests from Slack, automatically executes tasks using existing service definitions, and can even create new services on the fly when encountering novel requests. It acts as a bridge between human intent and computer execution, making task automation accessible through simple conversation.
+AI Secretary can automonously perform many tasks on a computer when prompted with natural language requests. It's designed to break a request down into steps and then uses the service index to match those steps with services offered. It then uses a series of task modules to execute the request. It troubleshoots errors, dynamically seeks solutions, and politely reports upon success, failure, and when it determines if it requires more information from the user.
+
+### How it works
+
+A message comes in from slack, the initial data is recorded by the Ticket and past to the Service Analyzer, which compiles the message in a prompt that includes the Service Index. This is passed to a GPT with instructions to break the request down in to steps, match those steps with services, and return the result in a JSON object. The Ticket is updated and passed to the Agent who uses the Service Definitions as a guide in how to execute each service, step by step according to the GPT, utilizing task modules.  When there is success, the Agent signals the Message Maker to notify the user. If the agent fails to accomplish the chain, the information is passed back to the Service Analyzer for either a new chain, or to signal the Message Maker to notify the user that it failed or it needs more info.
 
 ## Architecture
 

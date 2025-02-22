@@ -1,0 +1,273 @@
+================================================================================
+Session Started: 10:05:37 AM Feb 22, 2025
+================================================================================
+
+
+================================================================================
+[10:05:37 AM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[10:05:44 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> Schedule a date with Gabi tonight at 9:15"
+channel: "C08CF2DPMH8"
+ts: "1740247543.763349"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1740247543.763349",
+  "client_msg_id": "5e14c020-ee02-4760-a79b-64af4e060f5f",
+  "text": "<@U08CFAH1H1Q> Schedule a date with Gabi tonight at 9:15",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "4L5nI",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " Schedule a date with Gabi tonight at 9:15"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1740247543.763349",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[10:05:44 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> Schedule a date with Gabi tonight at 9:15"
+channel: "C08CF2DPMH8"
+ts: "1740247543.763349"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1740247543.763349",
+  "client_msg_id": "5e14c020-ee02-4760-a79b-64af4e060f5f",
+  "text": "<@U08CFAH1H1Q> Schedule a date with Gabi tonight at 9:15",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "4L5nI",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " Schedule a date with Gabi tonight at 9:15"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1740247543.763349"
+}
+
+
+================================================================================
+[10:05:48 AM] ServiceAnalyzer - request_analyzed
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250222_100544"
+confidence: 1.0
+execution_plan: [
+  {
+    "step_number": 1,
+    "service_id": "schedule_meeting",
+    "description": "Schedule a date with Gabi tonight at 9:15",
+    "required_params": {
+      "time": "9:15",
+      "date": "tonight"
+    },
+    "optional_params": {
+      "participants": "Gabi"
+    }
+  }
+]
+missing_inputs: []
+
+
+================================================================================
+[10:05:49 AM] Agent - tools_loaded
+--------------------------------------------------------------------------------
+total_tools: 7
+available_tools: [
+  "gpt_handler",
+  "email_manager",
+  "google_calendar",
+  "email_reader",
+  "email_composer",
+  "google_auth",
+  "conditions"
+]
+
+
+================================================================================
+[10:05:49 AM] Agent - services_loaded
+--------------------------------------------------------------------------------
+services_count: 5
+
+
+================================================================================
+[10:05:49 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I'm working on scheduling your dinner with Gabi. Let me take care of that for you."
+channel: "C08CF2DPMH8"
+ts: "1740247549.484739"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1740247549.484739",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I'm working on scheduling your dinner with Gabi. Let me take care of that for you.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "bH4rh",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I'm working on scheduling your dinner with Gabi. Let me take care of that for you."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1740247549.484739",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[10:05:49 AM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+
+
+================================================================================
+[10:05:50 AM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "Schedule a date with Gabi tonight at 9:15"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250222_100544"
+
+
+================================================================================
+[10:05:51 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I encountered an error while trying to schedule the date with Gabi tonight at 9:15. I will investigate and resolve this issue promptly. Thank you for your patience."
+channel: "C08CF2DPMH8"
+ts: "1740247550.841369"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1740247550.841369",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I encountered an error while trying to schedule the date with Gabi tonight at 9:15. I will investigate and resolve this issue promptly. Thank you for your patience.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "Nh0q",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I encountered an error while trying to schedule the date with Gabi tonight at 9:15. I will investigate and resolve this issue promptly. Thank you for your patience."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1740247550.841369",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[10:05:51 AM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

@@ -1,0 +1,76 @@
+================================================================================
+Session Started: 08:05:08 PM Feb 21, 2025
+================================================================================
+
+
+================================================================================
+[08:05:08 PM] OfficeAssistant - message_processed
+--------------------------------------------------------------------------------
+message: "Please schedule dinner with Gabi tomorrow night at 7"
+channel_id: "C08CF2DPMH8"
+user_id: "U08CTNTT97B"
+ticket_id: "ticket_20250221_200442"
+
+
+================================================================================
+[08:05:09 PM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CFAH1H1Q"
+text: "I encountered an error while trying to schedule your dinner with Gabi. Unfortunately, I couldn't proceed due to a technical issue. I'll work on resolving this problem so we can proceed with the scheduling. Thank you for your understanding."
+channel: "C08CF2DPMH8"
+ts: "1740197108.298199"
+thread_ts: null
+full_event: {
+  "user": "U08CFAH1H1Q",
+  "type": "message",
+  "ts": "1740197108.298199",
+  "bot_id": "B08D451MSAC",
+  "app_id": "A08CFA8P8V8",
+  "text": "I encountered an error while trying to schedule your dinner with Gabi. Unfortunately, I couldn't proceed due to a technical issue. I'll work on resolving this problem so we can proceed with the scheduling. Thank you for your understanding.",
+  "team": "T08C0G5FA4F",
+  "bot_profile": {
+    "id": "B08D451MSAC",
+    "deleted": false,
+    "name": "AphroAgent",
+    "updated": 1739072535,
+    "app_id": "A08CFA8P8V8",
+    "icons": {
+      "image_36": "https://a.slack-edge.com/80588/img/plugins/app/bot_36.png",
+      "image_48": "https://a.slack-edge.com/80588/img/plugins/app/bot_48.png",
+      "image_72": "https://a.slack-edge.com/80588/img/plugins/app/service_72.png"
+    },
+    "team_id": "T08C0G5FA4F"
+  },
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "Df/",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "text",
+              "text": "I encountered an error while trying to schedule your dinner with Gabi. Unfortunately, I couldn't proceed due to a technical issue. I'll work on resolving this problem so we can proceed with the scheduling. Thank you for your understanding."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1740197108.298199",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[08:05:09 PM] OfficeAssistant - event_skipped
+--------------------------------------------------------------------------------
+reason: "Not a valid user message"
+has_text: true
+subtype: null
+bot_id: "B08D451MSAC"
+user: "U08CFAH1H1Q"
+

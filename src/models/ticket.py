@@ -1,9 +1,10 @@
-from typing import Dict, Any, Optional, List, Set
+from typing import Dict, Any, Optional, List, Set, Deque
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 import logging
 from copy import deepcopy
+from collections import deque
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,10 @@ class Message:
     direction: str  # "incoming" or "outgoing"
     metadata: Dict[str, Any] = field(default_factory=dict)  # For additional context
 
+# Constants for memory management
+MAX_MESSAGES = 100  # Maximum number of messages to keep
+MAX_HISTORY = 50   # Maximum number of historical items
+
 @dataclass
 class Ticket:
     """
@@ -80,21 +85,21 @@ class Ticket:
     current_step: Optional[str] = None
     execution_plan: List[Dict[str, Any]] = field(default_factory=list)
     
-    # Conversation history
-    incoming_messages: List[Message] = field(default_factory=list)  # Set by ServiceAnalyzer
-    outgoing_messages: List[Message] = field(default_factory=list)  # Set by MessageMaker
+    # Conversation history with bounded deques
+    incoming_messages: Deque[Message] = field(default_factory=lambda: deque(maxlen=MAX_MESSAGES))
+    outgoing_messages: Deque[Message] = field(default_factory=lambda: deque(maxlen=MAX_MESSAGES))
     
-    # Execution history
-    steps_executed: List[Dict[str, Any]] = field(default_factory=list)
-    errors: List[Dict[str, Any]] = field(default_factory=list)
-    created_services: List[Dict[str, Any]] = field(default_factory=list)
+    # Execution history with bounded deques
+    steps_executed: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=MAX_HISTORY))
+    errors: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=MAX_HISTORY))
+    created_services: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=MAX_HISTORY))
     
     # Results
     execution_results: List[Dict[str, Any]] = field(default_factory=list)
     final_response: Optional[str] = None
 
-    # Execution tracking
-    execution_steps: List[Dict[str, Any]] = field(default_factory=list)
+    # Execution tracking with bounded deque
+    execution_steps: Deque[Dict[str, Any]] = field(default_factory=lambda: deque(maxlen=MAX_HISTORY))
     step_results: Dict[int, Any] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -267,3 +272,33 @@ class Ticket:
             if step['step_number'] not in executed_steps:
                 return step
         return None 
+
+    @property
+    def messages(self) -> List[Message]:
+        """Get all messages in chronological order."""
+        all_messages = list(self.incoming_messages) + list(self.outgoing_messages)
+        return sorted(all_messages, key=lambda m: m.timestamp)
+        
+    def add_message(self, content: str, source: str, metadata: Optional[Dict[str, Any]] = None):
+        """Add a message to the appropriate queue."""
+        message = Message(
+            content=content,
+            timestamp=datetime.now(),
+            direction="incoming" if source == "user" else "outgoing",
+            metadata=metadata or {}
+        )
+        
+        if source == "user":
+            self.incoming_messages.append(message)
+        else:
+            self.outgoing_messages.append(message)
+            
+    def get_last_message(self, direction: Optional[str] = None) -> Optional[Message]:
+        """Get the last message, optionally filtered by direction."""
+        if direction == "incoming":
+            return self.incoming_messages[-1] if self.incoming_messages else None
+        elif direction == "outgoing":
+            return self.outgoing_messages[-1] if self.outgoing_messages else None
+        else:
+            messages = self.messages
+            return messages[-1] if messages else None 

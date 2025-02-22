@@ -5,6 +5,7 @@ from openai import AsyncOpenAI
 from slack_sdk.web.async_client import AsyncWebClient
 from src.models import Ticket, TicketStatus
 from src.utils.flow_logger import FlowLogger
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,18 @@ class MessageMaker:
                 raise ValueError("Missing required environment variables SLACK_BOT_TOKEN or OPENAI_API_KEY")
                 
             self.slack = AsyncWebClient(token=self.slack_token)
-            self.openai = AsyncOpenAI(api_key=self.openai_key)
+            
+            # Create httpx client with proper configuration
+            http_client = httpx.AsyncClient(
+                timeout=60.0,
+                follow_redirects=True
+            )
+            
+            # Initialize OpenAI client with http_client
+            self.openai = AsyncOpenAI(
+                api_key=self.openai_key,
+                http_client=http_client
+            )
         
         self.flow_logger = flow_logger
         
@@ -176,7 +188,7 @@ class MessageMaker:
     def _format_message_history(self, ticket: Ticket) -> str:
         """Format message history for GPT prompt."""
         return "\n".join([
-            f"{msg['source']}: {msg['message']}"
+            f"{msg.direction}: {msg.content}"
             for msg in ticket.messages[-5:]  # Last 5 messages for context
         ])
     

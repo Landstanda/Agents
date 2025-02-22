@@ -23,7 +23,10 @@ class FlowLogger:
         
         # Set up current log file
         self.current_log_file = None
-        self._setup_log_file()
+        
+    async def setup(self):
+        """Async setup of the logger."""
+        await self._setup_log_file()
         
     async def _setup_log_file(self):
         """Set up the current log file with timestamp."""

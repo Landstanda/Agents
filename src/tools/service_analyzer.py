@@ -7,6 +7,7 @@ from openai import AsyncOpenAI
 from datetime import datetime
 from src.models import Ticket, TicketStatus
 from src.utils.flow_logger import FlowLogger
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,22 @@ class ServiceAnalyzer:
                  flow_logger: Optional[FlowLogger] = None):
         """Initialize the service analyzer."""
         self.services_path = Path(services_path)
-        self.openai = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
+            
+        # Create httpx client with proper configuration
+        http_client = httpx.AsyncClient(
+            timeout=60.0,
+            follow_redirects=True
+        )
+        
+        # Initialize OpenAI client with http_client
+        self.openai = AsyncOpenAI(
+            api_key=api_key,
+            http_client=http_client
+        )
+        
         self.flow_logger = flow_logger
         self.services_schema = self._load_services_schema()
         

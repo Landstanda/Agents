@@ -43,30 +43,54 @@ class GoogleAuthModule(BaseModule):
 
     async def _refresh_credentials(self, creds):
         """Refresh credentials in a thread pool"""
-        return await asyncio.to_thread(creds.refresh, Request())
+        try:
+            return await asyncio.to_thread(creds.refresh, Request())
+        except Exception as e:
+            logger.error(f"Failed to refresh token: {str(e)}")
+            if "invalid_grant" in str(e):
+                raise ValueError("Token refresh failed - needs reauthorization") from e
+            raise
 
     async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Handle Google authentication flow"""
         try:
             logger.debug("\n=== Starting Google Authentication Flow ===")
+            logger.debug(f"Current working directory: {os.getcwd()}")
             
             # Validate credentials file
             logger.debug("🔍 Validating credentials file...")
-            creds_path = self.credential_manager.get_credentials_path()
-            logger.debug(f"Credentials path: {creds_path}")
+            try:
+                creds_path = self.credential_manager.get_credentials_path()
+                logger.debug(f"Credentials path: {creds_path}")
+                logger.debug(f"Credentials file exists: {os.path.exists(creds_path)}")
+                logger.debug(f"Credentials file permissions: {oct(os.stat(creds_path).st_mode)[-3:]}")
+            except Exception as e:
+                logger.error(f"Error accessing credentials file: {str(e)}")
+                raise
             
             if not await self.credential_manager.validate_credentials_file():
                 logger.error("❌ Invalid credentials file")
                 raise ValueError("Invalid credentials file")
             logger.debug("✓ Credentials file is valid")
 
+            # Check token directory
+            token_dir = self.credential_manager.token_dir
+            logger.debug(f"Token directory: {token_dir}")
+            logger.debug(f"Token directory exists: {os.path.exists(token_dir)}")
+            if os.path.exists(token_dir):
+                logger.debug(f"Token directory permissions: {oct(os.stat(token_dir).st_mode)[-3:]}")
+
             # Load existing token if available
             logger.debug("🔄 Attempting to load existing token...")
             token_data = await self.credential_manager.load_token(self.service_name)
             if token_data:
                 logger.debug("✓ Found existing token, deserializing...")
-                self.creds = pickle.loads(token_data)
-                logger.debug(f"Token loaded. Valid: {self.creds.valid if self.creds else False}, Expired: {self.creds.expired if self.creds else True}")
+                try:
+                    self.creds = pickle.loads(token_data)
+                    logger.debug(f"Token loaded. Valid: {self.creds.valid if self.creds else False}, Expired: {self.creds.expired if self.creds else True}")
+                except Exception as e:
+                    logger.error(f"Error deserializing token: {str(e)}")
+                    self.creds = None
             else:
                 logger.debug("ℹ️ No existing token found")
                 
@@ -74,11 +98,23 @@ class GoogleAuthModule(BaseModule):
             if not self.creds or not self.creds.valid:
                 logger.debug("🔄 Credentials need refresh or creation")
                 
-                if self.creds and self.creds.expired and self.creds.refresh_token:
-                    logger.debug("🔄 Refreshing expired credentials...")
-                    await self._refresh_credentials(self.creds)
-                    logger.debug("✓ Credentials refreshed successfully")
-                else:
+                try:
+                    if self.creds and self.creds.expired and self.creds.refresh_token:
+                        logger.debug("🔄 Refreshing expired credentials...")
+                        try:
+                            await self._refresh_credentials(self.creds)
+                            logger.debug("✓ Credentials refreshed successfully")
+                        except Exception as e:
+                            logger.error(f"Error refreshing credentials: {str(e)}")
+                            raise
+                except ValueError as e:
+                    if "needs reauthorization" in str(e):
+                        logger.info("🔄 Token refresh failed, starting new OAuth2 flow...")
+                        self.creds = None  # Force new OAuth2 flow
+                    else:
+                        raise
+
+                if not self.creds or not self.creds.valid:
                     logger.debug("🔐 Starting new OAuth2 flow...")
                     # Start OAuth2 flow with credentials file
                     creds_path = self.credential_manager.get_credentials_path()
@@ -116,9 +152,13 @@ class GoogleAuthModule(BaseModule):
 
                 # Save the credentials securely
                 logger.debug("💾 Saving new credentials...")
-                token_data = pickle.dumps(self.creds)
-                await self.credential_manager.secure_token_storage(token_data, self.service_name)
-                logger.debug("✓ Credentials saved successfully")
+                try:
+                    token_data = pickle.dumps(self.creds)
+                    await self.credential_manager.secure_token_storage(token_data, self.service_name)
+                    logger.debug("✓ Credentials saved successfully")
+                except Exception as e:
+                    logger.error(f"Error saving credentials: {str(e)}")
+                    raise
 
             # Verify final credential state
             logger.debug("\n=== Final Credential State ===")

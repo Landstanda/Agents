@@ -1,0 +1,53 @@
+================================================================================
+Session Started: 08:01:36 AM Feb 22, 2025
+================================================================================
+
+
+================================================================================
+[08:01:37 AM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[08:01:50 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> Please schedule dinner with Gabi tomorrow night at 7"
+channel: "C08CF2DPMH8"
+ts: "1740240109.853759"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1740240109.853759",
+  "client_msg_id": "c07c0b21-72ad-4be8-b769-9c44b952526b",
+  "text": "<@U08CFAH1H1Q> Please schedule dinner with Gabi tomorrow night at 7",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "IhfGk",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " Please schedule dinner with Gabi tomorrow night at 7"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1740240109.853759",
+  "channel_type": "channel"
+}
+

@@ -1,7 +1,7 @@
 import os
 import logging
 import asyncio
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Set
 from slack_bolt.async_app import AsyncApp
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.socket_mode.aiohttp import SocketModeClient
@@ -16,11 +16,14 @@ from datetime import datetime
 import traceback
 from dotenv import load_dotenv
 import signal
+from contextlib import AsyncExitStack
+
+# Configure logging at the start of the program
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
-
-logger = logging.getLogger(__name__)
 
 class OfficeAssistant:
     """
@@ -38,13 +41,21 @@ class OfficeAssistant:
         self.message_maker = None
         self.flow_logger = None
         self.bot_user_id = None
+        self._exit_stack = AsyncExitStack()
+        self._pending_tasks: Set[asyncio.Task] = set()
+        self._shutdown_event = asyncio.Event()
+        
+    def _track_task(self, task: asyncio.Task) -> None:
+        """Track a pending task and remove it when done."""
+        self._pending_tasks.add(task)
+        task.add_done_callback(self._pending_tasks.discard)
         
     async def setup(self):
         """Initialize components and authenticate with Slack."""
         try:
             # Initialize flow logger first
             self.flow_logger = FlowLogger()
-            await self.flow_logger._setup_log_file()
+            await self.flow_logger.setup()
             
             # Initialize service analyzer with flow logger
             self.service_analyzer = ServiceAnalyzer(flow_logger=self.flow_logger)
@@ -74,6 +85,7 @@ class OfficeAssistant:
             
         except Exception as e:
             logger.error(f"Error during setup: {str(e)}")
+            await self.stop()  # Ensure cleanup on setup failure
             raise
             
     async def handle_socket_mode_request(self, client: SocketModeClient, req: SocketModeRequest) -> None:
@@ -90,108 +102,138 @@ class OfficeAssistant:
             logger.error(f"Error handling socket mode request: {str(e)}", exc_info=True)
             
     async def process_event(self, event: dict) -> None:
-        """Process a Slack event."""
+        """Process a Slack event with task tracking."""
+        # Create a task for event processing
+        task = asyncio.create_task(self._process_event_internal(event))
+        self._track_task(task)
+        await task
+
+    async def _process_event_internal(self, event: dict) -> None:
+        """Internal event processing with timeout."""
         try:
-            # Log event details
-            logger.info(f"Processing event: {event}")
-            await self.flow_logger.log_event(
-                "OfficeAssistant",
-                "event_details",
-                {
-                    "event_type": event.get("type"),
-                    "user": event.get("user"),
-                    "text": event.get("text"),
-                    "channel": event.get("channel"),
-                    "ts": event.get("ts"),
-                    "thread_ts": event.get("thread_ts"),
-                    "full_event": event
-                }
-            )
-            
-            # Skip bot messages and message subtypes
-            if (
-                "text" not in event or
-                event.get("subtype") is not None or
-                event.get("bot_id") is not None or
-                event.get("user") == self.bot_user_id
-            ):
-                logger.info(f"Skipping event: has_text={'text' in event}, subtype={event.get('subtype')}, bot_id={event.get('bot_id')}")
+            # Set a timeout for the entire event processing
+            async with asyncio.timeout(30):  # 30 second timeout for event processing
+                # Log event details
+                logger.info(f"Processing event: {event}")
                 await self.flow_logger.log_event(
                     "OfficeAssistant",
-                    "event_skipped",
+                    "event_details",
                     {
-                        "reason": "Not a valid user message",
-                        "has_text": "text" in event,
-                        "subtype": event.get("subtype"),
-                        "bot_id": event.get("bot_id"),
-                        "user": event.get("user")
+                        "event_type": event.get("type"),
+                        "user": event.get("user"),
+                        "text": event.get("text"),
+                        "channel": event.get("channel"),
+                        "ts": event.get("ts"),
+                        "thread_ts": event.get("thread_ts"),
+                        "full_event": event
                     }
                 )
-                return
-
-            # Only process app_mention events
-            if event.get("type") != "app_mention":
-                return
-
-            message = event["text"]
-            channel_id = event["channel"]
-            user_info = {
-                "user_id": event["user"],
-                "channel_id": channel_id,
-                "thread_ts": event.get("thread_ts"),
-                "ts": event["ts"]
-            }
-            
-            # Remove bot mention if present
-            bot_mention = f"<@{self.bot_user_id}>"
-            if bot_mention in message:
-                message = message.replace(bot_mention, "").strip()
-            
-            logger.info(f"Processing message: {message}")
-            logger.info(f"Channel ID: {channel_id}")
-            
-            # Create ticket
-            ticket = Ticket(
-                user_info=user_info,
-                original_message=message,
-                channel_id=channel_id,
-                thread_ts=event.get("thread_ts")
-            )
-            
-            # Analyze the request using service analyzer
-            ticket = await self.service_analyzer.analyze_request(ticket)
-            
-            # Execute the service if one was matched and all inputs are available
-            if ticket.status == TicketStatus.EXECUTING:
-                logger.debug(f"Executing service plan: {ticket.execution_plan}")
-                agent = Agent(flow_logger=self.flow_logger)
-                await agent.initialize()
                 
-                # Execute each service in the plan
-                for step in ticket.execution_plan:
+                # Skip bot messages and message subtypes
+                if (
+                    "text" not in event or
+                    event.get("subtype") is not None or
+                    event.get("bot_id") is not None or
+                    event.get("user") == self.bot_user_id
+                ):
+                    logger.info(f"Skipping event: has_text={'text' in event}, subtype={event.get('subtype')}, bot_id={event.get('bot_id')}")
+                    await self.flow_logger.log_event(
+                        "OfficeAssistant",
+                        "event_skipped",
+                        {
+                            "reason": "Not a valid user message",
+                            "has_text": "text" in event,
+                            "subtype": event.get("subtype"),
+                            "bot_id": event.get("bot_id"),
+                            "user": event.get("user")
+                        }
+                    )
+                    return
+
+                # Only process app_mention events
+                if event.get("type") != "app_mention":
+                    return
+
+                message = event["text"]
+                channel_id = event["channel"]
+                user_info = {
+                    "user_id": event["user"],
+                    "channel_id": channel_id,
+                    "thread_ts": event.get("thread_ts"),
+                    "ts": event["ts"]
+                }
+                
+                # Remove bot mention if present
+                bot_mention = f"<@{self.bot_user_id}>"
+                if bot_mention in message:
+                    message = message.replace(bot_mention, "").strip()
+                
+                logger.info(f"Processing message: {message}")
+                logger.info(f"Channel ID: {channel_id}")
+                
+                # Create ticket
+                ticket = Ticket(
+                    user_info=user_info,
+                    original_message=message,
+                    channel_id=channel_id,
+                    thread_ts=event.get("thread_ts")
+                )
+                
+                # Analyze the request using service analyzer
+                ticket = await self.service_analyzer.analyze_request(ticket)
+                
+                # Execute the service if one was matched and all inputs are available
+                if ticket.status == TicketStatus.EXECUTING:
+                    logger.debug(f"Executing service plan: {ticket.execution_plan}")
+                    agent = Agent(flow_logger=self.flow_logger)
+                    await agent.initialize()
+                    
+                    # Send initial acknowledgment
+                    initial_message = "I'm working on scheduling your dinner with Gabi. Let me take care of that for you."
+                    ticket.add_message(initial_message, "assistant")
+                    await self.web_client.chat_postMessage(
+                        channel=ticket.channel_id,
+                        text=initial_message,
+                        thread_ts=ticket.thread_ts
+                    )
+                    
+                    # Execute the service
                     result = await agent.execute_service(ticket)
                     if result.get('status') == 'error':
                         logger.error(f"Service execution failed: {result.get('error')}")
                         ticket.update_status(TicketStatus.ERROR)
                         ticket.add_error(result.get('error'), "execution_error")
-                        break
-                    ticket.execution_results.append(result)
-            
-            # Generate and send response
-            await self.message_maker.send_message(ticket)
-            
-            # Log success
-            await self.flow_logger.log_event(
-                "OfficeAssistant",
-                "message_processed",
-                {
-                    "message": message,
-                    "channel_id": channel_id,
-                    "user_id": user_info["user_id"],
-                    "ticket_id": ticket.ticket_id
-                }
-            )
-            
+                    else:
+                        ticket.execution_results.append(result)
+                        if result.get('status') == 'success':
+                            ticket.update_status(TicketStatus.COMPLETED)
+                    
+                    # Send final response
+                    await self.message_maker.send_message(ticket)
+                else:
+                    # For non-execution statuses (WAITING_INPUT, ERROR, etc.), send message immediately
+                    await self.message_maker.send_message(ticket)
+                
+                # Log success
+                await self.flow_logger.log_event(
+                    "OfficeAssistant",
+                    "message_processed",
+                    {
+                        "message": message,
+                        "channel_id": channel_id,
+                        "user_id": user_info["user_id"],
+                        "ticket_id": ticket.ticket_id
+                    }
+                )
+                
+        except asyncio.TimeoutError:
+            logger.error("Event processing timed out")
+            if self.flow_logger:
+                await self.flow_logger.log_event(
+                    "OfficeAssistant",
+                    "event_timeout",
+                    {"event": event}
+                )
         except Exception as e:
             logger.error(f"Error processing event: {str(e)}")
             logger.error("Full exception details:", exc_info=True)
@@ -319,8 +361,29 @@ class OfficeAssistant:
                 await self.socket_client.close()
             raise
             
-    async def stop(self):
-        """Stop the Socket Mode client."""
+    async def stop(self, timeout: float = 5.0):
+        """Graceful shutdown with timeout."""
+        logger.info("Starting graceful shutdown...")
+        
+        # Signal shutdown
+        self._shutdown_event.set()
+        
+        # Cancel all pending tasks
+        if self._pending_tasks:
+            logger.info(f"Cancelling {len(self._pending_tasks)} pending tasks")
+            for task in self._pending_tasks:
+                task.cancel()
+            
+            # Wait for tasks with timeout
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*self._pending_tasks, return_exceptions=True),
+                    timeout=timeout
+                )
+            except asyncio.TimeoutError:
+                logger.warning(f"Some tasks did not complete within {timeout} seconds")
+        
+        # Close clients explicitly
         try:
             if self.socket_client:
                 logger.info("Closing socket client...")
@@ -328,13 +391,28 @@ class OfficeAssistant:
                 if hasattr(self.socket_client, 'client'):
                     await self.socket_client.client.close()
                 self.socket_client = None
+                
             if self.web_client:
                 logger.info("Closing web client...")
-                await self.web_client.close()
+                # AsyncWebClient doesn't need explicit cleanup
                 self.web_client = None
+                
+            # Close OpenAI clients and their http clients
+            if hasattr(self.service_analyzer, 'openai'):
+                logger.info("Closing service analyzer OpenAI client...")
+                if hasattr(self.service_analyzer.openai._client, 'aclose'):
+                    await self.service_analyzer.openai._client.aclose()
+                
+            if hasattr(self.message_maker, 'openai'):
+                logger.info("Closing message maker OpenAI client...")
+                if hasattr(self.message_maker.openai._client, 'aclose'):
+                    await self.message_maker.openai._client.aclose()
+                
         except Exception as e:
-            logger.error(f"Error during shutdown: {e}")
+            logger.error(f"Error closing clients: {e}")
             
+        logger.info("Shutdown complete")
+
 async def main():
     """Main entry point for the application."""
     assistant = None
