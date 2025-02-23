@@ -6,12 +6,21 @@ import json
 import shutil
 import os
 from dotenv import load_dotenv
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 from src.tools.nlp import NLPAnalyzer, Ticket, TicketStatus
 from src.tools.service_maker import ServiceMaker
 from src.tools.agent import Agent
 from src.tools.message_maker import MessageMaker
 import logging
+from src.tools.service_analyzer import ServiceAnalyzer
+from src.core.registry.service_registry import ServiceRegistry
+from src.core.registry.tool_registry import ToolRegistry
+from src.execution.context import ExecutionContext
+from datetime import datetime
+from src.core.agent.agent import Agent
+from src.models.ticket import Ticket
+from src.core.ticket_status import TicketStatus
+from src.execution.context import ExecutionContext
 
 # Load environment variables from .env file
 load_dotenv()
@@ -427,4 +436,292 @@ async def test_end_to_end_missing_info(test_env):
         assert len(updated_ticket.missing_entities) < len(ticket.missing_entities)
         
     except Exception as e:
-        pytest.fail(f"End-to-end test failed: {str(e)}") 
+        pytest.fail(f"End-to-end test failed: {str(e)}")
+
+@pytest.fixture
+async def mock_openai():
+    """Mock OpenAI client with predefined responses."""
+    mock_client = MagicMock()
+    mock_client.chat.completions.create = AsyncMock()
+    mock_client.chat.completions.create.return_value = MagicMock(
+        choices=[
+            MagicMock(
+                message=MagicMock(
+                    content="""
+                    {
+                        "service": "schedule_meeting",
+                        "confidence": 0.95,
+                        "entities": {
+                            "time": "2:00 PM",
+                            "date": "2024-03-20",
+                            "description": "Team sync meeting",
+                            "participants": ["john@example.com", "alice@example.com"]
+                        }
+                    }
+                    """
+                )
+            )
+        ]
+    )
+    return mock_client
+
+@pytest.fixture
+async def mock_slack():
+    """Mock Slack client."""
+    mock_client = AsyncMock()
+    mock_client.chat_postMessage = AsyncMock(return_value={"ok": True})
+    return mock_client
+
+@pytest.fixture
+async def service_analyzer(mock_openai):
+    """Create ServiceAnalyzer instance with test services."""
+    return ServiceAnalyzer(services_path="tests/fixtures/test_services.json", openai_client=mock_openai)
+
+@pytest.fixture
+async def message_maker(mock_openai, mock_slack):
+    """Create MessageMaker instance with mock clients."""
+    return MessageMaker(use_mock=True, mock_openai=mock_openai, mock_slack=mock_slack)
+
+@pytest.fixture
+async def agent():
+    """Create Agent instance."""
+    service_registry = ServiceRegistry()
+    tool_registry = ToolRegistry()
+    return Agent(service_registry, tool_registry)
+
+@pytest.mark.asyncio
+class TestServiceAnalyzerIntegration:
+    """Integration tests for ServiceAnalyzer."""
+    
+    @pytest.mark.asyncio
+    async def test_analyze_and_execute(self, service_analyzer, agent):
+        """Test complete flow from analysis to execution."""
+        # Create test ticket
+        ticket = Ticket(
+            id="test-123",
+            user_id="U123",
+            channel_id="C123",
+            message="Schedule a team meeting tomorrow at 2 PM",
+            status=TicketStatus.NEW
+        )
+        
+        # Analyze request
+        analysis = await service_analyzer.analyze(ticket)
+        assert analysis["service"] == "schedule_meeting"
+        assert analysis["confidence"] > 0.8
+        assert "time" in analysis["entities"]
+        assert "date" in analysis["entities"]
+        
+        # Update ticket with analysis results
+        ticket.service = analysis["service"]
+        ticket.entities = analysis["entities"]
+        
+        # Execute the request
+        context = ExecutionContext(ticket=ticket)
+        result = await agent.execute(context)
+        
+        assert result.status == TicketStatus.COMPLETED
+        assert "event_id" in result.response
+    
+    @pytest.mark.asyncio
+    async def test_analyze_missing_information(self, service_analyzer):
+        """Test analyzing request with missing information."""
+        ticket = Ticket(
+            id="test-124",
+            user_id="U123",
+            channel_id="C123",
+            message="Schedule a meeting",
+            status=TicketStatus.NEW
+        )
+        
+        # Mock analyzer to return missing parameters
+        service_analyzer._openai_client.chat.completions.create.return_value = MagicMock(
+            choices=[
+                MagicMock(
+                    message=MagicMock(
+                        content="""
+                        {
+                            "service": "schedule_meeting",
+                            "confidence": 0.9,
+                            "entities": {},
+                            "missing_entities": ["time", "date", "participants"]
+                        }
+                        """
+                    )
+                )
+            ]
+        )
+        
+        analysis = await service_analyzer.analyze(ticket)
+        assert "missing_entities" in analysis
+        assert len(analysis["missing_entities"]) > 0
+    
+    @pytest.mark.asyncio
+    async def test_analyze_unsupported_request(self, service_analyzer):
+        """Test analyzing unsupported request."""
+        ticket = Ticket(
+            id="test-125",
+            user_id="U123",
+            channel_id="C123",
+            message="Order a pizza",
+            status=TicketStatus.NEW
+        )
+        
+        # Mock analyzer to return low confidence
+        service_analyzer._openai_client.chat.completions.create.return_value = MagicMock(
+            choices=[
+                MagicMock(
+                    message=MagicMock(
+                        content="""
+                        {
+                            "service": null,
+                            "confidence": 0.2,
+                            "entities": {}
+                        }
+                        """
+                    )
+                )
+            ]
+        )
+        
+        analysis = await service_analyzer.analyze(ticket)
+        assert analysis["confidence"] < 0.5
+        assert not analysis["service"]
+
+@pytest.mark.asyncio
+class TestMessageMakerIntegration:
+    """Integration tests for MessageMaker."""
+    
+    @pytest.fixture
+    async def message_maker(self, mock_openai, mock_slack):
+        """Create a MessageMaker instance with mock clients."""
+        return MessageMaker(use_mock=True, mock_openai=mock_openai, mock_slack=mock_slack)
+    
+    async def test_success_message_generation(self, message_maker):
+        """Test generating success message."""
+        ticket = Ticket(
+            id="test-126",
+            user_id="U123",
+            channel_id="C123",
+            message="Schedule a team meeting",
+            status=TicketStatus.COMPLETED,
+            service="schedule_meeting",
+            entities={
+                "time": "2:00 PM",
+                "date": "2024-03-20",
+                "description": "Team sync meeting",
+                "participants": ["john@example.com", "alice@example.com"]
+            }
+        )
+        ticket.execution_results = [{
+            "success": True,
+            "event_id": "123",
+            "event_link": "https://calendar.google.com/123"
+        }]
+        
+        # Mock GPT response for success message
+        message_maker.openai.chat.completions.create.return_value = MagicMock(
+            choices=[
+                MagicMock(
+                    message=MagicMock(
+                        content="Meeting scheduled successfully! You can view it here: https://calendar.google.com/123"
+                    )
+                )
+            ]
+        )
+        
+        # Generate and send message
+        await message_maker.send_message(ticket)
+        
+        # Verify message was sent
+        assert message_maker.slack.chat_postMessage.called
+        call_args = message_maker.slack.chat_postMessage.call_args
+        sent_message = call_args[1]["text"]
+        
+        # Verify message content
+        assert "success" in sent_message.lower()
+        assert "https://calendar.google.com/123" in sent_message
+    
+    async def test_error_message_generation(self, message_maker):
+        """Test generating error message."""
+        ticket = Ticket(
+            id="test-127",
+            user_id="U123",
+            channel_id="C123",
+            message="Schedule a team meeting",
+            status=TicketStatus.ERROR,
+            service="schedule_meeting"
+        )
+        ticket.add_error("Missing required information: time, date", "validation_error")
+        
+        # Mock GPT response for error message
+        message_maker.openai.chat.completions.create.return_value = MagicMock(
+            choices=[
+                MagicMock(
+                    message=MagicMock(
+                        content="I couldn't schedule the meeting because I need the time and date. Please provide these details."
+                    )
+                )
+            ]
+        )
+        
+        # Generate and send message
+        await message_maker.send_message(ticket)
+        
+        # Verify message was sent
+        assert message_maker.slack.chat_postMessage.called
+        call_args = message_maker.slack.chat_postMessage.call_args
+        sent_message = call_args[1]["text"]
+        
+        # Verify message content
+        assert "time" in sent_message.lower()
+        assert "date" in sent_message.lower()
+    
+    async def test_waiting_input_message_generation(self, message_maker):
+        """Test generating message for waiting input state."""
+        ticket = Ticket(
+            id="test-128",
+            user_id="U123",
+            channel_id="C123",
+            message="Schedule a meeting",
+            status=TicketStatus.WAITING_INPUT,
+            service="schedule_meeting",
+            missing_entities=["time", "date"]
+        )
+        
+        # Mock GPT response for waiting input message
+        message_maker.openai.chat.completions.create.return_value = MagicMock(
+            choices=[
+                MagicMock(
+                    message=MagicMock(
+                        content="I need some additional information to schedule the meeting. What time and date would you like to schedule it for?"
+                    )
+                )
+            ]
+        )
+        
+        # Generate and send message
+        await message_maker.send_message(ticket)
+        
+        # Verify message was sent
+        assert message_maker.slack.chat_postMessage.called
+        call_args = message_maker.slack.chat_postMessage.call_args
+        sent_message = call_args[1]["text"]
+        
+        # Verify message content
+        assert "time" in sent_message.lower()
+        assert "date" in sent_message.lower()
+        assert "additional information" in sent_message.lower()
+
+@pytest.mark.asyncio
+async def test_simple():
+    """A simple test that always passes."""
+    assert True
+
+@pytest.mark.asyncio
+async def test_async_mock():
+    """Test that async mocks work correctly."""
+    mock = AsyncMock()
+    mock.return_value = "test"
+    result = await mock()
+    assert result == "test" 

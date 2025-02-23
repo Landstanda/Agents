@@ -12,7 +12,7 @@ A message comes in from slack, the initial data is recorded by the Ticket and pa
 
 ## Architecture
 
-The system consists of core components that work together to process and execute user requests. A Ticket is created upon a request via Slack message and passed along the chain of components until the request is fulfilled. Here is the flow a successful request:
+The system consists of core components that work together to process and execute user requests. Here is the enhanced flow of a successful request:
 
 ```
                                     +----------------+
@@ -26,23 +26,37 @@ The system consists of core components that work together to process and execute
                                     +-------+-------+
                                             |
                                     +-------v-------+
-                                    |     GPT       |
-                                    |   Analysis    |
-                                    +-------+-------+
-                                            |
-                                    +-------v-------+
                                     |     Agent     |
-                                    |   Execution   |
+                                    |   (Core)      |
                                     +-------+-------+
                                             |
-                                    +-------v-------+
-                                    |   Message     |
-                                    |    Maker      |
-                                    +-------+-------+
-                                            |
-                                    +-------v-------+
-                                    |     User      |
-                                    +---------------+
+                              +-------------+-------------+
+                              |                          |
+                       +------v------+            +------v------+
+                       |   Tool      |            |  Service    |
+                       | Registry    |            |  Registry   |
+                       +------+------+            +------+------+
+                              |                          |
+                              |                    +-----v------+
+                              |                    |  Service   |
+                              |                    | Executor   |
+                              |                    +-----+------+
+                              |                          |
+                              +-------------+------------+
+                                           |
+                                    +------v------+
+                                    |   Tools     |
+                                    | Execution   |
+                                    +------+------+
+                                           |
+                                    +------v------+
+                                    |  Message    |
+                                    |   Maker     |
+                                    +------+------+
+                                           |
+                                    +------v------+
+                                    |    User     |
+                                    +-------------+
 ```
 
 ### Service File Structure
@@ -150,27 +164,47 @@ service_name:
 
 ### Core Components
 
-1. **Service Analyzer** (`src/tools/service_analyzer.py`)
-   - Uses GPT to analyze incoming requests
-   - Breaks down requests into sequential steps
-   - Matches steps to available services
-   - Identifies required and optional parameters
-   - Validates parameter availability
-   - Returns structured execution plan
+1. **Agent Core** (`src/core/agent/`)
+   - Base agent interface and implementation
+   - Service execution coordination
+   - State management
+   - Error handling and recovery
 
-2. **Agent** (`src/tools/agent.py`)
-   - Uses `service_definitions.yaml` for execution
-   - Executes steps sequentially
-   - Handles error recovery using service-defined retry logic
-   - Tracks execution results
-   - Reports success/failure status
+2. **Service Registry** (`src/core/registry/services.py`)
+   - Manages service definitions and versions
+   - Validates service configurations
+   - Handles service dependencies
+   - Supports service versioning
 
-3. **Message Maker** (`src/tools/message_maker.py`)
-   - Generates user-friendly responses
-   - Manages Slack communication
-   - Formats execution results
+3. **Tool Registry** (`src/core/registry/tools.py`)
+   - Dynamic tool loading and validation
+   - Capability-based tool matching
+   - Tool dependency management
+   - Runtime tool validation
+
+4. **Service Executor** (`src/core/agent/executor.py`)
+   - Handles step-by-step execution
+   - Manages execution context
+   - Provides error recovery
+   - Handles parallel execution
+
+5. **Execution Context** (`src/execution/context.py`)
+   - Manages execution state
+   - Handles variable storage and retrieval
+   - Tracks execution progress
+   - Stores step results
+
+6. **Service Analyzer** (`src/tools/service_analyzer.py`)
+   - Uses GPT for request analysis
+   - Matches requests to services
+   - Handles missing information
+   - Creates execution plans
+
+7. **Message Maker** (`src/tools/message_maker.py`)
+   - Generates user responses
    - Handles error messages
-   - Requests missing information from users
+   - Manages conversation flow
+   - Formats execution results
 
 ### Ticket System
 
@@ -261,33 +295,57 @@ ticket.update_status(TicketStatus.COMPLETED)
 
 ### System Flows
 
-1. Basic Request Flow:
+1. **Basic Request Flow**:
 ```
-User → Service Analyzer → GPT Analysis → Agent → Message Maker → User
-     └── Request      └── Break into  └── Execute  └── Respond
-                         Steps          Steps
-```
-
-2. Missing Information Flow:
-```
-User → Service Analyzer → GPT → Message Maker → User
-     └── Request      └── Missing  └── Request     └── Provide
-                         Params       Information     Information
-                                                       ↓
-                                               Service Analyzer
-                                                   ↓
-                                                 Agent → Execute Steps
+User → Service Analyzer → Agent Core → Tool Registry → Service Executor → Tools → Message Maker → User
+     └── Request      └── Analyze    └── Coordinate └── Load Tools  └── Execute    └── Run   └── Respond
 ```
 
-3. Error Recovery Flow:
+2. **Service Execution Flow**:
 ```
-Step Execution → Error → Check Service Definition → Analyzer GPT w/ Steps/Errors
-              └── Fail  └── Retry Count/Actions   └── New Chain or Stop
-                                                       ↓
-                                                  Message Maker
-                                                     ↓
-                                                 User Update
+Service Executor → Load Service → Validate Tools → Execute Steps → Handle Results → Update Context
+                └── Version     └── Capabilities └── Sequential └── Success/    └── Store
+                    Check          Check           Execution      Error          Results
 ```
+
+3. **Tool Execution Flow**:
+```
+Tool Registry → Load Tool → Validate → Initialize → Execute → Handle Result
+             └── Check    └── Check   └── Setup    └── Run   └── Process
+                Version     Deps        Context      Tool      Output
+```
+
+4. **Error Recovery Flow**:
+```
+Error Detection → Check Service Definition → Retry Logic → Alternative Steps → User Update
+               └── Error Type            └── Attempt   └── Fallback      └── Status
+                  Classification            Count         Options          Message
+```
+
+## Authentication and Security
+
+### Google Workspace Authentication
+
+The system uses a robust OAuth2-based authentication system for Google Workspace:
+
+1. **Token Management**
+   - Secure token storage in `.auth_tokens` directory
+   - Automatic token refresh handling
+   - Scope validation and management
+   - Graceful reauthorization when needed
+
+2. **Authentication Flow**
+```
+Check Token → Valid → Use Existing Token
+          └── Invalid → Check Refresh Token → Valid → Refresh Token
+                                          └── Invalid → Start OAuth2 Flow
+```
+
+3. **Security Measures**
+   - Encrypted token storage
+   - Secure credential handling
+   - Environment-based configuration
+   - Scope-based access control
 
 ## Setup
 
@@ -296,14 +354,23 @@ Step Execution → Error → Check Service Definition → Analyzer GPT w/ Steps/
 - Python 3.8+
 - Slack Workspace and Bot Token
 - OpenAI API Key (GPT-4 access required)
+- Google Workspace Account
 - Required Python packages (see `requirements.txt`)
 
 ### Environment Variables
 
 ```bash
+# Slack Configuration
 SLACK_BOT_TOKEN=your-slack-bot-token
 SLACK_APP_TOKEN=your-slack-app-token
+
+# OpenAI Configuration
 OPENAI_API_KEY=your-openai-api-key
+
+# Google Authentication
+GOOGLE_CREDENTIALS_PATH=/path/to/credentials.json
+GOOGLE_TOKEN_DIR=/path/to/.auth_tokens
+GOOGLE_API_SCOPES=gmail.modify,drive.file,calendar,docs,spreadsheets
 ```
 
 ### Installation
@@ -314,40 +381,125 @@ git clone https://github.com/yourusername/ai-secretary.git
 cd ai-secretary
 ```
 
-2. Install dependencies
+2. Create and activate virtual environment
+```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+3. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Set up environment variables
+4. Set up environment variables
 ```bash
 cp .env.example .env
-# Edit .env with your tokens and keys
+# Edit .env with your configuration
 ```
 
-4. Run the assistant
+5. Set up Google credentials
+   - Create a Google Cloud Project
+   - Enable required APIs (Calendar, Gmail, etc.)
+   - Create OAuth 2.0 credentials
+   - Download credentials.json
+   - Place in location specified by GOOGLE_CREDENTIALS_PATH
+
+6. First run and authentication
 ```bash
 python src/main.py
+# Follow OAuth2 flow in browser when prompted
+```
+
+### Development Setup
+
+For development and testing:
+
+1. Install development dependencies
+```bash
+pip install -r requirements-dev.txt
+```
+
+2. Run tests
+```bash
+pytest tests/
+```
+
+3. Run specific test suites
+```bash
+pytest tests/test_integration.py  # Integration tests
+pytest tests/test_google_calendar.py  # Calendar tests
+pytest tests/test_refactored_system.py  # New system tests
 ```
 
 ## Error Handling
 
-The system implements robust error handling through service definitions:
+The system implements a comprehensive error handling system through multiple layers:
 
-1. **Retry Logic**
-   - Each service defines retry counts and conditions
-   - Agent automatically retries failed steps
-   - Simple delay between retry attempts
+1. **Service-Level Error Handling**
+   - Defined in service definitions
+   - Supports multiple retry strategies
+   - Custom error recovery actions
+   - Step dependency management
 
-2. **Missing Parameters**
-   - ServiceAnalyzer identifies missing required parameters
-   - MessageMaker requests missing information from user
-   - Execution continues once parameters are provided
+```yaml
+steps:
+  - name: "example_step"
+    tool: "example_tool"
+    retry_strategy:
+      max_attempts: 3
+      delay_seconds: 5
+      backoff_factor: 2
+    error_handling:
+      - condition: "error.type == 'auth_error'"
+        action: "refresh_auth"
+      - condition: "error.type == 'rate_limit'"
+        action: "wait_and_retry"
+      - condition: "error.type == 'validation_error'"
+        action: "request_user_input"
+```
 
-3. **Service Errors**
-   - Network errors: Automatic retry
-   - Authentication errors: Retry with refresh
-   - Other errors: Report to user
+2. **Execution Context Error Handling**
+   - Step result tracking
+   - Error state management
+   - Variable persistence
+   - Rollback capabilities
+
+3. **Tool-Level Error Handling**
+   - Tool-specific error types
+   - Automatic retry logic
+   - Resource cleanup
+   - State recovery
+
+4. **System-Level Error Recovery**
+   - Service executor recovery
+   - Tool registry management
+   - Authentication refresh
+   - System state maintenance
+
+5. **Error Types and Actions**
+
+| Error Type | Default Action | Alternative Actions |
+|------------|---------------|-------------------|
+| auth_error | refresh_auth | reauthorize, notify_user |
+| rate_limit | wait_and_retry | skip_step, notify_user |
+| validation_error | request_user_input | use_defaults, skip_step |
+| network_error | retry | fail_fast, use_cached |
+| system_error | notify_admin | restart_service, failover |
+
+6. **Recovery Strategies**
+   - Step retry with backoff
+   - Alternative service paths
+   - Graceful degradation
+   - User intervention requests
+   - Automatic service recreation
+
+7. **Error Reporting**
+   - Detailed error logging
+   - User-friendly messages
+   - Error categorization
+   - Recovery suggestions
+   - Admin notifications
 
 ## Limitations
 

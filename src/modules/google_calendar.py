@@ -2,12 +2,16 @@
 
 from typing import Dict, Any, List, Optional
 from ..core.module_interface import BaseModule
+from ..execution.context import ExecutionContext
 from ..utils.logging import get_logger
 from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 import pytz
 import logging
 import asyncio
+from google.oauth2.credentials import Credentials
+from ..models.ticket import TicketStatus
+from ..models import Ticket
 
 logger = get_logger(__name__)
 
@@ -15,169 +19,243 @@ class GoogleCalendarModule(BaseModule):
     """Module for handling Google Calendar operations"""
     
     def __init__(self):
+        self.logger = get_logger(__name__)
+        self.logger.debug("🗓️ Initializing Google Calendar Module")
         self.service = None
-        logger.debug("🗓️ Initializing Google Calendar Module")
+        self.auth_module = None
         
     async def _execute_api_call(self, api_call):
         """Execute a Google Calendar API call asynchronously"""
         return await asyncio.to_thread(api_call.execute)
         
-    async def _initialize_service(self):
-        """Initialize Google Calendar API service"""
-        logger.debug("\n=== Google Calendar Service Initialization ===")
-        if not self.service:
-            try:
-                logger.debug("🔄 Importing GoogleAuthModule...")
-                from .google_auth import GoogleAuthModule
-                logger.debug("✓ GoogleAuthModule imported")
-                
-                logger.debug("🔐 Creating auth module instance...")
-                auth_module = GoogleAuthModule()
-                logger.debug("✓ Auth module instance created")
-                
-                logger.debug("🔑 Executing auth module...")
-                auth_result = await auth_module.execute({})
-                logger.debug(f"Auth result: {auth_result}")
-                
-                if not auth_result.get('success'):
-                    logger.error(f"❌ Authentication failed: {auth_result.get('error')}")
-                    raise ValueError(f"Authentication failed: {auth_result.get('error')}")
-                
-                logger.debug("✓ Authentication successful")
-                credentials = auth_result['credentials']
-                
-                logger.debug("🔄 Building calendar service...")
-                self.service = build('calendar', 'v3', credentials=credentials)
-                logger.debug("✓ Calendar service initialized successfully")
-            except ImportError as e:
-                logger.error(f"❌ Failed to import GoogleAuthModule: {str(e)}", exc_info=True)
-                raise
-            except Exception as e:
-                logger.error(f"❌ Failed to initialize calendar service: {str(e)}", exc_info=True)
-                raise
-            
-    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute Google Calendar operations"""
+    async def _initialize_service(self, context: ExecutionContext) -> Optional[Any]:
+        """Initialize the Google Calendar service"""
         try:
-            logger.debug(f"\n=== Executing Calendar Operation ===")
-            logger.debug(f"Parameters: {params}")
+            # Get authentication result
+            auth_result = context.get_result(step_number=1)
+            self.logger.debug(f"Auth result: {auth_result}")
             
-            logger.debug("🔄 Initializing service...")
-            await self._initialize_service()
-            logger.debug("✓ Service initialized")
+            if not auth_result or not auth_result.get('success'):
+                error_msg = "Authentication failed or no authentication result found"
+                self.logger.error(error_msg)
+                context.ticket.add_error(error_msg, "auth_failed", None)
+                context.ticket.status = TicketStatus.ERROR
+                context.store_result(step_number=2, result={"error": error_msg}, success=False)
+                return None
+
+            # Get credentials from auth result
+            credentials_data = auth_result.get('credentials')
+            self.logger.debug(f"Credentials data: {credentials_data}")
             
-            operation = params.get('operation')
-            if not operation:
-                error_msg = "No operation specified"
-                logger.error(f"❌ {error_msg}")
-                return {'success': False, 'error': error_msg}
+            if not credentials_data:
+                error_msg = "No credentials found in authentication result"
+                self.logger.error(error_msg)
+                context.ticket.add_error(error_msg, "missing_credentials", None)
+                context.ticket.status = TicketStatus.ERROR
+                context.store_result(step_number=2, result={"error": error_msg}, success=False)
+                return None
+
+            # Build service
+            try:
+                # Create credentials object with only the required fields
+                creds_dict = {
+                    'token': credentials_data.get('token'),
+                    'refresh_token': credentials_data.get('refresh_token'),
+                    'token_uri': credentials_data.get('token_uri'),
+                    'client_id': credentials_data.get('client_id'),
+                    'client_secret': credentials_data.get('client_secret'),
+                    'scopes': credentials_data.get('scopes')
+                }
+                self.logger.debug(f"Creating credentials with: {creds_dict}")
                 
-            operations = {
-                'create_event': self._create_event,
-                'update_event': self._update_event,
-                'delete_event': self._delete_event,
-                'get_event': self._get_event,
-                'list_events': self._list_events,
-                'create_calendar': self._create_calendar,
-                'list_calendars': self._list_calendars,
-                'check_availability': self._check_availability,
-                'update_event_attendees': self._update_event_attendees,
-                'set_event_reminders': self._set_event_reminders,
-                'delete_calendar': self._delete_calendar
+                credentials = Credentials(**creds_dict)
+                self.logger.debug("Successfully created credentials object")
+                
+                service = build('calendar', 'v3', credentials=credentials)
+                self.logger.debug("Successfully built calendar service")
+                return service
+                
+            except Exception as e:
+                error_msg = f"Failed to build calendar service: {str(e)}"
+                self.logger.error(error_msg)
+                context.ticket.add_error(error_msg, "service_build_failed", None)
+                context.ticket.status = TicketStatus.ERROR
+                context.store_result(step_number=2, result={"error": error_msg}, success=False)
+                return None
+
+        except Exception as e:
+            error_msg = f"Error initializing calendar service: {str(e)}"
+            self.logger.error(error_msg)
+            context.ticket.add_error(error_msg, "service_init_error", None)
+            context.ticket.status = TicketStatus.ERROR
+            context.store_result(step_number=2, result={"error": error_msg}, success=False)
+            return None
+            
+    async def execute(self, context: ExecutionContext) -> Dict[str, Any]:
+        """Execute calendar operations based on ticket entities"""
+        ticket = context.ticket
+        self.logger.debug(f"Executing calendar operation with entities: {ticket.entities}")
+
+        # Initialize service first
+        service = await self._initialize_service(context)
+        if not service:
+            error_msg = "Failed to initialize Google Calendar service"
+            ticket.add_error(error_msg, "service_initialization_error", None)
+            ticket.status = TicketStatus.ERROR
+            return {
+                'status': 'error',
+                'error': error_msg,
+                'results': [None]
+            }
+
+        # Get operation type
+        operation = ticket.entities.get('operation', 'create_event')
+
+        # Define required entities based on operation
+        required_entities = []
+        if operation == 'create_event':
+            required_entities = ['time', 'date', 'description', 'participants']
+        elif operation == 'list_events':
+            required_entities = []  # No required entities for listing events
+        elif operation == 'check_availability':
+            required_entities = ['date', 'time']
+
+        # Check for required entities
+        missing_entities = [entity for entity in required_entities if entity not in ticket.entities]
+        if missing_entities:
+            error_msg = f"Missing required entities: {', '.join(missing_entities)}"
+            self.logger.error(error_msg)
+            ticket.add_error(error_msg, "missing_entities", None)
+            ticket.status = TicketStatus.ERROR
+            return {
+                'status': 'error',
+                'error': error_msg,
+                'results': [None]
+            }
+
+        try:
+            if operation == 'create_event':
+                result = await self._create_event(service, ticket.entities)
+                if not result.get('success', False):
+                    ticket.status = TicketStatus.ERROR
+                    ticket.add_error(result.get('error', 'Unknown error'), "calendar_operation_failed", None)
+                    return {
+                        'status': 'error',
+                        'error': result.get('error', 'Failed to create event'),
+                        'results': [result]
+                    }
+                ticket.status = TicketStatus.COMPLETED
+                return {
+                    'status': 'completed',
+                    'results': [result]
+                }
+            elif operation == 'list_events':
+                result = await self._list_events(service, context)
+                return result
+            elif operation == 'check_availability':
+                result = await self._check_availability(service, context)
+                return result
+            else:
+                error_msg = f"Unsupported operation: {operation}"
+                ticket.add_error(error_msg, "unsupported_operation", None)
+                ticket.status = TicketStatus.ERROR
+                return {
+                    'status': 'error',
+                    'error': error_msg,
+                    'results': [None]
+                }
+        except Exception as e:
+            error_msg = f"Error executing calendar operation: {str(e)}"
+            ticket.add_error(error_msg, "execution_error", None)
+            ticket.status = TicketStatus.ERROR
+            return {
+                'status': 'error',
+                'error': error_msg,
+                'results': [None]
             }
             
-            if operation not in operations:
-                error_msg = f"Unknown operation: {operation}"
-                logger.error(f"❌ {error_msg}")
-                return {'success': False, 'error': error_msg}
-                
-            logger.debug(f"🔄 Executing operation: {operation}")
-            result = await operations[operation](params)
-            logger.debug(f"Operation result: {result}")
-            return result
-            
-        except Exception as e:
-            logger.error(f"❌ Calendar operation error: {str(e)}", exc_info=True)
-            return {'success': False, 'error': str(e)}
-            
-    async def _create_event(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a calendar event"""
-        logger.debug(f"Creating calendar event with params: {params}")
-        calendar_id = params.get('calendar_id', 'primary')
-        summary = params.get('summary')
-        start_time = params.get('start_time')
-        duration = params.get('duration', 3600)  # Default 1 hour in seconds
-        timezone = params.get('timezone', 'UTC')
-        description = params.get('description', '')
-        location = params.get('location', '')
-        attendees = params.get('attendees') or []  # Default to empty list if None
-        recurrence = params.get('recurrence', None)
-        reminders = params.get('reminders', {'useDefault': True})
-        
-        if not all([summary, start_time]):
-            error_msg = "Missing required parameters"
-            logger.error(f"{error_msg}. Required: summary={bool(summary)}, start_time={bool(start_time)}")
-            raise ValueError(error_msg)
-            
+    async def _create_event(self, service, entities: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a calendar event."""
         try:
-            # Parse start time
-            if isinstance(start_time, str):
-                start_dt = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-            else:
-                start_dt = start_time
-                
-            # Calculate end time
-            end_dt = start_dt + timedelta(seconds=duration)
+            # Validate required parameters
+            required_params = ['time', 'date', 'description', 'participants']
+            missing_params = [param for param in required_params if param not in entities]
             
-            logger.debug("Building event object")
+            if missing_params:
+                error_msg = f"Missing required parameters: {', '.join(missing_params)}"
+                self.logger.error(f"❌ {error_msg}")
+                return {'success': False, 'error': error_msg}
+
+            # Extract parameters
+            time = entities['time']
+            date = entities['date']
+            description = entities['description']
+            participants = entities['participants']
+            duration = entities.get('duration', 60)  # Default to 60 minutes
+
+            # Calculate start and end times
+            start_time = await self._calculate_start_time(date, time)
+            end_time = await self._calculate_end_time(start_time, duration)
+
+            # Create event details
             event = {
-                'summary': summary,
-                'location': location,
+                'summary': description,
                 'description': description,
                 'start': {
-                    'dateTime': start_dt.isoformat(),
-                    'timeZone': timezone,
+                    'dateTime': start_time.isoformat(),
+                    'timeZone': 'UTC',
                 },
                 'end': {
-                    'dateTime': end_dt.isoformat(),
-                    'timeZone': timezone,
+                    'dateTime': end_time.isoformat(),
+                    'timeZone': 'UTC',
                 },
-                'visibility': 'default',
-                'transparency': 'opaque'
+                'attendees': [{'email': email} for email in participants],
+                'reminders': {
+                    'useDefault': True
+                }
             }
-            
-            # Only add attendees if the list is not empty
-            if attendees and isinstance(attendees, list) and all(isinstance(email, str) for email in attendees):
-                logger.debug(f"Adding attendees: {attendees}")
-                event['attendees'] = [{'email': email} for email in attendees]
-                
-            if recurrence:
-                logger.debug(f"Adding recurrence: {recurrence}")
-                event['recurrence'] = [recurrence]
-                
-            if reminders:
-                logger.debug(f"Adding reminders: {reminders}")
-                event['reminders'] = reminders
-                
-            logger.debug(f"Inserting event into calendar {calendar_id}")
-            created_event = await self._execute_api_call(
-                self.service.events().insert(
-                    calendarId=calendar_id,
-                    body=event,
-                    sendUpdates='all' if attendees else 'none'  # Only send updates if there are attendees
+
+            # Create the event
+            try:
+                created_event = await self._execute_api_call(
+                    service.events().insert(calendarId='primary', body=event, sendUpdates='all')
                 )
-            )
-            
-            logger.debug(f"Event created successfully: {created_event['id']}")
-            return {
-                'success': True,
-                'event_id': created_event['id'],
-                'html_link': created_event['htmlLink']
-            }
-            
+                
+                return {
+                    'success': True,
+                    'event_id': created_event.get('id'),
+                    'html_link': created_event.get('htmlLink')
+                }
+
+            except Exception as e:
+                error_msg = f"Failed to create event: {str(e)}"
+                self.logger.error(f"❌ {error_msg}")
+                return {'success': False, 'error': error_msg}
+
         except Exception as e:
-            logger.error(f"Failed to create event: {str(e)}", exc_info=True)
-            return {'success': False, 'error': str(e)}
+            error_msg = f"Failed to create event: {str(e)}"
+            self.logger.error(f"❌ {error_msg}")
+            return {'success': False, 'error': error_msg}
+
+    async def _calculate_start_time(self, date: str, time: str) -> datetime:
+        """Calculate the start time from date and time strings."""
+        try:
+            # Parse date and time
+            date_obj = datetime.strptime(date, '%Y-%m-%d')
+            time_obj = datetime.strptime(time, '%H:%M').time()
+            
+            # Combine date and time
+            return datetime.combine(date_obj.date(), time_obj)
+            
+        except ValueError as e:
+            raise ValueError(f"Invalid date or time format: {str(e)}")
+
+    async def _calculate_end_time(self, start_time: datetime, duration: int) -> datetime:
+        """Calculate the end time based on start time and duration in minutes."""
+        try:
+            return start_time + timedelta(minutes=duration)
+        except Exception as e:
+            raise ValueError(f"Failed to calculate end time: {str(e)}")
             
     async def _update_event(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Update an existing calendar event"""
@@ -272,22 +350,24 @@ class GoogleCalendarModule(BaseModule):
             logger.error(f"Failed to get event: {str(e)}")
             return {'success': False, 'error': str(e)}
             
-    async def _list_events(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _list_events(self, service, context: ExecutionContext) -> Dict[str, Any]:
         """List calendar events"""
-        calendar_id = params.get('calendar_id', 'primary')
-        time_min = params.get('time_min')
-        time_max = params.get('time_max')
-        max_results = params.get('max_results', 10)
+        calendar_id = context.entities.get('calendar_id', 'primary')
+        time_min = context.entities.get('time_min')
+        time_max = context.entities.get('time_max')
+        max_results = context.entities.get('max_results', 10)
         
         try:
-            events_result = await self.service.events().list(
-                calendarId=calendar_id,
-                timeMin=time_min,
-                timeMax=time_max,
-                maxResults=max_results,
-                singleEvents=True,
-                orderBy='startTime'
-            ).execute()
+            events_result = await self._execute_api_call(
+                service.events().list(
+                    calendarId=calendar_id,
+                    timeMin=time_min,
+                    timeMax=time_max,
+                    maxResults=max_results,
+                    singleEvents=True,
+                    orderBy='startTime'
+                )
+            )
             
             events = events_result.get('items', [])
             return {'success': True, 'events': events}
@@ -312,7 +392,10 @@ class GoogleCalendarModule(BaseModule):
                 'timeZone': timezone
             }
             
-            created_calendar = await self.service.calendars().insert(body=calendar).execute()
+            created_calendar = await self._execute_api_call(
+                self.service.calendars().insert(body=calendar)
+            )
+            
             return {
                 'success': True,
                 'calendar_id': created_calendar['id']
@@ -325,7 +408,10 @@ class GoogleCalendarModule(BaseModule):
     async def _list_calendars(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """List available calendars"""
         try:
-            calendars_result = await self.service.calendarList().list().execute()
+            calendars_result = await self._execute_api_call(
+                self.service.calendarList().list()
+            )
+            
             calendars = calendars_result.get('items', [])
             return {'success': True, 'calendars': calendars}
             
@@ -333,12 +419,12 @@ class GoogleCalendarModule(BaseModule):
             logger.error(f"Failed to list calendars: {str(e)}")
             return {'success': False, 'error': str(e)}
             
-    async def _check_availability(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _check_availability(self, service, context: ExecutionContext) -> Dict[str, Any]:
         """Check availability for a time slot"""
-        calendar_id = params.get('calendar_id', 'primary')
-        start_time = params.get('start_time')
-        end_time = params.get('end_time')
-        timezone = params.get('timezone', 'UTC')
+        calendar_id = context.entities.get('calendar_id', 'primary')
+        start_time = context.entities.get('start_time')
+        end_time = context.entities.get('end_time')
+        timezone = context.entities.get('timezone', 'UTC')
         
         if not all([start_time, end_time]):
             raise ValueError("Start time and end time required")
@@ -351,12 +437,14 @@ class GoogleCalendarModule(BaseModule):
                 end_time = end_time.isoformat()
                 
             # Query for events in the time range
-            events_result = await self.service.events().list(
-                calendarId=calendar_id,
-                timeMin=start_time,
-                timeMax=end_time,
-                singleEvents=True
-            ).execute()
+            events_result = await self._execute_api_call(
+                service.events().list(
+                    calendarId=calendar_id,
+                    timeMin=start_time,
+                    timeMax=end_time,
+                    singleEvents=True
+                )
+            )
             
             events = events_result.get('items', [])
             is_available = len(events) == 0
@@ -382,20 +470,24 @@ class GoogleCalendarModule(BaseModule):
             
         try:
             # Get existing event
-            event = await self.service.events().get(
-                calendarId=calendar_id,
-                eventId=event_id
-            ).execute()
+            event = await self._execute_api_call(
+                self.service.events().get(
+                    calendarId=calendar_id,
+                    eventId=event_id
+                )
+            )
             
             # Update attendees
             event['attendees'] = [{'email': email} for email in attendees]
             
-            updated_event = await self.service.events().update(
-                calendarId=calendar_id,
-                eventId=event_id,
-                body=event,
-                sendUpdates='all'
-            ).execute()
+            updated_event = await self._execute_api_call(
+                self.service.events().update(
+                    calendarId=calendar_id,
+                    eventId=event_id,
+                    body=event,
+                    sendUpdates='all'
+                )
+            )
             
             return {
                 'success': True,
@@ -417,19 +509,23 @@ class GoogleCalendarModule(BaseModule):
             
         try:
             # Get existing event
-            event = await self.service.events().get(
-                calendarId=calendar_id,
-                eventId=event_id
-            ).execute()
+            event = await self._execute_api_call(
+                self.service.events().get(
+                    calendarId=calendar_id,
+                    eventId=event_id
+                )
+            )
             
             # Update reminders
             event['reminders'] = reminders
             
-            updated_event = await self.service.events().update(
-                calendarId=calendar_id,
-                eventId=event_id,
-                body=event
-            ).execute()
+            updated_event = await self._execute_api_call(
+                self.service.events().update(
+                    calendarId=calendar_id,
+                    eventId=event_id,
+                    body=event
+                )
+            )
             
             return {
                 'success': True,
@@ -448,7 +544,9 @@ class GoogleCalendarModule(BaseModule):
             raise ValueError("Calendar ID required")
             
         try:
-            await self.service.calendars().delete(calendarId=calendar_id).execute()
+            await self._execute_api_call(
+                self.service.calendars().delete(calendarId=calendar_id)
+            )
             return {'success': True}
             
         except Exception as e:

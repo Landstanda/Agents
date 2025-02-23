@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Type
 import logging
 import yaml
 from pathlib import Path
@@ -7,7 +7,8 @@ import inspect
 from src.utils.flow_logger import FlowLogger
 import re
 from src.models import Ticket, TicketStatus
-from src.core.module_interface import BaseModule
+from src.core.module_interface import BaseModule, ModuleResponse
+from src.core.success_evaluator import SuccessEvaluator
 from datetime import datetime
 import asyncio
 from asyncio import Lock
@@ -32,11 +33,12 @@ class Agent:
         self.tools_path = workspace_root / tools_path
         self.modules_path = workspace_root / modules_path
         self.services: Dict[str, Any] = {}
-        self.tools: Dict[str, Any] = {}
+        self.tools: Dict[str, Type[BaseModule]] = {}
         self._busy_lock = Lock()  # Add async lock
         self.is_busy = False
         self.current_service = None
         self.flow_logger = flow_logger or FlowLogger()
+        self.success_evaluator = SuccessEvaluator()
         
         logger.debug(f"Initializing Agent with paths:")
         logger.debug(f"Services path: {self.services_path}")
@@ -53,19 +55,54 @@ class Agent:
     async def load_services(self):
         """Load services from the services file."""
         try:
+            logger.debug(f"\n=== Loading Services ===")
+            logger.debug(f"Services path: {self.services_path}")
+            logger.debug(f"Path exists: {self.services_path.exists()}")
+            
             if not self.services_path.exists():
                 logger.warning(f"Services file not found at {self.services_path}")
                 return
                 
             with open(self.services_path, 'r') as f:
-                self.services = yaml.safe_load(f) or {}
+                # Read and log raw content
+                content = f.read()
+                logger.debug(f"Raw file content (first 500 chars):\n{content[:500]}...")
                 
-            logger.info(f"Loaded {len(self.services)} services")
+                # Reset file pointer and parse YAML
+                f.seek(0)
+                self.services = yaml.safe_load(f)
+                
+                if self.services is None:
+                    logger.error("YAML file loaded as None")
+                    raise ValueError("YAML file loaded as None")
+                    
+                logger.debug(f"Loaded services structure: {list(self.services.keys())}")
+                logger.info(f"Loaded {len(self.services)} services")
+                
+                await self.flow_logger.log_event(
+                    "Agent",
+                    "services_loaded",
+                    {"services_count": len(self.services)}
+                )
+                
+        except yaml.YAMLError as e:
+            error_msg = str(e)
+            if hasattr(e, 'problem_mark'):
+                mark = e.problem_mark
+                lines = content.split('\n')
+                start = max(0, mark.line - 2)
+                end = min(len(lines), mark.line + 3)
+                context = "\n".join(f"{'>>>' if i == mark.line else '   '} {i+1}: {lines[i]}" 
+                                  for i in range(start, end))
+                error_msg = f"{error_msg}\nContext:\n{context}"
+            
+            logger.error(f"YAML parsing error: {error_msg}")
             await self.flow_logger.log_event(
                 "Agent",
-                "services_loaded",
-                {"services_count": len(self.services)}
+                "services_load_error",
+                {"error": error_msg}
             )
+            raise
             
         except Exception as e:
             logger.error(f"Error loading services: {str(e)}")
@@ -184,23 +221,22 @@ class Agent:
     
     def _safe_json_serialize(self, obj: Any) -> Any:
         """Safely serialize objects to JSON, handling non-serializable types."""
-        if isinstance(obj, bool):
-            return obj  # Preserve boolean values
+        if isinstance(obj, ModuleResponse):
+            return obj.to_dict()
         elif hasattr(obj, '__dict__'):
             return str(obj)
         elif isinstance(obj, (list, tuple)):
             return [self._safe_json_serialize(item) for item in obj]
         elif isinstance(obj, dict):
             return {k: self._safe_json_serialize(v) for k, v in obj.items()}
-        elif isinstance(obj, (int, float, bool)):
-            return obj  # Preserve numeric types too
+        elif isinstance(obj, (int, float, bool, str)) or obj is None:
+            return obj
         return str(obj)
 
     async def execute_service(self, ticket: Ticket) -> Dict[str, Any]:
         """Execute a service with the given ticket."""
-        logger.debug(f"\n{'='*50}\nStarting service execution for ticket {ticket.ticket_id}")
-        logger.debug(f"Service: {ticket.service}")
-        logger.debug(f"Execution plan: {json.dumps(ticket.execution_plan, indent=2)}")
+        logger.info(f"\n=== Starting service execution for ticket {ticket.ticket_id} ===")
+        logger.info(f"Service: {ticket.service}")
         
         start_time = datetime.now()
         
@@ -212,30 +248,17 @@ class Agent:
                 ticket.add_error("Agent is busy with another service", "execution_error")
                 return {'status': 'error', 'error': 'Agent is busy with another service'}
             self.is_busy = True
-            logger.debug("Agent marked as busy")
         
         try:
-            # Load service definitions
-            logger.debug("Loading service definitions...")
-            elapsed_time = (datetime.now() - start_time).total_seconds()
-            logger.debug(f"Elapsed time before loading services: {elapsed_time:.2f} seconds")
-            
-            services = await self._load_service_definitions()
-            if not services:
-                error_msg = "No service definitions found"
-                logger.error(f"❌ {error_msg}")
-                ticket.add_error(error_msg, "service_definition_error")
-                return {'status': 'error', 'error': error_msg}
-            
-            # Get service definition for the requested service
-            service_def = services.get(ticket.service)
+            # Load service definition
+            service_def = self.services.get(ticket.service)
             if not service_def:
                 error_msg = f"Service '{ticket.service}' not found in definitions"
                 logger.error(f"❌ {error_msg}")
                 ticket.add_error(error_msg, "service_not_found")
                 return {'status': 'error', 'error': error_msg}
             
-            logger.debug(f"Service '{ticket.service}' found in definitions")
+            logger.info(f"Found service definition for '{ticket.service}'")
             
             # Validate required entities
             missing_entities = self._validate_required_entities(service_def, ticket.entities)
@@ -246,96 +269,88 @@ class Agent:
                 ticket.missing_entities = missing_entities
                 return {'status': 'error', 'error': error_msg, 'missing_entities': missing_entities}
             
-            # Map execution plan steps to service definition steps
-            execution_steps = self._map_execution_steps(ticket.execution_plan, service_def)
-            if not execution_steps:
-                error_msg = "Failed to map execution steps to service definition"
-                logger.error(f"❌ {error_msg}")
-                ticket.add_error(error_msg, "step_mapping_error")
-                return {'status': 'error', 'error': error_msg}
-            
-            # Initialize execution state
-            results = []
+            # Execute steps in sequence
             current_step = None
-            
-            # Execute steps according to service definition flow
-            while True:
-                elapsed_time = (datetime.now() - start_time).total_seconds()
-                logger.debug(f"Elapsed time: {elapsed_time:.2f} seconds")
+            for step in service_def['steps']:
+                logger.info(f"\n=== Executing Step: {step['name']} ===")
                 
-                if elapsed_time > 25:  # Assuming 30 second timeout
-                    logger.error("⚠️ Approaching timeout limit!")
+                # Update ticket's current step
+                ticket.current_step = step['name']
                 
-                # Get next step based on current state and conditions
-                next_step = self._get_next_step(current_step, execution_steps, results)
-                if not next_step:
-                    logger.debug("✓ All steps completed")
-                    break
+                # Execute step with retry logic if specified
+                max_attempts = service_def.get('error_handling', {}).get('retry_count', 3)
+                delay_seconds = service_def.get('error_handling', {}).get('delay_seconds', 5)
                 
-                logger.debug(f"\n--- Executing Step: {next_step['name']} ---")
-                logger.debug(f"Tool: {next_step.get('tool')}")
-                logger.debug(f"Action: {next_step.get('action')}")
-                logger.debug(f"Params: {json.dumps(next_step.get('params', {}), indent=2)}")
-                
-                # Execute step with retry logic from service definition
-                result = await self._execute_step_with_retry(next_step, ticket, service_def)
-                
-                # Process step result
-                if result['status'] == 'success':
-                    logger.debug(f"✓ Step completed successfully")
-                    # Safely log the result
-                    safe_result = self._safe_json_serialize(result.get('result', {}))
-                    logger.debug(f"Result: {json.dumps(safe_result, indent=2)}")
-                    results.append(result)
-                    
-                    # Store step result in ticket
-                    ticket.store_step_result(next_step.get('step_number'), result)
-                    
-                    # Check success conditions and determine next step
-                    next_action = self._evaluate_success_conditions(next_step, result, service_def)
-                    if next_action.get('complete'):
-                        break
-                    current_step = next_action.get('next_step')
-                    
-                else:
-                    # Handle error according to service definition
-                    error_action = self._handle_step_error(next_step, result, service_def)
-                    if error_action.get('retry'):
-                        continue
-                    if error_action.get('alternate_step'):
-                        current_step = error_action['alternate_step']
-                        continue
+                for attempt in range(max_attempts):
+                    try:
+                        # Get and execute the tool
+                        tool_name = step['tool']
+                        tool_class = self.tools.get(tool_name)
+                        if not tool_class:
+                            error_msg = f"Tool {tool_name} not found"
+                            logger.error(f"❌ {error_msg}")
+                            ticket.add_error(error_msg, "tool_not_found")
+                            return {'status': 'error', 'error': error_msg}
                         
-                    # Unhandled error
-                    error_msg = f"Step failed: {result['error']}"
-                    logger.error(f"❌ {error_msg}")
-                    ticket.add_error(error_msg, "step_execution_error")
-                    return {
-                        'status': 'error',
-                        'error': error_msg,
-                        'step': next_step.get('name'),
-                        'partial_results': results
-                    }
-                
-            # Verify all success criteria are met
-            if not self._check_success_criteria(service_def, results):
-                error_msg = "Not all success criteria were met"
-                logger.error(f"❌ {error_msg}")
-                ticket.add_error(error_msg, "success_criteria_error")
-                return {'status': 'error', 'error': error_msg, 'partial_results': results}
+                        # Process parameters
+                        params = self._process_params(step.get('params', {}), ticket.entities)
+                        
+                        # Execute the tool
+                        tool = tool_class()
+                        result = await tool.execute(ticket, params)
+                        
+                        if result['success']:
+                            # Check success conditions from service definition
+                            on_success = step.get('on_success', {})
+                            next_step = on_success.get('next_step')
+                            
+                            if next_step == 'complete':
+                                logger.info("✓ Service execution completed successfully")
+                                ticket.update_status(TicketStatus.COMPLETED)
+                                return {'status': 'success', 'results': ticket.step_results}
+                            
+                            # Move to next step
+                            current_step = next_step
+                            break
+                        else:
+                            # Handle failure
+                            on_failure = step.get('on_failure', {})
+                            if attempt < max_attempts - 1 and on_failure.get('action') == 'retry':
+                                logger.warning(f"Step failed, attempt {attempt + 1}/{max_attempts}")
+                                await asyncio.sleep(delay_seconds)
+                                continue
+                            
+                            # Step failed after all retries
+                            error_msg = result.get('error', 'Step failed')
+                            logger.error(f"❌ {error_msg}")
+                            ticket.add_error(error_msg, "step_execution_error")
+                            return {
+                                'status': 'error',
+                                'error': error_msg,
+                                'step': step['name']
+                            }
+                            
+                    except Exception as e:
+                        if attempt < max_attempts - 1:
+                            logger.error(f"Error in step execution: {str(e)}")
+                            await asyncio.sleep(delay_seconds)
+                            continue
+                        error_msg = f"Step failed after {max_attempts} attempts: {str(e)}"
+                        logger.error(f"❌ {error_msg}")
+                        ticket.add_error(error_msg, "step_execution_error")
+                        return {'status': 'error', 'error': error_msg}
             
             # All steps completed successfully
-            logger.debug("✓ Service execution completed successfully")
+            logger.info("✓ Service execution completed successfully")
             ticket.update_status(TicketStatus.COMPLETED)
-            ticket.execution_results = results
-            
             return {
                 'status': 'success',
-                'results': results
+                'results': ticket.step_results
             }
             
         except Exception as e:
             logger.error(f"❌ Error executing service: {str(e)}")
+            logger.error("Full error details:", exc_info=True)
             ticket.update_status(TicketStatus.ERROR)
             ticket.add_error(str(e), "execution_error")
             return {'status': 'error', 'error': str(e)}
@@ -344,7 +359,6 @@ class Agent:
             # Release busy state with lock protection
             async with self._busy_lock:
                 self.is_busy = False
-                logger.debug("Agent released busy state")
     
     def _validate_required_entities(self, service_def: Dict[str, Any], entities: Dict[str, Any]) -> List[str]:
         """Validate that all required entities are present."""
@@ -453,44 +467,44 @@ class Agent:
         return None
 
     def _evaluate_success_conditions(self, step: Dict[str, Any], result: Dict[str, Any], service_def: Dict[str, Any]) -> Dict[str, Any]:
-        """Evaluate success conditions and determine next action."""
-        logger.debug(f"\nEvaluating success conditions for step: {step['name']}")
-        
-        # Create a safe copy of the result for logging
-        safe_result = {
-            'status': result.get('status'),
-            'success': True if result.get('status') == 'success' else False
-        }
-        if 'result' in result:
-            safe_result['result'] = self._safe_json_serialize(result['result'])
-        logger.debug(f"Full result (safe): {json.dumps(safe_result, indent=2)}")
-        
-        on_success = step.get('on_success', [])
-        logger.debug(f"Success conditions: {json.dumps(on_success, indent=2)}")
-        
-        for condition in on_success:
-            logger.debug(f"\nChecking condition: {condition.get('condition')}")
-            # Create response object that includes both top-level and nested results
-            response = {
-                'success': True if result.get('status') == 'success' else False
-            }
-            if 'result' in result:
-                response.update(self._safe_json_serialize(result['result']))
-            logger.debug(f"Response for condition: {json.dumps(response, indent=2)}")
+        """Evaluate success conditions for a step"""
+        try:
+            logger.debug("\nEvaluating success conditions for step: " + step['name'])
+            logger.debug(f"Full result (safe): {json.dumps(self._safe_json_serialize(result), indent=2)}")
             
-            if self._evaluate_condition(condition.get('condition', 'True'), response):
-                logger.debug(f"✓ Condition passed, next step: {condition.get('next_step')}")
-                return {
-                    'complete': condition.get('next_step') == 'complete',
-                    'next_step': condition.get('next_step')
-                }
-            else:
-                logger.debug("✗ Condition failed")
-                
-        # If no conditions matched
-        logger.debug("No success conditions matched")
-        return {'complete': False, 'next_step': None}
-
+            # Get success criteria from step
+            success_criteria = step.get('success_criteria', {})
+            logger.debug(f"Success criteria: {json.dumps(success_criteria, indent=2)}")
+            
+            # Convert result to ModuleResponse if needed
+            if not isinstance(result, ModuleResponse):
+                if isinstance(result, dict):
+                    result = ModuleResponse(
+                        success=result.get('status') == 'success',
+                        data=result.get('result', {}),
+                        error=result.get('error'),
+                        error_type=result.get('error_type')
+                    )
+                else:
+                    logger.error(f"Invalid result type: {type(result)}")
+                    return {
+                        'action': 'error',
+                        'error': 'Invalid result type'
+                    }
+                    
+            # Evaluate using success evaluator
+            evaluation = self.success_evaluator.evaluate(success_criteria, result)
+            logger.debug(f"Success condition evaluation result: {evaluation}")
+            
+            return evaluation
+            
+        except Exception as e:
+            logger.error(f"Error evaluating success conditions: {str(e)}")
+            return {
+                'action': 'error',
+                'error': str(e)
+            }
+            
     def _handle_step_error(self, step: Dict[str, Any], error_result: Dict[str, Any], service_def: Dict[str, Any]) -> Dict[str, Any]:
         """Handle step error according to service definition."""
         on_error = step.get('on_error', [])
@@ -587,8 +601,8 @@ class Agent:
             'action': step.get('action', '')
         }
 
-    async def _execute_step(self, step: Dict[str, Any], entities: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a single step using the appropriate tool."""
+    async def _execute_step(self, step: Dict[str, Any], entities: Dict[str, Any]) -> ModuleResponse:
+        """Execute a single step using the appropriate tool"""
         try:
             tool_name = step.get('tool', '').lower()
             action = step.get('action', '')
@@ -599,12 +613,12 @@ class Agent:
             if not tool_class:
                 error_msg = f'Tool {tool_name} not found'
                 logger.error(f"❌ {error_msg}")
-                return {
-                    'status': 'error',
-                    'error': error_msg,
-                    'tool': tool_name,
-                    'action': action
-                }
+                return ModuleResponse(
+                    success=False,
+                    data={},
+                    error=error_msg,
+                    error_type='tool_not_found'
+                )
                 
             # Create instance of the tool
             try:
@@ -623,72 +637,76 @@ class Agent:
                 # Execute the action
                 result = await tool_instance.execute(processed_params)
                 
-                # Log the result safely
-                safe_result = self._safe_json_serialize(result)
-                logger.debug(f"Step result: {json.dumps(safe_result, indent=2)}")
+                # For authentication results, preserve the success status
+                if tool_name == 'google_auth':
+                    logger.debug("Processing Google auth result")
+                    return ModuleResponse(
+                        success=result.get('success'),
+                        data=result,
+                        error=result.get('error'),
+                        error_type=result.get('error_type')
+                    )
                 
-                return {
-                    'status': 'success',
-                    'result': result,
-                    'tool': tool_name,
-                    'action': action
-                }
+                return ModuleResponse(
+                    success=result.get('success'),
+                    data=result.get('result', {}),
+                    error=result.get('error'),
+                    error_type=result.get('error_type')
+                )
+                
             except TypeError as e:
                 error_msg = f'Error instantiating tool {tool_name}: {str(e)}'
                 logger.error(f"❌ {error_msg}")
-                return {
-                    'status': 'error',
-                    'error': error_msg,
-                    'tool': tool_name,
-                    'action': action
-                }
+                return ModuleResponse(
+                    success=False,
+                    data={},
+                    error=error_msg,
+                    error_type='instantiation_error'
+                )
             except Exception as e:
                 error_msg = f'Error executing step: {str(e)}'
                 logger.error(f"❌ {error_msg}")
-                return {
-                    'status': 'error',
-                    'error': error_msg,
-                    'tool': tool_name,
-                    'action': action
-                }
+                return ModuleResponse(
+                    success=False,
+                    data={},
+                    error=error_msg,
+                    error_type='execution_error'
+                )
                 
         except Exception as e:
             error_msg = f'Error in _execute_step: {str(e)}'
             logger.error(f"❌ {error_msg}")
-            return {
-                'status': 'error',
-                'error': error_msg,
-                'tool': tool_name if 'tool_name' in locals() else '',
-                'action': action if 'action' in locals() else ''
-            }
+            return ModuleResponse(
+                success=False,
+                data={},
+                error=error_msg,
+                error_type='system_error'
+            )
     
     def _check_success_criteria(self, service: Dict[str, Any], results: List[Dict[str, Any]]) -> bool:
-        """Check if all success criteria are met."""
-        criteria = service.get('success_criteria', [])
-        if not criteria:
-            return True
-            
-        # Convert results to a simple format for checking
-        result_data = {
-            result['tool'] + '.' + result['action']: result['result']
-            for result in results
-            if result['status'] == 'success'
-        }
-        
-        # Check each criterion
-        for criterion in criteria:
-            if not self._evaluate_criterion(criterion, result_data):
-                return False
-                
-        return True
-    
-    def _evaluate_criterion(self, criterion: str, results: Dict[str, Any]) -> bool:
-        """Evaluate a single success criterion."""
+        """Check if all service success criteria are met"""
         try:
-            # Simple exact match for now
-            return criterion in str(results)
+            # Get overall success criteria
+            success_criteria = service.get('success_criteria', {})
+            if not success_criteria:
+                # If no criteria specified, check if all steps succeeded
+                return all(r.get('success', False) for r in results)
+                
+            # Create a combined result for evaluation
+            combined_result = ModuleResponse(
+                success=all(r.get('success', False) for r in results),
+                data={
+                    'results': results,
+                    'all_steps_complete': True
+                }
+            )
+            
+            # Evaluate using success evaluator
+            evaluation = self.success_evaluator.evaluate(success_criteria, combined_result)
+            return evaluation.get('success', False)
+            
         except Exception as e:
-            logger.error(f"Error evaluating criterion: {str(e)}")
+            logger.error(f"Error checking success criteria: {str(e)}")
             return False
 
     def _format_response(self, execution_plan: Dict[str, Any], results: List[Dict[str, Any]], context: Dict[str, Any]) -> str:
@@ -719,20 +737,28 @@ class Agent:
             # Create a safe copy of the result for evaluation
             safe_result = {}
             if isinstance(result, dict):
-                for key, value in result.items():
-                    if key == 'success':
-                        safe_result[key] = bool(value)  # Ensure success is a boolean
-                    elif key == 'credentials':
-                        safe_result[key] = bool(value)  # Just check if credentials exist
-                    else:
-                        safe_result[key] = self._safe_json_serialize(value)
+                # Handle both direct and nested results
+                if 'result' in result and isinstance(result['result'], dict):
+                    inner_result = result['result']
+                    safe_result = {
+                        'success': bool(inner_result.get('success')),  # Get from inner result
+                        'credentials': bool(inner_result.get('credentials')),
+                        'scopes': self._safe_json_serialize(inner_result.get('scopes', []))
+                    }
+                    logger.debug("Using nested result structure")
+                else:
+                    # Handle direct result structure
+                    safe_result = {
+                        'success': bool(result.get('success')),
+                        'credentials': bool(result.get('credentials')),
+                        'scopes': self._safe_json_serialize(result.get('scopes', []))
+                    }
+                    logger.debug("Using direct result structure")
             
-            # Create a namespace with the safe result
+            # Create namespace and evaluate
             namespace = {'response': safe_result}
-            logger.debug(f"Namespace for evaluation: {json.dumps(namespace, indent=2)}")
-            
             eval_result = eval(condition, {"__builtins__": {}}, namespace)
-            logger.debug(f"Evaluation result: {eval_result}")
+            logger.debug(f"Condition evaluation result: {eval_result}")
             return bool(eval_result)
             
         except Exception as e:

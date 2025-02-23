@@ -1,0 +1,69 @@
+{
+    "schedule_meeting": {
+        "name": "Schedule Meeting",
+        "description": "Schedule a meeting in Google Calendar",
+        "intent": "schedule_meeting",
+        "triggers": [
+            "schedule a meeting",
+            "set up a meeting",
+            "arrange a meeting",
+            "book a meeting"
+        ],
+        "required_entities": [
+            "time",
+            "date",
+            "description",
+            "participants"
+        ],
+        "optional_entities": [
+            "duration",
+            "location"
+        ],
+        "steps": [
+            {
+                "tool": "google_calendar",
+                "action": "create_event",
+                "params": {
+                    "time": "{time}",
+                    "date": "{date}",
+                    "description": "{description}",
+                    "participants": "{participants}",
+                    "duration": "{duration}",
+                    "location": "{location}"
+                }
+            }
+        ],
+        "success_criteria": [
+            "result.success == true",
+            "result.event_id is not null"
+        ]
+    },
+    "check_availability": {
+        "name": "Check Calendar Availability",
+        "description": "Check availability in Google Calendar",
+        "intent": "check_availability",
+        "triggers": [
+            "check availability",
+            "am I free",
+            "check calendar"
+        ],
+        "required_entities": [
+            "time",
+            "date"
+        ],
+        "steps": [
+            {
+                "tool": "google_calendar",
+                "action": "check_availability",
+                "params": {
+                    "time": "{time}",
+                    "date": "{date}"
+                }
+            }
+        ],
+        "success_criteria": [
+            "result.success == true",
+            "result.available is not null"
+        ]
+    }
+} 

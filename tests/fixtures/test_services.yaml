@@ -1,15 +1,135 @@
+# Test service definitions for testing
 test_service:
-  description: A test service
-  intent: test_intent
-  name: test_service
+  name: "Test Service"
+  version: "1.0.0"
   required_entities:
-  - entity1
+    - test_param
   steps:
-  - action: test_action
-    params:
-      param1: value1
-    tool: test_tool
-  success_criteria:
-  - test_criterion
-  triggers:
-  - test trigger
+    - name: "step1"
+      tool: test_tool
+      action: execute
+      params:
+        test_param: "value1"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response['success'] == True"
+        on_success:
+          next_step: "step2"
+        on_failure:
+          action: "retry"
+          max_attempts: 1
+          params:
+            delay_seconds: 1
+
+    - name: "step2"
+      tool: test_tool
+      action: execute
+      params:
+        test_param: "value2"
+      depends_on: [1]
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response['success'] == True"
+        on_success:
+          next_step: "complete"
+        on_failure:
+          action: "retry"
+          max_attempts: 1
+          params:
+            delay_seconds: 1
+
+test_service_v2:
+  name: "Test Service"
+  version: "2.0.0"
+  required_entities:
+    - test_param
+    - additional_param
+  steps:
+    - name: "step1"
+      tool: test_tool
+      action: execute
+      params:
+        test_param: "value1"
+        additional_param: "extra"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response['success'] == True"
+        on_success:
+          next_step: "step2"
+        on_failure:
+          action: "retry"
+          max_attempts: 2
+          params:
+            delay_seconds: 1
+
+    - name: "step2"
+      tool: test_tool
+      action: execute
+      params:
+        test_param: "value2"
+        additional_param: "extra"
+      depends_on: [1]
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response['success'] == True"
+        on_success:
+          next_step: "step3"
+        on_failure:
+          action: "retry"
+          max_attempts: 2
+          params:
+            delay_seconds: 1
+
+    - name: "step3"
+      tool: test_tool
+      action: execute
+      params:
+        test_param: "value3"
+        additional_param: "extra"
+      depends_on: [2]
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response['success'] == True"
+        on_success:
+          next_step: "complete"
+        on_failure:
+          action: "retry"
+          max_attempts: 2
+          params:
+            delay_seconds: 1
+
+error_test_service:
+  name: "Error Test Service"
+  version: "1.0.0"
+  required_entities:
+    - test_param
+  steps:
+    - name: "failing_step"
+      tool: failing_tool
+      action: execute
+      params:
+        test_param: "value1"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response['success'] == True"
+        on_failure:
+          action: "error"
+          params:
+            message: "Step failed intentionally"
+
+    - name: "dependent_step"
+      tool: test_tool
+      action: execute
+      params:
+        test_param: "value2"
+      depends_on: [1]
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response['success'] == True"

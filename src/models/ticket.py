@@ -1,10 +1,10 @@
 from typing import Dict, Any, Optional, List, Set, Deque
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from collections import deque
 import logging
 from copy import deepcopy
-from collections import deque
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 

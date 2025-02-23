@@ -1,0 +1,145 @@
+================================================================================
+Session Started: 11:55:32 AM Feb 22, 2025
+================================================================================
+
+
+================================================================================
+[11:55:33 AM] OfficeAssistant - initialization_complete
+--------------------------------------------------------------------------------
+bot_user_id: "U08CFAH1H1Q"
+
+
+================================================================================
+[11:55:38 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "message"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> Please schedule dinner with Gabi tomorrow night at 7"
+channel: "C08CF2DPMH8"
+ts: "1740254138.102289"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "message",
+  "ts": "1740254138.102289",
+  "client_msg_id": "d6694cb6-fa6c-4f4d-81d7-e8a606e98d54",
+  "text": "<@U08CFAH1H1Q> Please schedule dinner with Gabi tomorrow night at 7",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "IhfGk",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " Please schedule dinner with Gabi tomorrow night at 7"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1740254138.102289",
+  "channel_type": "channel"
+}
+
+
+================================================================================
+[11:55:39 AM] OfficeAssistant - event_details
+--------------------------------------------------------------------------------
+event_type: "app_mention"
+user: "U08CTNTT97B"
+text: "<@U08CFAH1H1Q> Please schedule dinner with Gabi tomorrow night at 7"
+channel: "C08CF2DPMH8"
+ts: "1740254138.102289"
+thread_ts: null
+full_event: {
+  "user": "U08CTNTT97B",
+  "type": "app_mention",
+  "ts": "1740254138.102289",
+  "client_msg_id": "d6694cb6-fa6c-4f4d-81d7-e8a606e98d54",
+  "text": "<@U08CFAH1H1Q> Please schedule dinner with Gabi tomorrow night at 7",
+  "team": "T08C0G5FA4F",
+  "blocks": [
+    {
+      "type": "rich_text",
+      "block_id": "IhfGk",
+      "elements": [
+        {
+          "type": "rich_text_section",
+          "elements": [
+            {
+              "type": "user",
+              "user_id": "U08CFAH1H1Q"
+            },
+            {
+              "type": "text",
+              "text": " Please schedule dinner with Gabi tomorrow night at 7"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "channel": "C08CF2DPMH8",
+  "event_ts": "1740254138.102289"
+}
+
+
+================================================================================
+[11:55:43 AM] ServiceAnalyzer - request_analyzed
+--------------------------------------------------------------------------------
+ticket_id: "ticket_20250222_115539"
+confidence: 1.0
+execution_plan: [
+  {
+    "step_number": 1,
+    "service_id": "schedule_meeting",
+    "description": "Schedule a dinner with Gabi tomorrow night at 7",
+    "required_params": {
+      "time": "7pm",
+      "date": "tomorrow"
+    },
+    "optional_params": {
+      "participants": "Gabi",
+      "description": "Dinner"
+    }
+  }
+]
+missing_inputs: []
+
+
+================================================================================
+[11:55:44 AM] Agent - tools_loaded
+--------------------------------------------------------------------------------
+total_tools: 7
+available_tools: [
+  "gpt_handler",
+  "email_manager",
+  "google_calendar",
+  "email_reader",
+  "email_composer",
+  "google_auth",
+  "conditions"
+]
+
+
+================================================================================
+[11:55:44 AM] Agent - services_load_error
+--------------------------------------------------------------------------------
+error: "while parsing a block mapping\n  in \"/home/jeff/Agents/src/services/service_definitions.yaml\", line 163, column 11\nexpected <block end>, but found '<scalar>'\n  in \"/home/jeff/Agents/src/services/service_definitions.yaml\", line 163, column 43"
+
+
+================================================================================
+[11:55:44 AM] OfficeAssistant - event_processing_error
+--------------------------------------------------------------------------------
+error: "while parsing a block mapping\n  in \"/home/jeff/Agents/src/services/service_definitions.yaml\", line 163, column 11\nexpected <block end>, but found '<scalar>'\n  in \"/home/jeff/Agents/src/services/service_definitions.yaml\", line 163, column 43"
+

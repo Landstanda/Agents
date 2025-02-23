@@ -1,6 +1,27 @@
 # Service Definitions for Agent Execution
 # Contains complete technical details for service execution
 
+test_service:
+  name: "Test Service"
+  required_entities:
+    - test_entity
+  steps:
+    - name: "Test Step"
+      tool: test_tool
+      action: execute
+      params: {}
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response['success'] == True"
+        on_success:
+          next_step: "complete"
+        on_failure:
+          action: "retry"
+          max_attempts: 1
+          params:
+            delay_seconds: 1
+
 schedule_meeting:
   name: "Schedule Meeting"
   required_entities:
@@ -16,16 +37,22 @@ schedule_meeting:
       tool: google_auth
       action: execute
       params: {}
-      on_success:
-        - condition: "response.get('success')"
-          next_step: create_event
-      on_error:
-        - action: "retry"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response['success'] == True"
+          - "response['credentials'] is not None"
+          - "response['credentials']['valid'] == True"
+        on_success:
+          next_step: "create_event"
+        on_failure:
+          action: "retry"
           max_attempts: 3
+          params:
+            delay_seconds: 5
     - name: "Create Event"
       tool: google_calendar
-      id: create_event
-      action: execute
+      action: "create_event"
       params:
         operation: "create_event"
         summary: "{event_type} Meeting"
@@ -35,26 +62,31 @@ schedule_meeting:
         timezone: "America/Los_Angeles"
         location: "{location if location else 'Virtual Meeting'}"
         attendees: "{participants if participants else []}"
-      on_success:
-        - condition: "response.get('success') and response.get('event_id')"
-          next_step: complete
-      on_error:
-        - condition: "error.get('type') == 'time_conflict'"
-          action: "suggest_alternative"
-        - condition: "error.get('type') == 'auth_error'"
-          action: "retry"
-          next_step: "authenticate"
-        - action: "notify_error"
-  success_criteria:
-    - "response.get('success')"
-    - "response.get('event_id')"
-  error_handling:
-    time_conflict:
-      message: "There is a scheduling conflict at {time}"
-      action: "suggest_alternative"
-    creation_error:
-      message: "Failed to create event: {error}"
-      action: "retry"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.event_id is not None"
+        on_success:
+          next_step: "complete"
+        on_failure:
+          actions:
+            - condition: "response.error_type == 'time_conflict'"
+              action: "suggest_alternative"
+              params:
+                message: "There is a scheduling conflict at {time}"
+            - condition: "response.error_type == 'auth_error'"
+              action: "retry"
+              target_step: "authenticate"
+              params:
+                max_attempts: 3
+            - condition: "response.error_type == 'invalid_time'"
+              action: "request_clarification"
+              params:
+                message: "The specified time {time} is invalid. Please provide a valid time."
+          action: "notify_error"
+          params:
+            message: "Failed to create event: {error}"
 
 email_composer:
   name: "Email Composer"
@@ -76,31 +108,41 @@ email_composer:
       tool: google_auth
       action: execute
       params: {}
-      on_success:
-        - condition: "response.get('success')"
-          next_step: validate_recipients
-      on_error:
-        - action: "retry"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.credentials is not None"
+        on_success:
+          next_step: "validate_recipients"
+        on_failure:
+          action: "retry"
           max_attempts: 3
+          params:
+            delay_seconds: 5
 
     - name: "Validate Recipients"
-      id: validate_recipients
       tool: email_composer
       action: validate_addresses
       params:
         addresses: "{recipients}"
         cc: "{cc if cc else []}"
         bcc: "{bcc if bcc else []}"
-      on_success:
-        - condition: "response.get('all_valid')"
-          next_step: generate_content
-      on_error:
-        - condition: "error.get('type') == 'invalid_address'"
-          action: "request_clarification"
-          message: "Some email addresses are invalid: {error.get('details')}"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.all_valid == True"
+        on_success:
+          next_step: "generate_content"
+        on_failure:
+          actions:
+            - condition: "response.error_type == 'invalid_address'"
+              action: "request_clarification"
+              params:
+                message: "Some email addresses are invalid: {response.data.invalid_addresses}"
 
     - name: "Generate Content"
-      id: generate_content
       tool: email_composer
       action: compose
       params:
@@ -112,70 +154,85 @@ email_composer:
         original_email: "{original_email if original_email else None}"
         response_type: "{response_type if response_type else 'standard'}"
         key_points: "{key_points if key_points else []}"
-      on_success:
-        - condition: "response.get('status') == 'success'"
-          next_step: prepare_email
-      on_error:
-        - action: "retry"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.content is not None"
+        on_success:
+          next_step: "prepare_email"
+        on_failure:
+          action: "retry"
           max_attempts: 2
+          params:
+            delay_seconds: 3
 
     - name: "Prepare Email"
-      id: prepare_email
       tool: email_composer
       action: prepare
       params:
         to: "{recipients}"
-        subject: "{response.subject}"
-        content: "{response.content}"
+        subject: "{response.data.subject}"
+        content: "{response.data.content}"
         cc: "{cc if cc else []}"
         bcc: "{bcc if bcc else []}"
-      on_success:
-        - condition: "not attachments"
-          next_step: send_email
-        - condition: "attachments"
-          next_step: handle_attachments
-      on_error:
-        - action: "retry"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.draft_id is not None"
+        on_success:
+          next_step:
+            condition: "attachments is not None"
+            then: "handle_attachments"
+            else: "send_email"
+        on_failure:
+          action: "retry"
           max_attempts: 3
+          params:
+            delay_seconds: 2
 
     - name: "Handle Attachments"
-      id: handle_attachments
       tool: email_manager
       action: prepare_attachments
       params:
         attachments: "{attachments}"
-      on_success:
-        - next_step: send_email
-      on_error:
-        - condition: "error.get('type') == 'file_not_found'"
-          action: "request_clarification"
-          message: "Could not find attachment: {error.get('file')}"
-        - action: "retry"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.prepared_attachments is not None"
+        on_success:
+          next_step: "send_email"
+        on_failure:
+          actions:
+            - condition: "response.error_type == 'file_not_found'"
+              action: "request_clarification"
+              params:
+                message: "Could not find attachment: {response.data.missing_file}"
+          action: "retry"
           max_attempts: 2
+          params:
+            delay_seconds: 2
 
     - name: "Send Email"
-      id: send_email
       tool: email_composer
       action: send
       params:
-        draft_id: "{response.draft_id}"
-      on_success:
-        - condition: "response.get('sent')"
-          next_step: complete
-      on_error:
-        - action: "retry"
+        draft_id: "{response.data.draft_id}"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.sent == True"
+          - "response.data.email_id is not None"
+        on_success:
+          next_step: "complete"
+        on_failure:
+          action: "retry"
           max_attempts: 3
-          delay_seconds: 5
-
-  success_criteria:
-    - "response.get('sent')"
-    - "response.get('email_id')"
-  error_handling:
-    retry_count: 3
-    delay_seconds: 5
-    conditions:
-      network_error: true
-      rate_limit: true
+          params:
+            delay_seconds: 5
 
 email_reader:
   name: "Email Reader"
@@ -192,15 +249,20 @@ email_reader:
       tool: google_auth
       action: execute
       params: {}
-      on_success:
-        - condition: "response.get('success')"
-          next_step: apply_search_filters
-      on_error:
-        - action: "retry"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.credentials is not None"
+        on_success:
+          next_step: "apply_search_filters"
+        on_failure:
+          action: "retry"
           max_attempts: 3
+          params:
+            delay_seconds: 5
 
     - name: "Apply Search Filters"
-      id: apply_search_filters
       tool: email_reader
       action: search
       params:
@@ -209,59 +271,99 @@ email_reader:
         date_range: "{date_range if date_range else 'today'}"
         folder: "{folder_name if folder_name else 'INBOX'}"
         max_results: "{max_results if max_results else 10}"
-      on_success:
-        - next_step: check_results
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+        on_success:
+          next_step: "check_results"
+        on_failure:
+          action: "retry"
+          max_attempts: 2
+          params:
+            delay_seconds: 2
 
     - name: "Check Results"
-      id: check_results
       tool: conditions
       action: execute
       params:
         conditions:
           - if:
-              field: "response.results"
+              field: "response.data.results"
               equals: true
-            then_step: process_results
-            else_step: no_results
+            then_step: "process_results"
+            else_step: "no_results"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+        on_success:
+          next_step:
+            condition: "response.data.results"
+            then: "process_results"
+            else: "no_results"
+        on_failure:
+          action: "error"
+          params:
+            message: "Failed to check results"
 
     - name: "Process Results"
-      id: process_results
       tool: email_reader
       action: process_emails
       params:
-        email_ids: "{response.get('email_ids', [])}"
+        email_ids: "{response.data.email_ids}"
         include_attachments: "{include_attachments if include_attachments else False}"
-      on_success:
-        - next_step: check_more_emails
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.processed == True"
+        on_success:
+          next_step: "check_more_emails"
+        on_failure:
+          action: "retry"
+          max_attempts: 2
+          params:
+            delay_seconds: 2
 
     - name: "Check More Emails"
-      id: check_more_emails
       tool: conditions
       action: execute
       params:
         loop_check:
-          while: "has_more_emails"
-          then_step: 1
-          else_step: complete
+          while: "response.data.has_more_emails"
+          then_step: "process_results"
+          else_step: "complete"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+        on_success:
+          next_step:
+            condition: "response.data.has_more_emails"
+            then: "process_results"
+            else: "complete"
+        on_failure:
+          action: "error"
+          params:
+            message: "Failed to check for more emails"
 
     - name: "No Results Found"
-      id: no_results
       tool: message_maker
       action: create_message
       params:
         message_type: "no_results"
         search_params: "{params}"
-      on_success:
-        - next_step: complete
-
-  success_criteria:
-    - "response.get('processed')"
-  error_handling:
-    retry_count: 3
-    delay_seconds: 2
-    conditions:
-      network_error: true
-      auth_error: true
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+        on_success:
+          next_step: "complete"
+        on_failure:
+          action: "error"
+          params:
+            message: "Failed to create no results message"
 
 email_manager:
   name: "Email Manager"
@@ -279,54 +381,73 @@ email_manager:
       tool: google_auth
       action: execute
       params: {}
-      on_success:
-        - condition: "response.get('success')"
-          next_step: validate_email
-      on_error:
-        - action: "retry"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.credentials is not None"
+        on_success:
+          next_step: "validate_email"
+        on_failure:
+          action: "retry"
           max_attempts: 3
+          params:
+            delay_seconds: 5
 
     - name: "Validate Email ID"
-      id: validate_email
       tool: email_reader
       action: validate_email
       params:
         email_id: "{email_id}"
-      on_success:
-        - condition: "response.get('valid')"
-          next_step: classify_email
-      on_error:
-        - action: "request_clarification"
-          message: "Email not found or inaccessible"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.valid == True"
+        on_success:
+          next_step: "classify_email"
+        on_failure:
+          action: "request_clarification"
+          params:
+            message: "Email not found or inaccessible"
 
     - name: "Classify Email"
-      id: classify_email
       tool: email_manager
       action: classify_email
       params:
         email_id: "{email_id}"
-      on_success:
-        - condition: "response.get('status') == 'success'"
-          next_step: process_classification
-      on_error:
-        - action: "retry"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.classification is not None"
+        on_success:
+          next_step: "process_classification"
+        on_failure:
+          action: "retry"
           max_attempts: 2
+          params:
+            delay_seconds: 2
 
     - name: "Process Classification"
-      id: process_classification
       tool: email_manager
       action: process_classification
       params:
-        classification: "{response.classification}"
+        classification: "{response.data.classification}"
         email_id: "{email_id}"
-      on_success:
-        - next_step: perform_action
-      on_error:
-        - action: "retry"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+        on_success:
+          next_step: "perform_action"
+        on_failure:
+          action: "retry"
           max_attempts: 2
+          params:
+            delay_seconds: 2
 
     - name: "Perform Action"
-      id: perform_action
       tool: email_manager
       action: "{action_type}"
       params:
@@ -335,14 +456,22 @@ email_manager:
         flag_type: "{flag_type if flag_type else None}"
         attachment_name: "{attachment_name if attachment_name else None}"
         new_status: "{new_status if new_status else None}"
-      on_success:
-        - next_step: complete
-      on_error:
-        - condition: "error.get('type') == 'folder_not_found'"
-          action: "create_folder"
-          next_step: perform_action
-        - action: "retry"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+          - "response.data.action_completed == True"
+        on_success:
+          next_step: "complete"
+        on_failure:
+          actions:
+            - condition: "response.error_type == 'folder_not_found'"
+              action: "create_folder"
+              next_step: "perform_action"
+          action: "retry"
           max_attempts: 2
+          params:
+            delay_seconds: 2
 
   success_criteria:
     - "response.get('action_completed')"
@@ -369,19 +498,27 @@ conditions:
         context: "{context if context else {}}"
         loop_check: "{loop_check if loop_check else None}"
       on_success:
-        - condition: "response.get('status') == 'success' and response.get('result') is not None"
-          next_step: process_result
-        - condition: "response.get('status') == 'success' and response.get('continue_loop') is not None"
-          next_step: process_loop
-      on_error:
-        - condition: "error.get('type') == 'invalid_field'"
-          action: "notify_error"
-          message: "Invalid field path specified"
-        - condition: "error.get('type') == 'invalid_condition'"
-          action: "notify_error"
-          message: "Invalid condition format"
-        - action: "retry"
-          max_attempts: 2
+        type: "any"
+        conditions:
+          - "response.get('status') == 'success' and response.get('result') is not None"
+          - "response.get('status') == 'success' and response.get('continue_loop') is not None"
+        next_steps:
+          - condition: "response.get('status') == 'success' and response.get('result') is not None"
+            next_step: "process_result"
+          - condition: "response.get('status') == 'success' and response.get('continue_loop') is not None"
+            next_step: "process_loop"
+      on_failure:
+        actions:
+          - condition: "error.get('type') == 'invalid_field'"
+            action: "notify_error"
+            params:
+              message: "Invalid field path specified"
+          - condition: "error.get('type') == 'invalid_condition'"
+            action: "notify_error"
+            params:
+              message: "Invalid condition format"
+        action: "retry"
+        max_attempts: 2
 
     - name: "Process Result"
       id: process_result
@@ -391,14 +528,19 @@ conditions:
         conditions:
           field: "response.result"
           equals: true
-      on_success:
-        - condition: "response.get('result')"
-          next_step: "{response.get('next_step', 'complete')}"
-        - condition: "not response.get('result')"
-          next_step: "{response.get('else_step', 'complete')}"
-      on_error:
-        - action: "notify_error"
-          message: "Failed to process condition result"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+        on_success:
+          next_step:
+            condition: "response.get('result')"
+            then: "{response.get('next_step', 'complete')}"
+            else: "{response.get('else_step', 'complete')}"
+        on_failure:
+          action: "notify_error"
+          params:
+            message: "Failed to process condition result"
 
     - name: "Process Loop"
       id: process_loop
@@ -408,14 +550,19 @@ conditions:
         conditions:
           field: "response.continue_loop"
           equals: true
-      on_success:
-        - condition: "response.get('result')"
-          next_step: "{response.get('next_step', 1)}"
-        - condition: "not response.get('result')"
-          next_step: "{response.get('else_step', 'complete')}"
-      on_error:
-        - action: "notify_error"
-          message: "Failed to process loop condition"
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.success == True"
+        on_success:
+          next_step:
+            condition: "response.get('result')"
+            then: "{response.get('next_step', 1)}"
+            else: "{response.get('else_step', 'complete')}"
+        on_failure:
+          action: "notify_error"
+          params:
+            message: "Failed to process loop condition"
 
   success_criteria:
     - "response.get('status') == 'success'"
@@ -426,4 +573,26 @@ conditions:
     conditions:
       invalid_field: true
       invalid_condition: true
-      evaluation_error: true 
+      evaluation_error: true
+
+services:
+  test_service:
+    name: "Test Service"
+    required_entities:
+      - test_entity
+    steps:
+      - name: "Test Step"
+        tool: test_tool
+        action: execute
+        params: {}
+        success_criteria:
+          type: "all"
+          conditions:
+            - "response['success'] == True"
+          on_success:
+            next_step: "complete"
+          on_failure:
+            action: "retry"
+            max_attempts: 1
+            params:
+              delay_seconds: 1 

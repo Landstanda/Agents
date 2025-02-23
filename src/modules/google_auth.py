@@ -1,5 +1,6 @@
 from typing import Dict, Any, List
 from src.core.module_interface import BaseModule
+from src.execution.context import ExecutionContext
 from src.utils.logging import get_logger
 from src.utils.credential_manager import CredentialManager
 from google.oauth2.credentials import Credentials
@@ -8,7 +9,6 @@ from google.auth.transport.requests import Request
 import os
 import pickle
 import json
-from googleapiclient.discovery import build
 import asyncio
 
 logger = get_logger(__name__)
@@ -51,7 +51,7 @@ class GoogleAuthModule(BaseModule):
                 raise ValueError("Token refresh failed - needs reauthorization") from e
             raise
 
-    async def execute(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute(self, context: ExecutionContext, **params) -> Dict[str, Any]:
         """Handle Google authentication flow"""
         try:
             logger.debug("\n=== Starting Google Authentication Flow ===")
@@ -62,23 +62,20 @@ class GoogleAuthModule(BaseModule):
             try:
                 creds_path = self.credential_manager.get_credentials_path()
                 logger.debug(f"Credentials path: {creds_path}")
-                logger.debug(f"Credentials file exists: {os.path.exists(creds_path)}")
-                logger.debug(f"Credentials file permissions: {oct(os.stat(creds_path).st_mode)[-3:]}")
+                if not os.path.exists(creds_path):
+                    error = f"Credentials file not found at: {creds_path}"
+                    context.store_result(1, None, success=False, error=error)
+                    return {"success": False, "error": error}
             except Exception as e:
-                logger.error(f"Error accessing credentials file: {str(e)}")
-                raise
+                error = f"Error accessing credentials file: {str(e)}"
+                context.store_result(1, None, success=False, error=error)
+                return {"success": False, "error": error}
             
             if not await self.credential_manager.validate_credentials_file():
-                logger.error("❌ Invalid credentials file")
-                raise ValueError("Invalid credentials file")
+                error = "Invalid credentials file"
+                context.store_result(1, None, success=False, error=error)
+                return {"success": False, "error": error}
             logger.debug("✓ Credentials file is valid")
-
-            # Check token directory
-            token_dir = self.credential_manager.token_dir
-            logger.debug(f"Token directory: {token_dir}")
-            logger.debug(f"Token directory exists: {os.path.exists(token_dir)}")
-            if os.path.exists(token_dir):
-                logger.debug(f"Token directory permissions: {oct(os.stat(token_dir).st_mode)[-3:]}")
 
             # Load existing token if available
             logger.debug("🔄 Attempting to load existing token...")
@@ -87,7 +84,7 @@ class GoogleAuthModule(BaseModule):
                 logger.debug("✓ Found existing token, deserializing...")
                 try:
                     self.creds = pickle.loads(token_data)
-                    logger.debug(f"Token loaded. Valid: {self.creds.valid if self.creds else False}, Expired: {self.creds.expired if self.creds else True}")
+                    logger.debug(f"Token loaded. Valid: {self.creds.valid}, Expired: {self.creds.expired}")
                 except Exception as e:
                     logger.error(f"Error deserializing token: {str(e)}")
                     self.creds = None
@@ -105,36 +102,32 @@ class GoogleAuthModule(BaseModule):
                             await self._refresh_credentials(self.creds)
                             logger.debug("✓ Credentials refreshed successfully")
                         except Exception as e:
-                            logger.error(f"Error refreshing credentials: {str(e)}")
-                            raise
+                            error = f"Error refreshing credentials: {str(e)}"
+                            context.store_result(1, None, success=False, error=error)
+                            return {"success": False, "error": error}
                 except ValueError as e:
                     if "needs reauthorization" in str(e):
                         logger.info("🔄 Token refresh failed, starting new OAuth2 flow...")
-                        self.creds = None  # Force new OAuth2 flow
+                        self.creds = None
                     else:
-                        raise
+                        error = str(e)
+                        context.store_result(1, None, success=False, error=error)
+                        return {"success": False, "error": error}
 
                 if not self.creds or not self.creds.valid:
                     logger.debug("🔐 Starting new OAuth2 flow...")
                     # Start OAuth2 flow with credentials file
                     creds_path = self.credential_manager.get_credentials_path()
-                    logger.debug(f"Using credentials file: {creds_path}")
-                    
-                    if not os.path.exists(creds_path):
-                        error_msg = f"Credentials file not found at: {creds_path}"
-                        logger.error(f"❌ {error_msg}")
-                        raise FileNotFoundError(error_msg)
-                    
-                    flow = InstalledAppFlow.from_client_secrets_file(
-                        creds_path,
-                        self.SCOPES
-                    )
                     
                     try:
                         # Try specific ports in case some are blocked
                         for port in [8080, 8090, 8888, 9000]:
                             try:
                                 logger.info(f"🌐 Attempting to start local server on port {port}...")
+                                flow = InstalledAppFlow.from_client_secrets_file(
+                                    creds_path,
+                                    self.SCOPES
+                                )
                                 self.creds = await self._run_local_server(flow, port)
                                 logger.debug(f"✓ Successfully authenticated on port {port}")
                                 break
@@ -144,11 +137,16 @@ class GoogleAuthModule(BaseModule):
                         else:
                             # If no ports worked, try random port as last resort
                             logger.info("🔄 Trying random port...")
+                            flow = InstalledAppFlow.from_client_secrets_file(
+                                creds_path,
+                                self.SCOPES
+                            )
                             self.creds = await self._run_local_server(flow, 0)
                             logger.debug("✓ Successfully authenticated on random port")
                     except Exception as e:
-                        logger.error(f"❌ Failed to start local server: {str(e)}", exc_info=True)
-                        raise
+                        error = f"Failed to start local server: {str(e)}"
+                        context.store_result(1, None, success=False, error=error)
+                        return {"success": False, "error": error}
 
                 # Save the credentials securely
                 logger.debug("💾 Saving new credentials...")
@@ -157,35 +155,34 @@ class GoogleAuthModule(BaseModule):
                     await self.credential_manager.secure_token_storage(token_data, self.service_name)
                     logger.debug("✓ Credentials saved successfully")
                 except Exception as e:
-                    logger.error(f"Error saving credentials: {str(e)}")
-                    raise
+                    logger.warning(f"Warning: Error saving credentials: {str(e)}")
+                    # Continue even if saving fails - we still have valid credentials in memory
 
-            # Verify final credential state
-            logger.debug("\n=== Final Credential State ===")
-            logger.debug(f"Valid: {self.creds.valid}")
-            logger.debug(f"Expired: {self.creds.expired}")
-            logger.debug(f"Has refresh token: {bool(self.creds.refresh_token)}")
-            logger.debug(f"Scopes: {json.dumps(self.creds.scopes, indent=2)}")
-            
-            return {
-                'success': True,
-                'credentials': self.creds,
-                'scopes': self.SCOPES
+            # Create result with credential state
+            result = {
+                "success": True,
+                "credentials": {
+                    "valid": self.creds.valid,
+                    "expired": self.creds.expired,
+                    "has_refresh_token": bool(self.creds.refresh_token),
+                    "scopes": self.creds.scopes,
+                    "token": self.creds.token,
+                    "refresh_token": bool(self.creds.refresh_token),
+                    "token_uri": self.creds.token_uri,
+                    "client_id": self.creds.client_id,
+                    "client_secret": "[REDACTED]"
+                },
+                "scopes": self.SCOPES
             }
+            
+            # Store result in context
+            context.store_result(1, result, success=True)
+            return result
 
         except Exception as e:
-            logger.error(f"❌ Authentication failed: {str(e)}", exc_info=True)
-            return {
-                'success': False,
-                'error': str(e)
-            }
-
-    def validate_params(self, params: Dict[str, Any]) -> bool:
-        """Validate input parameters"""
-        logger.debug(f"Validating params: {json.dumps(params, indent=2)}")
-        is_valid = isinstance(params, dict)
-        logger.debug(f"Params validation {'passed' if is_valid else 'failed'}")
-        return is_valid
+            error = f"Authentication failed: {str(e)}"
+            context.store_result(1, None, success=False, error=error)
+            return {"success": False, "error": error}
 
     @property
     def capabilities(self) -> List[str]:

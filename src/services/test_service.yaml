@@ -1,0 +1,17 @@
+test_service:
+  name: "Test Service"
+  required_entities:
+    - test_entity
+  steps:
+    - name: "Test Step"
+      tool: test_tool
+      action: execute
+      params: {}
+      success_criteria:
+        type: "all"
+        conditions:
+          - "response.get('success') == True"
+          - "response.get('data') is not None"
+      on_error:
+        action: "retry"
+        max_attempts: 2 
