@@ -66,19 +66,31 @@ class SuccessEvaluator:
             logger.debug(f"Response: {response.to_dict() if isinstance(response, ModuleResponse) else response}")
             
             criteria_type = criteria.get("type", "all")
-            conditions = criteria.get("conditions", [])
             
-            # Evaluate conditions based on type
-            if criteria_type == "all":
-                success = all(self._evaluate_condition(cond, response) for cond in conditions)
-            elif criteria_type == "any":
-                success = any(self._evaluate_condition(cond, response) for cond in conditions)
-            elif criteria_type == "custom":
+            # Handle custom expressions differently
+            if criteria_type == "custom":
                 success = self._evaluate_custom_condition(criteria.get("expression"), response)
             else:
-                logger.error(f"Unknown criteria type: {criteria_type}")
-                success = False
+                conditions = criteria.get("conditions", [])
                 
+                # Empty conditions list should fail
+                if not conditions:
+                    return {
+                        "success": False,
+                        "next_step": None,
+                        "action": "error",
+                        "action_params": {"error": "No conditions specified"}
+                    }
+                
+                # Evaluate conditions based on type
+                if criteria_type == "all":
+                    success = all(self._evaluate_condition(cond, response) for cond in conditions)
+                elif criteria_type == "any":
+                    success = any(self._evaluate_condition(cond, response) for cond in conditions)
+                else:
+                    logger.error(f"Unknown criteria type: {criteria_type}")
+                    success = False
+                    
             logger.debug(f"Overall success: {success}")
             
             # Determine next action based on success/failure
@@ -97,15 +109,20 @@ class SuccessEvaluator:
                 # Handle conditional failure actions
                 if "actions" in on_failure:
                     for action_def in on_failure["actions"]:
-                        if self._evaluate_condition(action_def["condition"], response):
-                            result = {
-                                "success": False,
-                                "next_step": action_def.get("target_step"),
-                                "action": action_def["action"],
-                                "action_params": action_def.get("params", {})
-                            }
-                            logger.debug(f"Conditional failure result: {result}")
-                            return result
+                        try:
+                            if self._evaluate_condition(action_def["condition"], response):
+                                result = {
+                                    "success": False,
+                                    "next_step": action_def.get("target_step"),
+                                    "action": action_def["action"],
+                                    "action_params": action_def.get("params", {})
+                                }
+                                logger.debug(f"Conditional failure result: {result}")
+                                return result
+                        except Exception as e:
+                            logger.error(f"Error evaluating failure condition: {str(e)}")
+                            continue
+                            
                 # Default failure action
                 result = {
                     "success": False,
@@ -129,7 +146,15 @@ class SuccessEvaluator:
         """Safely evaluate a single condition against a response"""
         try:
             # Create a safe evaluation environment
-            eval_globals = {"__builtins__": {}}
+            eval_globals = {
+                "__builtins__": {
+                    "str": str,
+                    "len": len,
+                    "True": True,
+                    "False": False,
+                    "None": None
+                }
+            }
             
             # Convert response to dict and wrap in DotDict for flexible access
             if isinstance(response, ModuleResponse):
@@ -139,10 +164,7 @@ class SuccessEvaluator:
             
             # Create evaluation locals with response as DotDict
             eval_locals = {
-                "response": response_dict,
-                "True": True,
-                "False": False,
-                "None": None
+                "response": response_dict
             }
             
             logger.debug(f"\n=== Evaluating Condition ===")
@@ -153,8 +175,6 @@ class SuccessEvaluator:
             logger.debug("\nTesting access patterns:")
             logger.debug(f"Direct success: {response_dict.success}")
             logger.debug(f"Direct credentials: {response_dict.credentials}")
-            if response_dict.credentials:
-                logger.debug(f"Nested valid: {response_dict.credentials.valid}")
             
             result = eval(condition, eval_globals, eval_locals)
             logger.debug(f"Condition evaluation result: {result}")
@@ -168,7 +188,19 @@ class SuccessEvaluator:
         """Evaluate a custom condition expression"""
         try:
             # Create a safe evaluation environment with more operators
-            eval_globals = {"__builtins__": {}}
+            eval_globals = {
+                "__builtins__": {
+                    "str": str,
+                    "len": len,
+                    "True": True,
+                    "False": False,
+                    "None": None,
+                    "and": lambda x, y: x and y,
+                    "or": lambda x, y: x or y,
+                    "not": lambda x: not x,
+                    "in": lambda x, y: x in y
+                }
+            }
             
             # Convert response to DotDict for flexible access
             if isinstance(response, ModuleResponse):
@@ -177,15 +209,7 @@ class SuccessEvaluator:
                 response_dict = DotDict(response if isinstance(response, dict) else {})
             
             eval_locals = {
-                "response": response_dict,
-                "True": True,
-                "False": False,
-                "None": None,
-                "and": lambda x, y: x and y,
-                "or": lambda x, y: x or y,
-                "not": lambda x: not x,
-                "in": lambda x, y: x in y,
-                "len": len
+                "response": response_dict
             }
             
             logger.debug(f"\n=== Evaluating Custom Expression ===")

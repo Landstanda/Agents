@@ -17,7 +17,7 @@ class FlowLogger:
         """Initialize the flow logger with a log directory."""
         self.log_dir = log_dir
         self.history = []  # Store events as a list
-        self.events = self.history  # For backward compatibility
+        self.events = []  # Store events separately
         self.errors = []  # Store errors as a list
         self._initialized = False
         self.max_history_size = 1000
@@ -36,11 +36,24 @@ class FlowLogger:
         self.current_log_file = os.path.join(self.log_dir, f"flow_{timestamp}.log")
         
         # Configure logging
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(levelname)s %(name)s:%(filename)s:%(lineno)d %(message)s',
-            handlers=[logging.FileHandler(self.current_log_file), logging.StreamHandler()]
-        )
+        logger = logging.getLogger()  # Get root logger
+        logger.setLevel(logging.INFO)
+        
+        # Remove any existing handlers to avoid duplicate logging
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+            
+        # Add file and stream handlers
+        file_handler = logging.FileHandler(self.current_log_file)
+        stream_handler = logging.StreamHandler()
+        
+        # Set format for both handlers
+        formatter = logging.Formatter('%(levelname)s %(name)s:%(filename)s:%(lineno)d %(message)s')
+        file_handler.setFormatter(formatter)
+        stream_handler.setFormatter(formatter)
+        
+        logger.addHandler(file_handler)
+        logger.addHandler(stream_handler)
 
     async def log_event(self, component: str, event_type: str, data: Dict[str, Any] = None) -> None:
         """Log an event with its details."""
@@ -62,11 +75,13 @@ class FlowLogger:
         }
         
         # Store event in memory
-        if len(self.history) >= self.max_history_size:
-            # Remove oldest events when limit is reached
-            self.history = self.history[-(self.max_history_size - 1):]
+        if len(self.events) >= self.max_history_size:
+            # Remove oldest events to make room for new event
+            self.events = self.events[-self.max_history_size + 1:]
+            self.history = self.events.copy()  # Keep history in sync
         
-        self.history.append(event)
+        self.events.append(event)
+        self.history = self.events.copy()  # Keep history in sync
         
         # Log to file
         logging.info(json.dumps(event))
@@ -111,5 +126,5 @@ class FlowLogger:
     def clear_history(self) -> None:
         """Clear all stored events and errors."""
         self.history = []
-        self.events = self.history  # Keep events in sync
+        self.events = []
         self.errors = [] 

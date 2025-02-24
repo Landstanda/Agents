@@ -83,14 +83,16 @@ class BaseAgent(AgentInterface):
 
             # Update ticket status based on results
             if result.get('status') == 'error':
-                ticket.status = TicketStatus.ERROR
+                if ticket.status != TicketStatus.ERROR:  # Only update if not already in error state
+                    ticket.update_status(TicketStatus.ERROR)
                 ticket.add_error(result.get('error', 'Unknown error'), 'execution_error')
             else:
-                ticket.status = TicketStatus.COMPLETED
+                ticket.update_status(TicketStatus.COMPLETED)
 
         except Exception as e:
             self.logger.error(f"Error executing service '{ticket.service}': {str(e)}")
-            ticket.status = TicketStatus.ERROR
+            if ticket.status != TicketStatus.ERROR:  # Only update if not already in error state
+                ticket.update_status(TicketStatus.ERROR)
             ticket.add_error(str(e), 'execution_error')
             
     async def execute_service(self, service_name: str, ticket: Ticket) -> Dict[str, Any]:

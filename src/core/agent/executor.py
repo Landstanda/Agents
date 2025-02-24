@@ -22,6 +22,17 @@ class ServiceExecutor:
         self.logger = logging.getLogger(__name__)
         self.logger.debug("ServiceExecutor initialized")
         
+        # Monitoring hooks
+        self.on_step_start = None
+        self.on_step_complete = None
+        
+    async def initialize(self) -> None:
+        """Initialize the executor"""
+        if not self.service_registry.initialized:
+            await self.service_registry.initialize()
+        if not self.tool_registry.initialized:
+            await self.tool_registry.initialize()
+            
     async def _get_execution_lock(self, ticket_id: str) -> asyncio.Lock:
         """Get or create a lock for a specific ticket execution"""
         async with self._global_lock:
@@ -39,6 +50,17 @@ class ServiceExecutor:
     async def execute_service(self, service_def: Dict[str, Any], ticket: Ticket) -> Dict[str, Any]:
         """Execute a service with the given ticket"""
         try:
+            # Validate service exists
+            service_name = service_def.get('name')
+            if not self.service_registry.get_item(service_name):
+                error_msg = f"Service '{service_name}' not found"
+                self.logger.error(error_msg)
+                ticket.update_status(TicketStatus.ERROR)
+                return {
+                    'status': 'error',
+                    'error': error_msg
+                }
+            
             # Create execution context
             context = ExecutionContext(ticket, service_def)
             
@@ -47,46 +69,75 @@ class ServiceExecutor:
             for i, step in enumerate(service_def['steps'], 1):
                 context.set_current_step(step, i)
                 
+                # Record start time
+                start_time = context.get_current_time()
+                
+                # Notify step start
+                if self.on_step_start:
+                    self.on_step_start(step, "start")
+                
                 # Get tool for step
                 tool_name = step['tool']
-                tool_class = await self.tool_registry.get_tool(tool_name)
+                tool_class = self.tool_registry.get_item(tool_name)
                 if not tool_class:
-                    raise ValueError(f"Tool '{tool_name}' not found")
+                    error_msg = f"Tool '{tool_name}' not found"
+                    self.logger.error(error_msg)
+                    ticket.update_status(TicketStatus.ERROR)
+                    return {
+                        'status': 'error',
+                        'error': error_msg
+                    }
                     
                 # Create tool instance
-                tool = tool_class()
+                tool = tool_class() if isinstance(tool_class, type) else tool_class
                 
                 # Execute tool with parameters
                 try:
-                    parameters = step.get('parameters', {})
+                    parameters = step.get('params', {})
                     parameters['context'] = context
                     result = await tool.execute(**parameters)
                     
-                    # Store result
-                    context.store_result(i, {
-                        'status': 'completed',
-                        'results': result
+                    # Record end time and duration
+                    end_time = context.get_current_time()
+                    duration = (end_time - start_time).total_seconds()
+                    
+                    # Add monitoring data to result
+                    result.update({
+                        'start_time': start_time.isoformat(),
+                        'end_time': end_time.isoformat(),
+                        'duration': duration
                     })
+                    
+                    # Store result
+                    context.store_result(i, result)
                     results.append(result)
                     
-                except Exception as e:
-                    error_result = {
-                        'status': 'error',
-                        'error': str(e)
-                    }
-                    context.store_result(i, error_result)
-                    return error_result
+                    # Notify step complete
+                    if self.on_step_complete:
+                        self.on_step_complete(step, "complete")
                     
+                except Exception as e:
+                    error_msg = f"Error executing step {i}: {str(e)}"
+                    self.logger.error(error_msg)
+                    ticket.update_status(TicketStatus.ERROR)
+                    return {
+                        'status': 'error',
+                        'error': error_msg,
+                        'results': results  # Include results up to failure
+                    }
+            
             return {
                 'status': 'completed',
                 'results': results
             }
             
         except Exception as e:
-            self.logger.error(f"Error executing service: {str(e)}")
+            error_msg = f"Error executing service: {str(e)}"
+            self.logger.error(error_msg)
+            ticket.update_status(TicketStatus.ERROR)
             return {
                 'status': 'error',
-                'error': str(e)
+                'error': error_msg
             }
 
     async def _execute_step(self, step: Dict[str, Any], context: ExecutionContext) -> Dict[str, Any]:
@@ -94,15 +145,15 @@ class ServiceExecutor:
         try:
             # Get tool for step
             tool_name = step['tool']
-            tool_class = await self.tool_registry.get_tool(tool_name)
+            tool_class = self.tool_registry.get_item(tool_name)
             if not tool_class:
                 raise ValueError(f"Tool '{tool_name}' not found")
                 
             # Create tool instance
-            tool = tool_class()
+            tool = tool_class() if isinstance(tool_class, type) else tool_class
             
             # Execute tool with parameters
-            parameters = step.get('parameters', {})
+            parameters = step.get('params', {})
             parameters['context'] = context
             
             result = await tool.execute(**parameters)
@@ -120,14 +171,13 @@ class ServiceExecutor:
 
     def _prepare_parameters(self, step: Dict[str, Any], context: ExecutionContext) -> Dict[str, Any]:
         """Prepare parameters for tool execution"""
-        params = step.get('parameters', {}).copy()
+        params = step.get('params', {}).copy()
         
         # Replace any template variables with actual values
         for key, value in params.items():
-            if isinstance(value, str) and value.startswith('$'):
-                var_name = value[1:]
-                if var_name in context.variables:
-                    params[key] = context.variables[var_name]
+            if isinstance(value, str) and value.startswith('{') and value.endswith('}'):
+                var_name = value[1:-1]
+                params[key] = context.get_variable(var_name, context.ticket.entities.get(var_name))
                     
         return params
         

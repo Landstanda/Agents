@@ -6,30 +6,57 @@ from src.execution.context import ExecutionContext
 class ModuleResponse:
     """Standardized response format for all modules"""
     
+    # Protected attributes that shouldn't be overwritten by data
+    _protected_attrs = {'success', 'data', 'error', 'error_type', 'to_dict', 'from_dict'}
+    
     def __init__(self, success: bool, data: Dict[str, Any] = None, error: str = None, error_type: str = None):
-        self.success = success
-        self.data = data or {}
-        self.error = error
-        self.error_type = error_type
+        """Initialize a ModuleResponse with success status and optional data/error information."""
+        # Set base attributes
+        self._success = success
+        self._data = data or {}
+        self._error = error
+        self._error_type = error_type
         
-        # Add data fields as direct attributes for compatibility
+        # Add data fields as direct attributes if they don't conflict
         for key, value in (data or {}).items():
-            setattr(self, key, value)
+            if key not in self._protected_attrs:
+                setattr(self, key, value)
+    
+    @property
+    def success(self) -> bool:
+        """Get success status."""
+        return self._success
+    
+    @property
+    def data(self) -> Dict[str, Any]:
+        """Get response data."""
+        return self._data
+    
+    @property
+    def error(self) -> Optional[str]:
+        """Get error message if any."""
+        return self._error
+    
+    @property
+    def error_type(self) -> Optional[str]:
+        """Get error type if any."""
+        return self._error_type
         
     def to_dict(self) -> Dict[str, Any]:
         """Convert response to dictionary format"""
         result = {
-            "success": self.success,
-            "data": self.data
+            "success": self._success,
+            "data": self._data
         }
-        if self.error:
-            result["error"] = self.error
-        if self.error_type:
-            result["error_type"] = self.error_type
+        if self._error:
+            result["error"] = self._error
+        if self._error_type:
+            result["error_type"] = self._error_type
             
         # Add direct attributes to root level
-        for key, value in self.data.items():
-            result[key] = value
+        for key, value in self._data.items():
+            if key not in self._protected_attrs:
+                result[key] = value
             
         return result
         

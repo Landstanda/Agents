@@ -194,7 +194,11 @@ class TestFlowLogger:
             
             # Verify event data in log file
             for line in log_lines:
-                log_data = json.loads(line.split("INFO")[-1].strip())
+                # Find the JSON data at the end of the line
+                json_start = line.find('{')
+                if json_start == -1:
+                    continue
+                log_data = json.loads(line[json_start:])
                 assert "timestamp" in log_data
                 assert "component" in log_data
                 assert "type" in log_data

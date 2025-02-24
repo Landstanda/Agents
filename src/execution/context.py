@@ -26,9 +26,13 @@ class ExecutionContext:
         self.service = service
         self.current_step: Optional[Dict[str, Any]] = None
         self.step_results: Dict[int, StepResult] = {}
-        self.variables: Dict[str, Any] = {}
+        self.variables = ticket.entities.copy()  # Initialize with a copy of ticket entities
         self.start_time = datetime.now()
         self.entities = ticket.entities if hasattr(ticket, 'entities') else {}
+        
+    def get_current_time(self) -> datetime:
+        """Get the current time"""
+        return datetime.now()
         
     def store_result(self, step_number: int = None, result: Dict[str, Any] = None, success: bool = True, error: Optional[str] = None, step: int = None) -> None:
         """Store the result of a step execution. Supports both step_number and step parameters."""
@@ -102,8 +106,17 @@ class ExecutionContext:
             if '.' in name:
                 parts = name.split('.')
                 target = self.variables
+                
+                # Validate the path exists or can be created
                 for part in parts[:-1]:
-                    target = target.setdefault(part, {})
+                    if part not in target:
+                        if not isinstance(target, dict):
+                            raise Exception(f"Cannot set nested path '{name}': parent is not a dictionary")
+                        target[part] = {}
+                    elif not isinstance(target[part], dict):
+                        raise Exception(f"Cannot set nested path '{name}': parent is not a dictionary")
+                    target = target[part]
+                    
                 target[parts[-1]] = value
             else:
                 self.variables[name] = value
@@ -112,6 +125,7 @@ class ExecutionContext:
             
         except Exception as e:
             logger.error(f"Error setting variable {name}: {str(e)}")
+            raise  # Re-raise the exception for proper error handling
             
     def _update_variables(self, output_vars: Dict[str, str], result: Any) -> None:
         """Update variables from step results"""

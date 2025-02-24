@@ -7,7 +7,7 @@ from src.core.agent.base_agent import BaseAgent
 from src.utils.flow_logger import FlowLogger
 from src.core.module_interface import ModuleResponse
 from src.core.success_evaluator import SuccessEvaluator
-from src.core.execution.context import ExecutionContext
+from src.execution.context import ExecutionContext
 
 logger = logging.getLogger(__name__)
 
