@@ -48,7 +48,8 @@ class GoogleAuthModule(BaseModule):
         except Exception as e:
             logger.error(f"Failed to refresh token: {str(e)}")
             if "invalid_grant" in str(e):
-                raise ValueError("Token refresh failed - needs reauthorization") from e
+                self.creds = None  # Clear invalid credentials
+                return None  # Return None to trigger reauthorization
             raise
 
     async def execute(self, context: ExecutionContext, **params) -> Dict[str, Any]:
@@ -95,24 +96,17 @@ class GoogleAuthModule(BaseModule):
             if not self.creds or not self.creds.valid:
                 logger.debug("🔄 Credentials need refresh or creation")
                 
-                try:
-                    if self.creds and self.creds.expired and self.creds.refresh_token:
-                        logger.debug("🔄 Refreshing expired credentials...")
-                        try:
-                            await self._refresh_credentials(self.creds)
+                if self.creds and self.creds.expired and self.creds.refresh_token:
+                    logger.debug("🔄 Refreshing expired credentials...")
+                    try:
+                        await self._refresh_credentials(self.creds)
+                        if self.creds:
                             logger.debug("✓ Credentials refreshed successfully")
-                        except Exception as e:
-                            error = f"Error refreshing credentials: {str(e)}"
-                            context.store_result(1, None, success=False, error=error)
-                            return {"success": False, "error": error}
-                except ValueError as e:
-                    if "needs reauthorization" in str(e):
-                        logger.info("🔄 Token refresh failed, starting new OAuth2 flow...")
+                        else:
+                            logger.info("🔄 Token refresh failed, starting new OAuth2 flow...")
+                    except Exception as e:
+                        logger.error(f"Error refreshing credentials: {str(e)}")
                         self.creds = None
-                    else:
-                        error = str(e)
-                        context.store_result(1, None, success=False, error=error)
-                        return {"success": False, "error": error}
 
                 if not self.creds or not self.creds.valid:
                     logger.debug("🔐 Starting new OAuth2 flow...")
