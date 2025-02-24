@@ -73,22 +73,16 @@ class MessageMaker:
         """
     
     async def send_message(self, ticket: Ticket) -> None:
-        """
-        Generate and send a message based on the ticket context.
-        
-        Args:
-            ticket: The ticket containing full context and history
-        """
+        """Send message to user based on ticket state."""
         try:
-            # Create prompt for GPT based on ticket context
-            user_prompt = self._create_prompt(ticket)
+            prompt = self._create_prompt(ticket)
             
             # Get GPT response
             response = await self.openai.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": self.system_prompt},
-                    {"role": "user", "content": user_prompt}
+                    {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
                 max_tokens=150
@@ -96,49 +90,28 @@ class MessageMaker:
             
             if response.choices:
                 message = response.choices[0].message.content.strip()
-                ticket.add_message(message, "assistant")
-                
-                # Send to Slack
-                await self.slack.chat_postMessage(
-                    channel=ticket.channel_id,
-                    text=message,
-                    thread_ts=ticket.thread_ts
-                )
-                
-                if ticket.status == TicketStatus.COMPLETED:
-                    ticket.final_response = message
             else:
-                logger.error("No response from GPT")
-                # Send fallback message
-                fallback = self._get_fallback_message(ticket)
-                ticket.add_message(fallback, "assistant")
-                await self.slack.chat_postMessage(
-                    channel=ticket.channel_id,
-                    text=fallback,
-                    thread_ts=ticket.thread_ts
-                )
-                
-        except Exception as e:
-            error_msg = str(e)
-            logger.error(f"Error sending message: {error_msg}")
-            if self.flow_logger:
-                await self.flow_logger.log_event("MessageMaker", "error", {"error": error_msg})
+                message = self._get_fallback_message(ticket)
             
-            ticket.add_error(error_msg, "message_sending_error")
-            # Send basic error message
-            try:
-                error_msg = self._get_fallback_message(ticket)
-                ticket.add_message(error_msg, "assistant")
-                await self.slack.chat_postMessage(
-                    channel=ticket.channel_id,
-                    text=error_msg,
-                    thread_ts=ticket.thread_ts
-                )
-            except Exception as e2:
-                error_msg = str(e2)
-                logger.error(f"Failed to send fallback message: {error_msg}")
-                if self.flow_logger:
-                    await self.flow_logger.log_event("MessageMaker", "error", {"error": error_msg})
+            # Add message to ticket and send to Slack
+            ticket.add_outgoing_message(message)
+            ticket.final_response = message  # Set the final response
+            await self.slack.chat_postMessage(
+                channel=ticket.channel_id,
+                thread_ts=ticket.thread_ts,
+                text=message
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error sending message: {str(e)}")
+            fallback_msg = self._get_fallback_message(ticket)
+            ticket.add_outgoing_message(fallback_msg)
+            ticket.final_response = fallback_msg  # Set the final response even for fallback
+            await self.slack.chat_postMessage(
+                channel=ticket.channel_id,
+                thread_ts=ticket.thread_ts,
+                text=fallback_msg
+            )
     
     def _create_prompt(self, ticket: Ticket) -> str:
         """Create GPT prompt based on ticket context."""
@@ -169,18 +142,20 @@ class MessageMaker:
             return f"""
                 I need to inform the user about an error.
                 Original request: {ticket.original_message}
-                Errors: {self._format_errors(ticket)}
+                Error details: {self._format_errors(ticket)}
                 Previous messages: {self._format_message_history(ticket)}
-                Generate a friendly message explaining the error.
+                Generate a clear and friendly message explaining what went wrong and what the user can do next.
+                Be specific about the error: {ticket.get_last_error().get('message') if ticket.get_last_error() else 'Unknown error'}
             """
             
         elif status == TicketStatus.SERVICE_CREATION:
             return f"""
-                I need to inform the user about a new service.
+                I need to inform the user about a new service being created.
                 Original request: {ticket.original_message}
-                Created services: {ticket.created_services}
+                Created services: {[s.get('name', '') for s in ticket.created_services]}
+                Service details: {ticket.created_services[-1] if ticket.created_services else {}}
                 Previous messages: {self._format_message_history(ticket)}
-                Generate a message about the new service being created.
+                Generate an informative message about the new service being created, including its purpose and capabilities.
             """
             
         return f"""

@@ -125,6 +125,10 @@ Return ONLY valid JSON matching this schema."""
             Updated ticket with execution plan
         """
         try:
+            # Only update status if not already analyzing
+            if ticket.status != TicketStatus.ANALYZING:
+                ticket.update_status(TicketStatus.ANALYZING)
+            
             # Format services for GPT
             services_json = json.dumps(self.services_schema, indent=2)
             
@@ -141,8 +145,7 @@ Return ONLY valid JSON matching this schema."""
                     {"role": "system", "content": self.system_prompt},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.1,  # Low temperature for consistent results
-                max_tokens=1000
+                temperature=0.1  # Low temperature for consistent results
             )
             
             if not response.choices:

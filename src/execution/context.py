@@ -29,36 +29,27 @@ class ExecutionContext:
         self.variables = ticket.entities.copy()  # Initialize with a copy of ticket entities
         self.start_time = datetime.now()
         self.entities = ticket.entities if hasattr(ticket, 'entities') else {}
+        self._step_start_time: Optional[datetime] = None
+        self.steps_executed = []  # Track executed steps
+        self.successful_steps = set()  # Track successful steps
+        self.errors = []
         
     def get_current_time(self) -> datetime:
         """Get the current time"""
         return datetime.now()
         
-    def store_result(self, step_number: int = None, result: Dict[str, Any] = None, success: bool = True, error: Optional[str] = None, step: int = None) -> None:
-        """Store the result of a step execution. Supports both step_number and step parameters."""
-        # Handle both step_number and step parameters for backward compatibility
-        step_num = step_number if step_number is not None else step
-        if step_num is None:
-            raise ValueError("Either step_number or step must be provided")
-
-        end_time = datetime.now()
-        step_result = StepResult(
-            step_number=step_num,
-            step_name=self.current_step.get('name', '') if self.current_step else '',
-            success=success,
-            result=result,
-            error=error,
-            end_time=end_time,
-            duration=(end_time - self.start_time).total_seconds()
-        )
-        self.step_results[step_num] = step_result
+    def get_step_execution_time(self) -> Optional[float]:
+        """Get the execution time of the current step in seconds"""
+        if not self._step_start_time:
+            return None
+        return (datetime.now() - self._step_start_time).total_seconds()
         
-        # Update variables with step results if specified
-        if success and self.current_step and 'output_vars' in self.current_step:
-            self._update_variables(self.current_step['output_vars'], result)
+    def store_result(self, step_number: int, result: Dict[str, Any], success: bool = False) -> None:
+        """Store a step result"""
+        self.step_results[step_number] = result
+        if success:
+            self.successful_steps.add(step_number)
             
-        logger.debug(f"Stored result for step {step_num}")
-
     def get_result(self, step_number: int) -> Optional[Dict[str, Any]]:
         """Get the result for a specific step"""
         step_result = self.step_results.get(step_number)
@@ -76,7 +67,9 @@ class ExecutionContext:
         
     def set_current_step(self, step: Dict[str, Any], step_number: int) -> None:
         """Set the current step being executed"""
-        self.current_step = {**step, 'step_number': step_number}
+        step['step_number'] = step_number
+        self.current_step = step
+        self._step_start_time = datetime.now()  # Reset step timer
         
     def next_step(self, step: Dict[str, Any]) -> None:
         """Set the current execution step"""
@@ -158,7 +151,7 @@ class ExecutionContext:
         """Get a summary of the execution"""
         self.end_time = datetime.now()
         
-        successful_steps = sum(1 for result in self.step_results.values() if result.success)
+        successful_steps = len(self.successful_steps)
         total_steps = len(self.step_results)
         
         return {
@@ -178,7 +171,10 @@ class ExecutionContext:
                     'duration': result.duration
                 }
                 for step_num, result in self.step_results.items()
-            }
+            },
+            'steps_executed': len(self.steps_executed),
+            'errors': len(self.errors),
+            'status': self.ticket.status.value if hasattr(self.ticket, 'status') else None
         }
         
     def has_failed_steps(self) -> bool:
@@ -200,4 +196,51 @@ class ExecutionContext:
         self.step_results.clear()
         self.clear_variables()
         self.current_step = None
-        logger.debug("Execution context rolled back to initial state") 
+        self.successful_steps.clear()
+        self.steps_executed.clear()
+        self.errors.clear()
+        logger.debug("Execution context rolled back to initial state")
+
+    def add_error(self, error_info: Dict[str, Any]) -> None:
+        """Add an error to the context"""
+        self.errors.append(error_info)
+        if hasattr(self.ticket, 'add_error'):
+            self.ticket.add_error(
+                error_info.get('error', 'Unknown error'),
+                error_info.get('error_type', 'unknown'),
+                error_info.get('step', 'unknown')
+            )
+            
+    def add_step(self, step_info: Dict[str, Any]) -> None:
+        """Add a step to the execution history"""
+        # Check if this step is already recorded (to avoid counting retries)
+        step_number = step_info.get('step_number')
+        step_name = step_info.get('step_name')
+        tool = step_info.get('tool')
+        
+        # Only add if this is a new step (different number or name)
+        # For alternative steps, replace the original step
+        existing_steps = [s for s in self.ticket.steps_executed 
+                         if s.get('step_number') == step_number]
+        
+        if existing_steps:
+            # If this is an alternative step, replace the original step
+            if tool == 'alternative_tool':
+                self.ticket.steps_executed.remove(existing_steps[0])
+                self.ticket.steps_executed.append(step_info)
+                if existing_steps[0] in self.steps_executed:
+                    self.steps_executed.remove(existing_steps[0])
+                self.steps_executed.append(step_info)
+        else:
+            self.ticket.steps_executed.append(step_info)
+            self.steps_executed.append(step_info)
+            
+    def get_last_error(self) -> Optional[dict]:
+        """Get the last error from the error history."""
+        if not self.ticket.error_history:
+            return None
+        return self.ticket.error_history[-1]
+
+    def get_step_count(self) -> int:
+        """Get the number of unique steps executed (excluding retries and replaced steps)"""
+        return len(set(s.get('step_number') for s in self.steps_executed)) 

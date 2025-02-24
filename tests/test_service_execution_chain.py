@@ -63,6 +63,12 @@ def mock_service_def():
                 "tool": "mock_tool",
                 "action": "test_action",
                 "params": {"param1": "value1"}
+            },
+            {
+                "name": "step2",
+                "tool": "mock_tool",
+                "action": "test_action",
+                "params": {"param2": "value2"}
             }
         ]
     }
@@ -109,23 +115,37 @@ class TestServiceExecutionChain:
     
     @pytest.mark.asyncio
     async def test_single_step_execution(self, service_executor, mock_service_def, mock_ticket):
-        """Test execution of a single step with time tracking"""
+        """Test execution of a service with two steps"""
         executor = await service_executor
         
         result = await executor.execute_service(mock_service_def, mock_ticket)
         
         assert result["status"] == "completed"
-        assert len(result["results"]) == 1
+        assert len(result["results"]) == 2
         
-        step_result = result["results"][0]
-        assert step_result["success"] is True
-        assert "start_time" in step_result
-        assert "end_time" in step_result
-        assert "duration" in step_result
-        assert isinstance(datetime.fromisoformat(step_result["start_time"]), datetime)
-        assert isinstance(datetime.fromisoformat(step_result["end_time"]), datetime)
-        assert isinstance(step_result["duration"], float)
-        assert step_result["duration"] >= 0
+        # Verify first step
+        step1_result = result["results"][0]
+        assert step1_result["success"] is True
+        assert "start_time" in step1_result
+        assert "end_time" in step1_result
+        assert "duration" in step1_result
+        assert isinstance(datetime.fromisoformat(step1_result["start_time"]), datetime)
+        assert isinstance(datetime.fromisoformat(step1_result["end_time"]), datetime)
+        assert isinstance(step1_result["duration"], float)
+        assert step1_result["duration"] >= 0
+        assert step1_result["data"]["param1"] == "value1"
+        
+        # Verify second step
+        step2_result = result["results"][1]
+        assert step2_result["success"] is True
+        assert "start_time" in step2_result
+        assert "end_time" in step2_result
+        assert "duration" in step2_result
+        assert isinstance(datetime.fromisoformat(step2_result["start_time"]), datetime)
+        assert isinstance(datetime.fromisoformat(step2_result["end_time"]), datetime)
+        assert isinstance(step2_result["duration"], float)
+        assert step2_result["duration"] >= 0
+        assert step2_result["data"]["param2"] == "value2"
 
     @pytest.mark.asyncio
     async def test_successful_execution_chain(self, service_executor, mock_service_def, mock_ticket):

@@ -114,9 +114,6 @@ class Ticket:
 
     def __post_init__(self):
         """Called after dataclass initialization to set up initial state."""
-        if self.original_message:
-            self.add_incoming_message(self.original_message)
-            
         # Set channel_id and thread_ts from user_info if available
         if self.user_info:
             self.channel_id = self.user_info.get("channel_id", "")
@@ -127,13 +124,13 @@ class Ticket:
             "status": self.status,
             "timestamp": self.created_at
         })
+        
+        # Add original message if available
+        if self.original_message:
+            self.add_incoming_message(self.original_message)
 
     def add_incoming_message(self, content: str, metadata: Optional[Dict[str, Any]] = None):
         """Add an incoming message (from user). Called by ServiceAnalyzer."""
-        # Skip if this is the original message during initialization
-        if content == self.original_message and not self.conversation_history:
-            return
-            
         message = Message(
             content=content,
             timestamp=datetime.now(),
@@ -145,7 +142,8 @@ class Ticket:
             "type": "incoming",
             "message": content,
             "timestamp": message.timestamp,
-            "metadata": message.metadata
+            "metadata": message.metadata,
+            "thread_ts": self.thread_ts
         })
 
     def add_outgoing_message(self, content: str, metadata: Optional[Dict[str, Any]] = None):
@@ -161,7 +159,8 @@ class Ticket:
             "type": "outgoing",
             "message": content,
             "timestamp": message.timestamp,
-            "metadata": message.metadata
+            "metadata": message.metadata,
+            "thread_ts": self.thread_ts
         })
 
     def add_step(self, step_name: str, tool: str, action: str, params: Dict[str, Any], result: Any):
@@ -199,12 +198,13 @@ class Ticket:
         """Update ticket status with validation."""
         # Validate status transition
         valid_transitions = {
-            TicketStatus.CREATED: {TicketStatus.ANALYZING, TicketStatus.WAITING_INPUT, TicketStatus.ERROR},
-            TicketStatus.ANALYZING: {TicketStatus.EXECUTING, TicketStatus.WAITING_INPUT, TicketStatus.ERROR},
-            TicketStatus.EXECUTING: {TicketStatus.COMPLETED, TicketStatus.ERROR, TicketStatus.WAITING_INPUT},
-            TicketStatus.WAITING_INPUT: {TicketStatus.ANALYZING, TicketStatus.EXECUTING, TicketStatus.ERROR},
-            TicketStatus.ERROR: {TicketStatus.ANALYZING, TicketStatus.EXECUTING, TicketStatus.WAITING_INPUT},
-            TicketStatus.COMPLETED: set()  # Terminal state
+            TicketStatus.CREATED: [TicketStatus.ANALYZING, TicketStatus.SERVICE_CREATION],
+            TicketStatus.ANALYZING: [TicketStatus.EXECUTING, TicketStatus.WAITING_INPUT, TicketStatus.ERROR, TicketStatus.SERVICE_CREATION],
+            TicketStatus.EXECUTING: [TicketStatus.COMPLETED, TicketStatus.ERROR],
+            TicketStatus.WAITING_INPUT: [TicketStatus.ANALYZING],
+            TicketStatus.ERROR: [TicketStatus.COMPLETED, TicketStatus.ANALYZING],  # Allow retrying from error
+            TicketStatus.COMPLETED: [TicketStatus.ANALYZING],  # Allow new requests in same thread
+            TicketStatus.SERVICE_CREATION: [TicketStatus.ANALYZING, TicketStatus.ERROR]
         }
         
         if new_status not in valid_transitions.get(self.status, set()):
@@ -294,8 +294,10 @@ class Ticket:
         }
 
     def get_last_error(self) -> Optional[Dict[str, Any]]:
-        """Get the most recent error."""
-        return self.errors[-1] if self.errors else None
+        """Get the most recent error from the error history."""
+        if not self.error_history:
+            return None
+        return self.error_history[-1]
 
     def get_failed_services(self) -> List[str]:
         """Get list of services that failed execution."""

@@ -7,6 +7,7 @@ from src.execution.context import ExecutionContext
 from src.core.module_interface import BaseModule, ModuleResponse
 from src.utils.logging import get_logger
 import logging
+from datetime import datetime
 
 logger = get_logger(__name__)
 
@@ -112,6 +113,17 @@ class ServiceExecutor:
                     context.store_result(i, result)
                     results.append(result)
                     
+                    # Check if step failed
+                    if not result.get('success', False):
+                        error_msg = result.get('error', 'Step failed without specific error')
+                        self.logger.error(f"Step {i} failed: {error_msg}")
+                        ticket.update_status(TicketStatus.ERROR)
+                        return {
+                            'status': 'error',
+                            'error': error_msg,
+                            'results': []  # Don't include failed steps in results
+                        }
+                    
                     # Notify step complete
                     if self.on_step_complete:
                         self.on_step_complete(step, "complete")
@@ -181,47 +193,75 @@ class ServiceExecutor:
                     
         return params
         
-    async def _execute_step_with_retry(
-        self, 
-        step: Dict[str, Any], 
-        context: ExecutionContext
-    ) -> Dict[str, Any]:
+    async def _execute_step_with_retry(self, step: Dict[str, Any], context: ExecutionContext) -> Dict[str, Any]:
         """Execute a step with retry logic"""
-        max_attempts = step.get('retry_count', 3)
-        delay_seconds = step.get('retry_delay', 5)
-        
-        for attempt in range(max_attempts):
-            try:
-                result = await self._execute_step(step, context)
+        max_attempts = step.get('retry_count', 1)
+        delay = step.get('retry_delay', 0.1)
+        backoff = step.get('retry_backoff', 2)
+        attempt = 1
+        first_error = None
+
+        while attempt <= max_attempts:
+            result = await self._execute_step(step, context)
+            
+            if result.get('success', False):
+                return {
+                    'success': True,
+                    'status': 'completed',
+                    'result': result.get('result', {}),
+                    'alternative_used': False
+                }
+
+            error_type = result.get('error_type', 'unknown')
+            error_msg = result.get('error', 'Unknown error')
+            
+            # Record error
+            context.add_error({
+                'step': step.get('name', 'unknown'),
+                'error': error_msg,
+                'error_type': error_type,
+                'message': error_msg,
+                'attempt': attempt,
+                'timestamp': datetime.now().isoformat()
+            })
+
+            # Save first error for later
+            if first_error is None:
+                first_error = result
+
+            if error_type == 'permanent_error' or attempt >= max_attempts:
+                # Try alternative step
+                alternative_step = step.get('alternative_step')
+                if alternative_step:
+                    alternative_step['step_number'] = step.get('step_number', 0)
+                    alternative_result = await self._execute_step(alternative_step, context)
+                    if alternative_result.get('success', False):
+                        return {
+                            'success': True,
+                            'status': 'completed',
+                            'result': alternative_result.get('result', {}),
+                            'alternative_used': True
+                        }
                 
-                if result.get('success', False):
-                    return result
-                    
-                # Check if we should retry
-                if attempt < max_attempts - 1:
-                    error_type = result.get('error_type', '')
-                    if self._should_retry(error_type, step):
-                        logger.warning(f"Retrying step {step.get('name')} after error: {result.get('error')}")
-                        await asyncio.sleep(delay_seconds)
-                        continue
-                        
-                return result
-                
-            except Exception as e:
-                if attempt < max_attempts - 1:
-                    logger.error(f"Error executing step: {str(e)}")
-                    await asyncio.sleep(delay_seconds)
-                    continue
+                # No alternative step or alternative step failed
                 return {
                     'success': False,
-                    'error': str(e),
-                    'error_type': 'execution_error'
+                    'error': error_msg if error_type == 'permanent_error' else f'Max retries ({max_attempts}) exceeded: {error_msg}',
+                    'error_type': 'permanent_error',
+                    'status': 'error'
                 }
-                
+
+            # Retryable error, not yet at max attempts
+            await asyncio.sleep(delay)
+            delay *= backoff
+            attempt += 1
+
+        # All attempts failed
         return {
             'success': False,
-            'error': f"Step failed after {max_attempts} attempts",
-            'error_type': 'max_retries_exceeded'
+            'error': first_error.get('error', 'Unknown error'),
+            'error_type': 'permanent_error',
+            'status': 'error'
         }
         
     def _evaluate_success(

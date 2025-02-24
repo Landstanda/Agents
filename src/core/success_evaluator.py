@@ -65,6 +65,16 @@ class SuccessEvaluator:
             logger.debug(f"Criteria: {criteria}")
             logger.debug(f"Response: {response.to_dict() if isinstance(response, ModuleResponse) else response}")
             
+            # If no criteria provided, use response's success field
+            if not criteria:
+                success = response.get('success', False) if isinstance(response, dict) else getattr(response, 'success', False)
+                return {
+                    "success": success,
+                    "next_step": None,
+                    "action": None,
+                    "action_params": {}
+                }
+            
             criteria_type = criteria.get("type", "all")
             
             # Handle custom expressions differently
