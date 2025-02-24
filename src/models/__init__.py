@@ -1,3 +1,3 @@
-from src.models.ticket import Ticket, TicketStatus
+from src.models.ticket import Ticket, TicketStatus, Message
 
-__all__ = ['Ticket', 'TicketStatus'] 
+__all__ = ['Ticket', 'TicketStatus', 'Message'] 

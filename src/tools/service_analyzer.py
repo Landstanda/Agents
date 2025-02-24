@@ -229,27 +229,36 @@ Return ONLY valid JSON matching this schema."""
             return False
     
     def _update_ticket(self, ticket: Ticket, analysis: Dict[str, Any]) -> Ticket:
-        """Update ticket with analysis results."""
-        # Update ticket status based on analysis
-        if analysis.get("error"):
-            ticket.update_status(TicketStatus.ERROR)
-            ticket.add_error(analysis["error"], "analysis_error")
-        elif analysis.get("missing_information"):
-            ticket.update_status(TicketStatus.WAITING_INPUT)
-            ticket.missing_entities = [input_info["param"] for input_info in analysis["missing_information"]]
-        else:
-            ticket.update_status(TicketStatus.EXECUTING)
-        
-        # Update ticket with execution plan
+        """Update ticket based on analysis results."""
+        # Extract first service and its parameters from execution steps
         if analysis.get("execution_steps"):
-            # Sort services by step number and dependencies
-            execution_plan = self._sort_execution_plan(analysis["execution_steps"])
-            ticket.execution_plan = execution_plan
+            first_step = analysis["execution_steps"][0]
+            ticket.service = first_step["service_id"]
             
-            # Use first service as primary for backward compatibility
-            ticket.service = execution_plan[0]["service_id"]
-            ticket.entities.update(execution_plan[0]["required_params"])
-        
+            # Update entities with provided values
+            ticket.entities = {}
+            if "required_params" in first_step:
+                ticket.entities.update(first_step["required_params"])
+            if "optional_params" in first_step:
+                ticket.entities.update(first_step["optional_params"])
+            
+            # Update execution plan and steps
+            ticket.execution_plan = analysis["execution_steps"]
+            ticket.execution_steps.clear()  # Clear existing steps
+            for step in analysis["execution_steps"]:
+                ticket.execution_steps.append(step)
+            
+            # Check for missing information
+            missing_info = analysis.get("missing_information", [])
+            if missing_info:
+                ticket.missing_entities = [info["param"] for info in missing_info]
+                ticket.update_status(TicketStatus.WAITING_INPUT)
+            else:
+                ticket.update_status(TicketStatus.EXECUTING)
+        else:
+            ticket.update_status(TicketStatus.ERROR)
+            ticket.add_error("No execution steps found", "analysis_error")
+            
         return ticket
         
     def _sort_execution_plan(self, plan: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

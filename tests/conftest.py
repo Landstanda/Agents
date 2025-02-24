@@ -2,13 +2,19 @@ import pytest
 import os
 import yaml
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from openai import AsyncOpenAI
 from slack_sdk.web.async_client import AsyncWebClient
+from slack_sdk.socket_mode.aiohttp import SocketModeClient
+from slack_sdk.socket_mode.request import SocketModeRequest
+from slack_sdk.socket_mode.response import SocketModeResponse
 import sys
 import asyncio
 import logging
 from typing import Dict, Any
+from src.core.orchestrator import RequestOrchestrator
+from src.utils.flow_logger import FlowLogger
+from src.models import Ticket, TicketStatus
 
 # Add src directory to Python path
 src_path = str(Path(__file__).parent.parent / 'src')
@@ -31,6 +37,9 @@ TEST_ROOT = Path(__file__).parent
 WORKSPACE_ROOT = TEST_ROOT.parent
 TEST_DATA_DIR = TEST_ROOT / 'fixtures'
 TEST_SERVICES_FILE = TEST_DATA_DIR / 'test_services.yaml'
+
+# Add at the top of the file, after imports
+pytest_plugins = ('pytest_asyncio',)
 
 @pytest.fixture
 def mock_openai():
@@ -123,10 +132,11 @@ class TestTool:
     
     return tools_dir 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for each test case."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    policy = asyncio.get_event_loop_policy()
+    loop = policy.new_event_loop()
     yield loop
     loop.close()
 
@@ -211,3 +221,110 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "asyncio: mark test as async"
     ) 
+
+@pytest.fixture
+def web_client():
+    """Create a mock web client"""
+    mock = AsyncMock()
+    mock.ssl = None
+    return mock
+
+@pytest.fixture
+def socket_client():
+    """Create a mock socket client"""
+    mock = AsyncMock()
+    mock.connect = AsyncMock()
+    mock.disconnect = AsyncMock()
+    mock.send_socket_mode_response = AsyncMock()
+    return mock
+
+@pytest.fixture
+def flow_logger():
+    """Create a mock flow logger"""
+    mock = AsyncMock()
+    mock.setup = AsyncMock()
+    mock.log_event = AsyncMock()
+    mock.info = AsyncMock()
+    mock.error = AsyncMock()
+    mock.debug = AsyncMock()
+    mock.warning = AsyncMock()
+    return mock
+
+@pytest.fixture
+def service_analyzer():
+    """Create a mock service analyzer"""
+    mock = AsyncMock()
+    mock.analyze_request = AsyncMock()
+    mock.initialize = AsyncMock()
+    mock.info = AsyncMock()
+    mock.error = AsyncMock()
+    return mock
+
+@pytest.fixture
+def service_agent():
+    """Create a mock service agent"""
+    mock = AsyncMock()
+    mock.execute_service = AsyncMock()
+    mock.initialize = AsyncMock()
+    mock.info = AsyncMock()
+    mock.error = AsyncMock()
+    return mock
+
+@pytest.fixture
+def message_maker():
+    """Create a mock message maker"""
+    mock = AsyncMock()
+    mock.create_success_message = AsyncMock()
+    mock.create_error_message = AsyncMock()
+    mock.create_input_request_message = AsyncMock()
+    mock.send_message = AsyncMock()
+    mock.send_error_message = AsyncMock()
+    mock.info = AsyncMock()
+    mock.error = AsyncMock()
+    return mock
+
+@pytest.fixture
+async def orchestrator(service_agent, service_analyzer, message_maker, flow_logger):
+    """Create a test orchestrator instance"""
+    orchestrator_instance = RequestOrchestrator(flow_logger=flow_logger)
+    
+    # Set components directly
+    orchestrator_instance.agent = service_agent
+    orchestrator_instance.service_analyzer = service_analyzer
+    orchestrator_instance.message_maker = message_maker
+    
+    # Initialize
+    await orchestrator_instance.initialize()
+    yield orchestrator_instance
+
+@pytest.fixture
+def slack_token():
+    """Provide a test Slack bot token"""
+    return "xoxb-test-token"
+
+@pytest.fixture
+def app_token():
+    """Provide a test Slack app token"""
+    return "xapp-test-token"
+
+@pytest.fixture
+async def assistant(slack_token, app_token, web_client, socket_client, flow_logger, orchestrator):
+    """Create a test assistant instance"""
+    assistant_instance = OfficeAssistant(
+        slack_token=slack_token,
+        app_token=app_token
+    )
+    assistant_instance.web_client = web_client
+    assistant_instance.socket_client = socket_client
+    assistant_instance.flow_logger = flow_logger
+    assistant_instance.orchestrator = orchestrator
+    assistant_instance.bot_user_id = "U123BOT"
+    
+    await assistant_instance.setup()
+    yield assistant_instance
+    await assistant_instance.stop()
+
+def _update_ticket_for_test(ticket: Ticket, status: TicketStatus) -> Ticket:
+    """Helper function to update ticket status for testing"""
+    ticket.status = status
+    return ticket 

@@ -1,4 +1,4 @@
-from .services import ServiceRegistry
-from .tools import ToolRegistry
+from .service_registry import ServiceRegistry
+from .tool_registry import ToolRegistry
 
 __all__ = ['ServiceRegistry', 'ToolRegistry'] 

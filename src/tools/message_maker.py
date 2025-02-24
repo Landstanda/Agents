@@ -119,8 +119,12 @@ class MessageMaker:
                 )
                 
         except Exception as e:
-            logger.error(f"Error sending message: {str(e)}")
-            ticket.add_error(str(e), "message_sending_error")
+            error_msg = str(e)
+            logger.error(f"Error sending message: {error_msg}")
+            if self.flow_logger:
+                await self.flow_logger.log_event("MessageMaker", "error", {"error": error_msg})
+            
+            ticket.add_error(error_msg, "message_sending_error")
             # Send basic error message
             try:
                 error_msg = self._get_fallback_message(ticket)
@@ -131,7 +135,10 @@ class MessageMaker:
                     thread_ts=ticket.thread_ts
                 )
             except Exception as e2:
-                logger.error(f"Failed to send fallback message: {str(e2)}")
+                error_msg = str(e2)
+                logger.error(f"Failed to send fallback message: {error_msg}")
+                if self.flow_logger:
+                    await self.flow_logger.log_event("MessageMaker", "error", {"error": error_msg})
     
     def _create_prompt(self, ticket: Ticket) -> str:
         """Create GPT prompt based on ticket context."""
@@ -217,7 +224,7 @@ class MessageMaker:
             TicketStatus.SERVICE_CREATION: f"I'm creating a new service to handle your request.",
             TicketStatus.EXECUTING: "I'm processing your request.",
             TicketStatus.ANALYZING: "I'm analyzing your request.",
-            TicketStatus.CREATED: "I've received your request."
+            TicketStatus.CREATED: "I'm processing your request."
         }
         
         return fallbacks.get(status, "I'm processing your request.") 
