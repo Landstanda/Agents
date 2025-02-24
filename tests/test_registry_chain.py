@@ -24,73 +24,76 @@ class MockTool(BaseModule):
     async def execute(self, context=None, action=None):
         return {"success": True, "result": "mock_result"}
 
+# Define mock services as a constant to avoid async fixture issues
+MOCK_SERVICES = {
+    "test_service": {
+        "name": "test_service",
+        "steps": [
+            {
+                "name": "test_step",
+                "tool": "mock_tool",
+                "action": "test_action"
+            }
+        ]
+    },
+    "complex_service": {
+        "name": "complex_service",
+        "steps": [
+            {
+                "name": "auth_step",
+                "tool": "auth_tool",
+                "action": "authenticate",
+                "success_criteria": {
+                    "type": "all",
+                    "conditions": ["authenticated"]
+                }
+            },
+            {
+                "name": "process_step",
+                "tool": "process_tool",
+                "action": "process",
+                "on_error": {
+                    "action": "retry",
+                    "max_attempts": 3
+                }
+            }
+        ]
+    }
+}
+
 @pytest.fixture
 async def service_registry():
     """Create a service registry with mock services"""
     with patch('pathlib.Path.exists', return_value=True), \
          patch('builtins.open', create=True) as mock_open:
-        # Mock service definitions
-        mock_services = {
-            "test_service": {
-                "name": "test_service",
-                "steps": [
-                    {
-                        "name": "test_step",
-                        "tool": "mock_tool",
-                        "action": "test_action"
-                    }
-                ]
-            },
-            "complex_service": {
-                "name": "complex_service",
-                "steps": [
-                    {
-                        "name": "auth_step",
-                        "tool": "auth_tool",
-                        "action": "authenticate",
-                        "success_criteria": {
-                            "type": "all",
-                            "conditions": ["authenticated"]
-                        }
-                    },
-                    {
-                        "name": "process_step",
-                        "tool": "process_tool",
-                        "action": "process",
-                        "on_error": {
-                            "action": "retry",
-                            "max_attempts": 3
-                        }
-                    }
-                ]
-            }
-        }
         
         mock_open.return_value.__enter__.return_value.read.return_value = \
-            yaml.dump(mock_services)
+            yaml.dump(MOCK_SERVICES)
             
-        registry = ServiceRegistry()
-        await registry.initialize()
-        return registry
+        registry = ServiceRegistry("mock_services_path")
+        
+        # Mock the load_items method
+        async def mock_load_items():
+            for name, service in MOCK_SERVICES.items():
+                await registry.register_item(name, service)
+        
+        with patch.object(registry, 'load_items', side_effect=mock_load_items):
+            await registry.initialize()
+            return registry
 
 @pytest.fixture
 async def tool_registry():
     """Create a tool registry with mock tools"""
-    with patch('pathlib.Path.exists', return_value=True), \
-         patch('pathlib.Path.glob') as mock_glob:
-        # Set up mock tool files
-        mock_files = [
-            Mock(name="mock_tool.py", stem="mock_tool"),
-            Mock(name="auth_tool.py", stem="auth_tool"),
-            Mock(name="process_tool.py", stem="process_tool")
-        ]
-        mock_glob.return_value = mock_files
-        
-        # Create registry
-        registry = ToolRegistry()
+    registry = ToolRegistry("mock_tools_path")
+    
+    # Mock the load_items method to do nothing
+    async def mock_load_items():
+        pass
+    
+    with patch.object(registry, 'load_items', side_effect=mock_load_items):
         await registry.initialize()
         
-        # Register mock tools
+        # Register mock tools directly
         await registry.register_item("mock_tool", MockTool)
         await registry.register_item("auth_tool", MockTool)
         await registry.register_item("process_tool", MockTool)
