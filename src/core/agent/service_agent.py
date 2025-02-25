@@ -111,96 +111,35 @@ class ServiceAgent(BaseAgent):
         self.flow_logger = flow_logger or FlowLogger()
         self.success_evaluator = SuccessEvaluator()
         
-    async def execute_service(self, service_name: str, ticket: Ticket) -> dict:
-        """Execute a service with the given name using the provided ticket."""
+    async def execute_service(self, service_name: str, ticket: Ticket) -> Dict[str, Any]:
+        """Execute a specific service"""
         self.logger.info(f"Starting execution of service: {service_name}")
         
-        # Initialize execution state
-        execution_state = ServiceExecutionState()
-        
-        # Get service definition
-        service_def = self.service_registry.get_item(service_name)
-        if not service_def:
-            error_msg = f"Service '{service_name}' not found"
-            error = {
-                "message": error_msg,
-                "type": "service_not_found",
-                "step": None,
-                "timestamp": datetime.now()
-            }
-            execution_state.add_error(error)
-            self._record_error(ticket, error_msg, "service_not_found", None)
-            ticket.status = execution_state.get_ui_status()
-            return {"success": False, "error": error_msg, "status": "error"}
-
-        # Validate service definition
         try:
-            for step in service_def["steps"]:
-                if "tool" in step and not self.tool_registry.get_item(step["tool"]):
-                    error_msg = f"Tool '{step['tool']}' not found"
-                    error = {
-                        "message": error_msg,
-                        "type": "service_not_found",
-                        "step": step["name"],
-                        "timestamp": datetime.now()
-                    }
-                    execution_state.add_error(error)
-                    self._record_error(ticket, error_msg, "service_not_found", step["name"])
-                    ticket.status = execution_state.get_ui_status()
-                    return {"success": False, "error": error_msg, "status": "error"}
-        except (KeyError, TypeError) as e:
-            error_msg = f"Invalid service definition: {str(e)}"
-            error = {
-                "message": error_msg,
-                "type": "service_not_found",
-                "step": None,
-                "timestamp": datetime.now()
-            }
-            execution_state.add_error(error)
-            self._record_error(ticket, error_msg, "service_not_found", None)
-            ticket.status = execution_state.get_ui_status()
-            return {"success": False, "error": error_msg, "status": "error"}
-
-        # Execute each step
-        steps_executed = []
-        for step in service_def["steps"]:
-            execution_state.current_step = step["name"]
-            step_result = await self._execute_step_with_retry(step, ticket)
-            execution_state.update_from_step_result(step_result)
+            # Get service definition
+            service_def = self.service_registry.get_item(service_name)
+            if not service_def:
+                error_msg = f"Service '{service_name}' not found in registry"
+                self.logger.error(error_msg)
+                return {
+                    'status': 'error',
+                    'error': error_msg
+                }
             
-            # Record step execution
-            step_info = {
-                "step": step["name"],
-                "tool": step.get("tool") if not step_result.alternative_succeeded else "alternative_tool",
-                "action": step.get("action"),
-                "params": step.get("params", {}),
-                "result": {
-                    "success": step_result.success or step_result.alternative_succeeded,
-                    "error": step_result.error_message,
-                    "status": step_result.status.name.lower(),
-                    "data": step_result.result_data,
-                    "alternative_used": step_result.alternative_succeeded
-                },
-                "timestamp": datetime.now()
+            # Create execution context
+            context = ExecutionContext(ticket=ticket, service=service_def)
+            
+            # Execute service steps
+            result = await self.executor.execute_service(service_name, ticket)
+            return result
+        
+        except Exception as e:
+            error_msg = f"Error executing service '{service_name}': {str(e)}"
+            self.logger.error(error_msg)
+            return {
+                'status': 'error',
+                'error': error_msg
             }
-            steps_executed.append(step_info)
-
-            # Break if we should not continue
-            if not execution_state.should_continue():
-                break
-
-        # Update ticket state
-        ticket.steps_executed = deque(steps_executed, maxlen=ticket.steps_executed.maxlen)
-        ticket.status = execution_state.get_ui_status()
-
-        # Return final result
-        status = "error" if execution_state.has_permanent_error or execution_state.execution_status == ExecutionStatus.FAILED else "completed"
-        error = execution_state.get_final_error()
-        return {
-            "success": bool(execution_state.steps_succeeded) and not execution_state.has_permanent_error,
-            "status": status,
-            "error": error or step_result.error_message  # Use step error if no final error
-        }
 
     async def _execute_step_with_retry(self, step: dict, ticket: Ticket) -> StepResult:
         """Execute a step with retry logic and alternative step handling"""

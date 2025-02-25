@@ -179,12 +179,10 @@ class RequestOrchestrator:
     async def _send_acknowledgment(self, ticket: Ticket) -> None:
         """Send initial acknowledgment message"""
         try:
-            message = self._get_acknowledgment_message(ticket)
-            await self.message_maker.send_message(
-                channel=ticket.channel_id,
-                text=message,
-                thread_ts=ticket.thread_ts
-            )
+            # Create a copy of the ticket with the acknowledgment message
+            ack_ticket = ticket.copy()
+            ack_ticket.add_outgoing_message(self._get_acknowledgment_message(ticket))
+            await self.message_maker.send_message(ack_ticket)
         except Exception as e:
             logger.error(f"Failed to send acknowledgment: {str(e)}")
             
@@ -205,7 +203,11 @@ class RequestOrchestrator:
     async def _send_error_response(self, ticket: Ticket, error: str) -> None:
         """Send error response"""
         try:
-            await self.message_maker.send_error_message(ticket, error)
+            # Add the error to the ticket and update status
+            ticket.add_error(error, "orchestrator_error", None)
+            ticket.update_status(TicketStatus.ERROR)
+            # Use the standard send_message method
+            await self.message_maker.send_message(ticket)
         except Exception as e:
             logger.error(f"Failed to send error response: {str(e)}")
             

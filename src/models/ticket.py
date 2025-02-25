@@ -196,11 +196,15 @@ class Ticket:
 
     def update_status(self, new_status: TicketStatus):
         """Update ticket status with validation."""
+        # If the status is already set to the new status, just return
+        if self.status == new_status:
+            return
+            
         # Validate status transition
         valid_transitions = {
             TicketStatus.CREATED: [TicketStatus.ANALYZING, TicketStatus.SERVICE_CREATION, TicketStatus.ERROR],
             TicketStatus.ANALYZING: [TicketStatus.EXECUTING, TicketStatus.WAITING_INPUT, TicketStatus.ERROR, TicketStatus.SERVICE_CREATION],
-            TicketStatus.EXECUTING: [TicketStatus.COMPLETED, TicketStatus.ERROR],
+            TicketStatus.EXECUTING: [TicketStatus.COMPLETED, TicketStatus.ERROR, TicketStatus.ANALYZING],  # Added ANALYZING as valid transition
             TicketStatus.WAITING_INPUT: [TicketStatus.ANALYZING],
             TicketStatus.ERROR: [TicketStatus.COMPLETED, TicketStatus.ANALYZING],  # Allow retrying from error
             TicketStatus.COMPLETED: [TicketStatus.ANALYZING],  # Allow new requests in same thread
@@ -456,3 +460,8 @@ class Ticket:
             "completion_percentage": (successful_steps / total_steps * 100) if total_steps > 0 else 0,
             "success": failed_steps == 0 and total_steps > 0
         } 
+
+    def copy(self) -> 'Ticket':
+        """Create a copy of the ticket using to_dict and from_dict"""
+        ticket_dict = self.to_dict()
+        return Ticket.from_dict(ticket_dict) 

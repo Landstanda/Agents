@@ -59,6 +59,11 @@ class BaseAgent(AgentInterface):
             
     async def process_ticket(self, ticket: Ticket) -> None:
         """Process a ticket through the service execution pipeline"""
+        # Skip processing if ticket is None (used for initialization testing)
+        if ticket is None:
+            self.logger.debug("Skipping processing for None ticket (initialization test)")
+            return
+            
         self.logger.debug(f"Processing ticket: {ticket.ticket_id}")
         self.logger.debug(f"Service: {ticket.service}")
         self.logger.debug(f"Status: {ticket.status}")

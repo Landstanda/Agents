@@ -12,6 +12,8 @@ import asyncio
 from google.oauth2.credentials import Credentials
 from src.models.ticket import TicketStatus
 from src.models import Ticket
+import re
+from datetime import time
 
 logger = get_logger(__name__)
 
@@ -31,23 +33,28 @@ class GoogleCalendarModule(BaseModule):
     async def _initialize_service(self, context: ExecutionContext) -> Optional[Any]:
         """Initialize the Google Calendar service"""
         try:
-            # Get authentication result from step 1
-            auth_result = context.get_result(step_number=1)
-            self.logger.debug(f"Auth result: {auth_result}")
-            
-            if not auth_result or not auth_result.get('success'):
-                error_msg = "Authentication failed or no authentication result found"
-                self.logger.error(error_msg)
-                context.ticket.add_error(error_msg, "auth_failed", None)
-                context.ticket.update_status(TicketStatus.ERROR)
-                return None
-
-            # Get credentials from auth result
-            credentials = auth_result.get('credentials')
-            self.logger.debug(f"Credentials: {credentials}")
+            # First try to get credentials from context variables
+            credentials = context.get_variable('google_credentials')
             
             if not credentials:
-                error_msg = "No credentials found in authentication result"
+                # Try to get authentication result from step 1
+                auth_result = context.get_result(step_number=1)
+                self.logger.debug(f"Auth result: {auth_result}")
+                
+                if not auth_result or not auth_result.get('success'):
+                    error_msg = "Authentication failed or no authentication result found"
+                    self.logger.error(error_msg)
+                    context.ticket.add_error(error_msg, "auth_failed", None)
+                    context.ticket.update_status(TicketStatus.ERROR)
+                    return None
+
+                # Get credentials from auth result
+                credentials = auth_result.get('credentials')
+                
+            self.logger.debug(f"Credentials found: {credentials is not None}")
+            
+            if not credentials:
+                error_msg = "No credentials found in context or authentication result"
                 self.logger.error(error_msg)
                 context.ticket.add_error(error_msg, "missing_credentials", None)
                 context.ticket.update_status(TicketStatus.ERROR)
@@ -88,136 +95,218 @@ class GoogleCalendarModule(BaseModule):
         ticket = context.ticket
         self.logger.debug(f"Executing calendar operation with entities: {ticket.entities}")
 
+        # Make sure entities are set in the context
+        for key, value in ticket.entities.items():
+            context.set_variable(key, value)
+
         # Initialize service first
         service = await self._initialize_service(context)
         if not service:
             error_msg = "Failed to initialize Google Calendar service"
             ticket.add_error(error_msg, "service_initialization_error", None)
-            ticket.update_status(TicketStatus.ERROR)
+            # Don't update status to ERROR here, let the orchestrator handle it
             return {
-                'success': False,
-                'error': error_msg
+                "success": False,
+                "error": error_msg
             }
-
-        # Get operation type (default to create_event if not specified)
+            
+        self.service = service
+        
+        # Determine operation based on entities
         operation = ticket.entities.get('operation', 'create_event')
-
+        
         try:
             if operation == 'create_event':
-                # Extract event parameters from ticket entities
-                event_params = {
-                    'time': ticket.entities.get('time'),
-                    'date': ticket.entities.get('date'),
-                    'description': ticket.entities.get('description'),
-                    'participants': ticket.entities.get('participants', []),
-                    'duration': ticket.entities.get('duration', 60)
-                }
-                
-                result = await self._create_event(service, event_params)
-                if not result.get('success', False):
-                    ticket.update_status(TicketStatus.ERROR)
-                    ticket.add_error(result.get('error', 'Unknown error'), "calendar_operation_failed", None)
-                    return result
-                    
+                result = await self._create_event(
+                    context,
+                    ticket.entities.get('time'),
+                    ticket.entities.get('date'),
+                    ticket.entities.get('description', 'Meeting'),
+                    ticket.entities.get('participants'),
+                    ticket.entities.get('location'),
+                    ticket.entities.get('duration', 60)
+                )
                 return result
-                
             elif operation == 'list_events':
-                return await self._list_events(service, context)
+                # Implementation for listing events
+                return await self._list_events(context)
             elif operation == 'check_availability':
                 return await self._check_availability(service, context)
             else:
-                error_msg = f"Unsupported operation: {operation}"
+                error_msg = f"Unsupported calendar operation: {operation}"
                 ticket.add_error(error_msg, "unsupported_operation", None)
-                ticket.update_status(TicketStatus.ERROR)
+                # Don't update status to ERROR here
                 return {
-                    'success': False,
-                    'error': error_msg
+                    "success": False,
+                    "error": error_msg
                 }
-                
         except Exception as e:
             error_msg = f"Error executing calendar operation: {str(e)}"
-            ticket.add_error(error_msg, "execution_error", None)
-            ticket.update_status(TicketStatus.ERROR)
+            self.logger.error(error_msg)
+            ticket.add_error(error_msg, "calendar_operation_error", None)
+            # Don't update status to ERROR here
             return {
-                'success': False,
-                'error': error_msg
+                "success": False,
+                "error": error_msg
             }
             
-    async def _create_event(self, service, entities: Dict[str, Any]) -> Dict[str, Any]:
+    async def _create_event(self, context: ExecutionContext, time: str, date: str, description: str, participants=None, location=None, duration: int = 60) -> Dict[str, Any]:
         """Create a calendar event."""
         try:
             # Validate required parameters
-            required_params = ['time', 'date', 'description', 'participants']
-            missing_params = [param for param in required_params if param not in entities]
-            
-            if missing_params:
-                error_msg = f"Missing required parameters: {', '.join(missing_params)}"
+            if not time or not date or not description:
+                error_msg = "Missing required parameters: time, date, and description are required"
                 self.logger.error(f"❌ {error_msg}")
                 return {'success': False, 'error': error_msg}
-
-            # Extract parameters
-            time = entities['time']
-            date = entities['date']
-            description = entities['description']
-            participants = entities['participants']
-            duration = entities.get('duration', 60)  # Default to 60 minutes
-
-            # Calculate start and end times
-            start_time = await self._calculate_start_time(date, time)
-            end_time = await self._calculate_end_time(start_time, duration)
+            
+            try:
+                # Calculate start and end times
+                time_obj = await self._calculate_start_time(date, time)
+                end_time = time_obj + timedelta(minutes=duration)
+            except ValueError as e:
+                error_msg = f"Invalid date or time: {str(e)}"
+                self.logger.error(f"❌ {error_msg}")
+                return {'success': False, 'error': error_msg}
 
             # Create event details
             event = {
                 'summary': description,
                 'description': description,
                 'start': {
-                    'dateTime': start_time.isoformat(),
+                    'dateTime': time_obj.isoformat(),
                     'timeZone': 'UTC',
                 },
                 'end': {
                     'dateTime': end_time.isoformat(),
                     'timeZone': 'UTC',
                 },
-                'attendees': [{'email': email} for email in participants],
                 'reminders': {
                     'useDefault': True
                 }
             }
-
+            
+            # Add location if provided
+            if location:
+                event['location'] = location
+            
+            # Handle participants
+            attendees = []
+            if participants:
+                # If participants is a string, convert to list
+                if isinstance(participants, str):
+                    # Split by comma if multiple emails in one string
+                    if ',' in participants:
+                        participant_list = [p.strip() for p in participants.split(',')]
+                    else:
+                        participant_list = [participants]
+                elif isinstance(participants, list):
+                    participant_list = participants
+                else:
+                    participant_list = []
+                    
+                # Process each participant
+                for participant in participant_list:
+                    # If it's a string that looks like an email
+                    if isinstance(participant, str) and '@' in participant:
+                        attendees.append({'email': participant})
+                    # If it's a dict with an email key
+                    elif isinstance(participant, dict) and 'email' in participant:
+                        attendees.append(participant)
+                    # If it's just a name, log it but don't add (no email)
+                    elif isinstance(participant, str):
+                        self.logger.warning(f"Participant '{participant}' doesn't have an email address, skipping")
+            
+            # Add attendees if any
+            if attendees:
+                event['attendees'] = attendees
+                
             # Create the event
             try:
                 created_event = await self._execute_api_call(
-                    service.events().insert(calendarId='primary', body=event, sendUpdates='all')
+                    self.service.events().insert(calendarId='primary', body=event, sendUpdates='all')
                 )
                 
+                self.logger.info(f"✅ Event created: {created_event.get('htmlLink')}")
                 return {
                     'success': True,
                     'event_id': created_event.get('id'),
-                    'html_link': created_event.get('htmlLink')
+                    'event_link': created_event.get('htmlLink'),
+                    'summary': created_event.get('summary'),
+                    'start_time': created_event.get('start', {}).get('dateTime'),
+                    'end_time': created_event.get('end', {}).get('dateTime')
                 }
-
             except Exception as e:
                 error_msg = f"Failed to create event: {str(e)}"
                 self.logger.error(f"❌ {error_msg}")
                 return {'success': False, 'error': error_msg}
-
+                
         except Exception as e:
-            error_msg = f"Failed to create event: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
-            return {'success': False, 'error': error_msg}
+            self.logger.error(f"Error creating event: {str(e)}")
+            return {'success': False, 'error': str(e)}
 
-    async def _calculate_start_time(self, date: str, time: str) -> datetime:
-        """Calculate the start time from date and time strings."""
+    async def _calculate_start_time(self, date_str: str, time_str: str) -> datetime:
+        """Calculate start time from date and time strings"""
         try:
-            # Parse date and time
-            date_obj = datetime.strptime(date, '%Y-%m-%d')
-            time_obj = datetime.strptime(time, '%H:%M').time()
+            # Handle natural language dates
+            now = datetime.now()
+            
+            # Handle "today", "tomorrow", etc.
+            if date_str.lower() == 'today':
+                date_obj = now.date()
+            elif date_str.lower() == 'tomorrow':
+                date_obj = (now + timedelta(days=1)).date()
+            else:
+                # Try different date formats
+                date_formats = ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y']
+                date_obj = None
+                
+                for fmt in date_formats:
+                    try:
+                        date_obj = datetime.strptime(date_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+                
+                if not date_obj:
+                    raise ValueError(f"Unsupported date format: {date_str}")
+            
+            # Handle time formats
+            time_obj = None
+            
+            # Handle natural language time like "7pm"
+            time_match = re.match(r'(\d+)(?::(\d+))?\s*(am|pm)?', time_str.lower())
+            if time_match:
+                hour = int(time_match.group(1))
+                minute = int(time_match.group(2)) if time_match.group(2) else 0
+                ampm = time_match.group(3)
+                
+                # Adjust hour for PM
+                if ampm == 'pm' and hour < 12:
+                    hour += 12
+                elif ampm == 'am' and hour == 12:
+                    hour = 0
+                
+                time_obj = time(hour, minute)
+            else:
+                # Try standard time formats
+                time_formats = ['%H:%M', '%I:%M%p', '%I%p']
+                
+                for fmt in time_formats:
+                    try:
+                        time_obj = datetime.strptime(time_str, fmt).time()
+                        break
+                    except ValueError:
+                        continue
+                
+                if not time_obj:
+                    raise ValueError(f"Unsupported time format: {time_str}")
             
             # Combine date and time
-            return datetime.combine(date_obj.date(), time_obj)
+            return datetime.combine(date_obj, time_obj)
             
-        except ValueError as e:
-            raise ValueError(f"Invalid date or time format: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"Error calculating start time: {str(e)}")
+            raise ValueError(f"Failed to parse date '{date_str}' or time '{time_str}': {str(e)}")
 
     async def _calculate_end_time(self, start_time: datetime, duration: int) -> datetime:
         """Calculate the end time based on start time and duration in minutes."""
@@ -319,7 +408,7 @@ class GoogleCalendarModule(BaseModule):
             logger.error(f"Failed to get event: {str(e)}")
             return {'success': False, 'error': str(e)}
             
-    async def _list_events(self, service, context: ExecutionContext) -> Dict[str, Any]:
+    async def _list_events(self, context: ExecutionContext) -> Dict[str, Any]:
         """List calendar events"""
         calendar_id = context.entities.get('calendar_id', 'primary')
         time_min = context.entities.get('time_min')
@@ -328,7 +417,7 @@ class GoogleCalendarModule(BaseModule):
         
         try:
             events_result = await self._execute_api_call(
-                service.events().list(
+                self.service.events().list(
                     calendarId=calendar_id,
                     timeMin=time_min,
                     timeMax=time_max,
