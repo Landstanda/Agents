@@ -44,17 +44,32 @@ class ExecutionContext:
             return None
         return (datetime.now() - self._step_start_time).total_seconds()
         
-    def store_result(self, step_number: int, result: Dict[str, Any], success: bool = False) -> None:
+    def store_result(self, step_number: int, result: Dict[str, Any], success: bool = False, error: Optional[str] = None) -> None:
         """Store a step result"""
-        self.step_results[step_number] = result
-        if success:
+        if isinstance(result, StepResult):
+            self.step_results[step_number] = result
+        else:
+            # Create a StepResult object from the dictionary
+            step_name = self.current_step.get('name', 'unknown') if self.current_step else 'unknown'
+            step_result = StepResult(
+                step_number=step_number,
+                step_name=step_name,
+                success=result.get('success', success) if result else success,
+                result=result,
+                error=result.get('error', error) if result else error
+            )
+            self.step_results[step_number] = step_result
+            
+        if success or (result and result.get('success', False)):
             self.successful_steps.add(step_number)
             
     def get_result(self, step_number: int) -> Optional[Dict[str, Any]]:
         """Get the result for a specific step"""
         step_result = self.step_results.get(step_number)
         if step_result:
-            return step_result.result
+            if isinstance(step_result, StepResult):
+                return step_result.result
+            return step_result  # For backward compatibility
         return None
         
     def get_step_result(self, step_number: int) -> Optional[StepResult]:

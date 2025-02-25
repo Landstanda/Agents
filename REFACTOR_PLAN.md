@@ -172,3 +172,65 @@ class ToolRegistry:
 - Maintain current service definition format
 - Preserve ticket system core functionality
 - Ensure backward compatibility with ServiceAnalyzer and MessageMaker 
+
+
+Service Registry (High Priority)
+  - YAML service definition loading
+  - Service validation
+  - Service dependency resolution
+  - Error handling for invalid services
+Service Executor (High Priority)
+  - Step execution
+  - Error recovery
+  - Context management
+  - Parameter handling
+Flow Logger (Medium Priority)
+  - Event logging
+  - Error logging
+  - Event history tracking
+Execution Context (Medium Priority)
+  - Variable management
+  - Step tracking
+  - Result storage
+Success Evaluator (Low Priority)
+  - Condition evaluation
+  - Result validation
+  - Custom criteria handling
+
+Ticket System (src/models/ticket.py)
+  - Core state management
+  - Status lifecycle
+  - Entity tracking
+  - Conversation management
+  - Error history
+Module Interface (src/core/module_interface.py)
+  - ModuleResponse class
+  - Base module functionality
+  - Response formatting
+  - Error handling
+
+
+Ticket-Agent Flow
+  - Ticket creation → Service Analyzer → Agent execution
+  - Status updates throughout the pipeline
+  - Error propagation
+Service Execution Chain
+  - Service Registry → Tool Registry → Service Executor
+  - Context management across steps
+  - Error handling and recovery
+Message Flow
+  - User input → Ticket → Service Analyzer → Agent → Message Maker → User
+  - Conversation threading
+  - Status updates
+Error Recovery Flow
+  - Error detection → Service Definition checks → Retry logic
+  - Alternative step execution
+  - User notification
+Authentication Flow
+  - Token validation
+  - Refresh handling
+  - Reauthorization process
+  Variable Management
+  - Context variables across services
+  - Entity propagation
+  - Step result mapping

@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 
 from typing import Dict, Any, List, Optional
-from ..core.module_interface import BaseModule
-from ..execution.context import ExecutionContext
-from ..utils.logging import get_logger
+from src.core.module_interface import BaseModule
+from src.execution.context import ExecutionContext
+from src.utils.logging import get_logger
 from googleapiclient.discovery import build
 from datetime import datetime, timedelta
 import pytz
 import logging
 import asyncio
 from google.oauth2.credentials import Credentials
-from ..models.ticket import TicketStatus
-from ..models import Ticket
+from src.models.ticket import TicketStatus
+from src.models import Ticket
 
 logger = get_logger(__name__)
 
@@ -31,7 +31,7 @@ class GoogleCalendarModule(BaseModule):
     async def _initialize_service(self, context: ExecutionContext) -> Optional[Any]:
         """Initialize the Google Calendar service"""
         try:
-            # Get authentication result
+            # Get authentication result from step 1
             auth_result = context.get_result(step_number=1)
             self.logger.debug(f"Auth result: {auth_result}")
             
@@ -40,37 +40,31 @@ class GoogleCalendarModule(BaseModule):
                 self.logger.error(error_msg)
                 context.ticket.add_error(error_msg, "auth_failed", None)
                 context.ticket.status = TicketStatus.ERROR
-                context.store_result(step_number=2, result={"error": error_msg}, success=False)
                 return None
 
             # Get credentials from auth result
-            credentials_data = auth_result.get('credentials')
-            self.logger.debug(f"Credentials data: {credentials_data}")
+            credentials = auth_result.get('credentials')
+            self.logger.debug(f"Credentials: {credentials}")
             
-            if not credentials_data:
+            if not credentials:
                 error_msg = "No credentials found in authentication result"
                 self.logger.error(error_msg)
                 context.ticket.add_error(error_msg, "missing_credentials", None)
                 context.ticket.status = TicketStatus.ERROR
-                context.store_result(step_number=2, result={"error": error_msg}, success=False)
                 return None
 
             # Build service
             try:
-                # Create credentials object with only the required fields
-                creds_dict = {
-                    'token': credentials_data.get('token'),
-                    'refresh_token': credentials_data.get('refresh_token'),
-                    'token_uri': credentials_data.get('token_uri'),
-                    'client_id': credentials_data.get('client_id'),
-                    'client_secret': credentials_data.get('client_secret'),
-                    'scopes': credentials_data.get('scopes')
-                }
-                self.logger.debug(f"Creating credentials with: {creds_dict}")
+                # If credentials is already a Credentials object, use it directly
+                if isinstance(credentials, Credentials):
+                    self.logger.debug("Using existing Credentials object")
+                else:
+                    self.logger.error("Invalid credentials format")
+                    context.ticket.add_error("Invalid credentials format", "invalid_credentials", None)
+                    context.ticket.status = TicketStatus.ERROR
+                    return None
                 
-                credentials = Credentials(**creds_dict)
-                self.logger.debug("Successfully created credentials object")
-                
+                # Build service
                 service = build('calendar', 'v3', credentials=credentials)
                 self.logger.debug("Successfully built calendar service")
                 return service
@@ -80,7 +74,6 @@ class GoogleCalendarModule(BaseModule):
                 self.logger.error(error_msg)
                 context.ticket.add_error(error_msg, "service_build_failed", None)
                 context.ticket.status = TicketStatus.ERROR
-                context.store_result(step_number=2, result={"error": error_msg}, success=False)
                 return None
 
         except Exception as e:
@@ -88,7 +81,6 @@ class GoogleCalendarModule(BaseModule):
             self.logger.error(error_msg)
             context.ticket.add_error(error_msg, "service_init_error", None)
             context.ticket.status = TicketStatus.ERROR
-            context.store_result(step_number=2, result={"error": error_msg}, success=False)
             return None
             
     async def execute(self, context: ExecutionContext) -> Dict[str, Any]:
@@ -103,75 +95,53 @@ class GoogleCalendarModule(BaseModule):
             ticket.add_error(error_msg, "service_initialization_error", None)
             ticket.status = TicketStatus.ERROR
             return {
-                'status': 'error',
-                'error': error_msg,
-                'results': [None]
+                'success': False,
+                'error': error_msg
             }
 
-        # Get operation type
+        # Get operation type (default to create_event if not specified)
         operation = ticket.entities.get('operation', 'create_event')
-
-        # Define required entities based on operation
-        required_entities = []
-        if operation == 'create_event':
-            required_entities = ['time', 'date', 'description', 'participants']
-        elif operation == 'list_events':
-            required_entities = []  # No required entities for listing events
-        elif operation == 'check_availability':
-            required_entities = ['date', 'time']
-
-        # Check for required entities
-        missing_entities = [entity for entity in required_entities if entity not in ticket.entities]
-        if missing_entities:
-            error_msg = f"Missing required entities: {', '.join(missing_entities)}"
-            self.logger.error(error_msg)
-            ticket.add_error(error_msg, "missing_entities", None)
-            ticket.status = TicketStatus.ERROR
-            return {
-                'status': 'error',
-                'error': error_msg,
-                'results': [None]
-            }
 
         try:
             if operation == 'create_event':
-                result = await self._create_event(service, ticket.entities)
+                # Extract event parameters from ticket entities
+                event_params = {
+                    'time': ticket.entities.get('time'),
+                    'date': ticket.entities.get('date'),
+                    'description': ticket.entities.get('description'),
+                    'participants': ticket.entities.get('participants', []),
+                    'duration': ticket.entities.get('duration', 60)
+                }
+                
+                result = await self._create_event(service, event_params)
                 if not result.get('success', False):
                     ticket.status = TicketStatus.ERROR
                     ticket.add_error(result.get('error', 'Unknown error'), "calendar_operation_failed", None)
-                    return {
-                        'status': 'error',
-                        'error': result.get('error', 'Failed to create event'),
-                        'results': [result]
-                    }
+                    return result
+                    
                 ticket.status = TicketStatus.COMPLETED
-                return {
-                    'status': 'completed',
-                    'results': [result]
-                }
+                return result
+                
             elif operation == 'list_events':
-                result = await self._list_events(service, context)
-                return result
+                return await self._list_events(service, context)
             elif operation == 'check_availability':
-                result = await self._check_availability(service, context)
-                return result
+                return await self._check_availability(service, context)
             else:
                 error_msg = f"Unsupported operation: {operation}"
                 ticket.add_error(error_msg, "unsupported_operation", None)
                 ticket.status = TicketStatus.ERROR
                 return {
-                    'status': 'error',
-                    'error': error_msg,
-                    'results': [None]
+                    'success': False,
+                    'error': error_msg
                 }
+                
         except Exception as e:
             error_msg = f"Error executing calendar operation: {str(e)}"
             ticket.add_error(error_msg, "execution_error", None)
             ticket.status = TicketStatus.ERROR
             return {
-                'status': 'error',
-                'error': error_msg,
-                'results': [None]
+                'success': False,
+                'error': error_msg
             }
             
     async def _create_event(self, service, entities: Dict[str, Any]) -> Dict[str, Any]:

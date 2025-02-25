@@ -12,315 +12,160 @@ A message comes in from slack, the initial data is recorded by the Ticket and pa
 
 ## Architecture
 
-The system consists of core components that work together to process and execute user requests. Here is the enhanced flow of a successful request:
+The system consists of several interconnected components that work together to process and execute user requests. The architecture is fully asynchronous and supports graceful error handling and shutdown.
 
-```
-                                    +----------------+
-                                    |     Slack     |
-                                    |   Interface   |
-                                    +-------+-------+
-                                            |
-                                    +-------v-------+
-                                    |   Service     |
-                                    |   Analyzer    |
-                                    +-------+-------+
-                                            |
-                                    +-------v-------+
-                                    |     Agent     |
-                                    |   (Core)      |
-                                    +-------+-------+
-                                            |
-                              +-------------+-------------+
-                              |                          |
-                       +------v------+            +------v------+
-                       |   Tool      |            |  Service    |
-                       | Registry    |            |  Registry   |
-                       +------+------+            +------+------+
-                              |                          |
-                              |                    +-----v------+
-                              |                    |  Service   |
-                              |                    | Executor   |
-                              |                    +-----+------+
-                              |                          |
-                              +-------------+------------+
-                                           |
-                                    +------v------+
-                                    |   Tools     |
-                                    | Execution   |
-                                    +------+------+
-                                           |
-                                    +------v------+
-                                    |  Message    |
-                                    |   Maker     |
-                                    +------+------+
-                                           |
-                                    +------v------+
-                                    |    User     |
-                                    +-------------+
-```
+### Component Overview
 
-### Service File Structure
+1. **Office Assistant** (`src/main.py`)
+   - Main application entry point
+   - Handles Slack integration
+   - Manages task lifecycle
+   - Provides graceful shutdown
 
-The system uses two main files for service definitions:
-
-1. **Service Index** (`src/services/service_index.json`):
-   - Used by GPT for understanding and breaking down user requests
-   - Contains high-level service information and examples
-   - Example format:
-```json
-{
-    "service_name": {
-        "name": "Human-Readable Name",
-        "description": "Detailed description of what the service does",
-        "examples": [
-            "Example request 1",
-            "Example request 2"
-        ],
-        "combination_examples": [
-            {
-                "request": "Complex request example",
-                "services": [
-                    {
-                        "service1": "Why this service is needed"
-                    },
-                    {
-                        "service2": "Purpose in this combination"
-                    }
-                ]
-            }
-        ],
-        "required_entities": [
-            "entity1",
-            "entity2"
-        ],
-        "optional_entities": [
-            "optional1",
-            "optional2"
-        ],
-        "outputs": [
-            "Output 1 description",
-            "Output 2 description"
-        ]
-    }
-}
-```
-
-2. **Service Definitions** (`src/services/service_definitions.yaml`):
-   - Used by Agent for executing services
-   - Contains technical implementation details and error handling
-   - Example format:
-```yaml
-service_name:
-  name: "Service Name"
-  required_entities:
-    - entity1
-    - entity2
-  optional_entities:
-    - optional1
-    - optional2
-    - optional3
-    - optional4
-  steps:
-    - name: "Step Name"
-      tool: tool_name
-      action: execute
-      params: {}
-      on_success:
-        - condition: "response.get('success')"
-          next_step: next_step_id
-      on_error:
-        - action: "retry"
-          max_attempts: 3
-
-    - name: "Next Step"
-      tool: another_tool
-      id: next_step_id
-      action: execute
-      params:
-        operation: "operation_name"
-        param1: "{entity1}"
-        param2: "{entity2 if entity2 else 'default'}"
-      on_success:
-        - condition: "response.get('success') and response.get('data')"
-          next_step: complete
-      on_error:
-        - condition: "error.get('type') == 'specific_error'"
-          action: "specific_action"
-        - condition: "error.get('type') == 'auth_error'"
-          action: "retry"
-          next_step: "authenticate"
-        - action: "notify_error"
-
-  success_criteria:
-    - "response.get('success')"
-    - "response.get('data')"
-  error_handling:
-    retry_count: 3
-    delay_seconds: 5
-    conditions:
-      network_error: true
-      rate_limit: true
-```
-
-### Core Components
-
-1. **Agent Core** (`src/core/agent/`)
-   - Base agent interface and implementation
-   - Service execution coordination
-   - State management
-   - Error handling and recovery
-
-2. **Service Registry** (`src/core/registry/services.py`)
-   - Manages service definitions and versions
-   - Validates service configurations
-   - Handles service dependencies
-   - Supports service versioning
-
-3. **Tool Registry** (`src/core/registry/tools.py`)
-   - Dynamic tool loading and validation
-   - Capability-based tool matching
-   - Tool dependency management
-   - Runtime tool validation
-
-4. **Service Executor** (`src/core/agent/executor.py`)
-   - Handles step-by-step execution
-   - Manages execution context
+2. **Request Orchestrator** (`src/core/orchestrator.py`)
+   - Coordinates between components
+   - Manages request flow
+   - Handles async task tracking
    - Provides error recovery
-   - Handles parallel execution
 
-5. **Execution Context** (`src/execution/context.py`)
-   - Manages execution state
-   - Handles variable storage and retrieval
-   - Tracks execution progress
-   - Stores step results
-
-6. **Service Analyzer** (`src/tools/service_analyzer.py`)
-   - Uses GPT for request analysis
-   - Matches requests to services
-   - Handles missing information
+3. **Service Analyzer** (`src/tools/service_analyzer.py`)
+   - Uses GPT-4 for request analysis
+   - Maps natural language to services
    - Creates execution plans
+   - Validates service requirements
 
-7. **Message Maker** (`src/tools/message_maker.py`)
-   - Generates user responses
-   - Handles error messages
-   - Manages conversation flow
-   - Formats execution results
+4. **Agent Chain**
+   The agent chain consists of several components that work together:
 
-### Ticket System
+   a) **Base Agent** (`src/core/agent/base_agent.py`)
+      - Provides core agent functionality
+      - Manages component initialization
+      - Handles service execution
+      - Coordinates error recovery
 
-The Ticket system (`src/models/ticket.py`) is a fundamental component that acts as the central state manager for request processing. It maintains the complete lifecycle of a user request from initial message to final response.
+   b) **Service Registry** (`src/core/registry/service_registry.py`)
+      - Manages service definitions
+      - Validates service configurations
+      - Handles service versioning
+      - Provides service lookup
 
-#### Ticket Structure
-1. **Core Identification**
-   - Unique ticket ID
-   - Creation timestamp
-   - User and channel information
-   - Thread tracking for multi-message conversations
+   c) **Tool Registry** (`src/core/registry/tool_registry.py`)
+      - Dynamic tool loading
+      - Tool validation
+      - Capability matching
+      - Tool lifecycle management
 
-2. **Request Processing State**
-   - Original message
-   - Identified intent
-   - Selected service
-   - Required and provided entities (parameters)
-   - Missing entity tracking
-   - Current status (CREATED, ANALYZING, EXECUTING, etc.)
+   d) **Service Executor** (`src/core/agent/executor.py`)
+      - Executes service steps
+      - Manages execution context
+      - Handles step retry logic
+      - Provides error recovery
 
-3. **Conversation Management**
-   - Tracks both incoming (user) and outgoing (assistant) messages
-   - Maintains conversation history with timestamps
-   - Stores message metadata and context
-
-4. **Execution Tracking**
-   - Complete execution plan with ordered steps
-   - Step-by-step results
-   - Error history with types and descriptions
-   - Created service records
-   - Final execution results
-
-#### Status Lifecycle
-```
-CREATED → ANALYZING → EXECUTING → COMPLETED
-                   ↘ WAITING_INPUT ↗
-                   ↘ SERVICE_CREATION ↗
-                   ↘ ERROR
-```
-
-#### Key Features
-1. **State Management**
-   - Maintains consistent state across all system components
-   - Tracks progress through the execution pipeline
-   - Records all state changes and events
-
-2. **Error Handling**
-   - Captures and categorizes errors
-   - Maintains error history
-   - Supports retry mechanisms
-   - Tracks failed services and steps
-
-3. **Multi-Message Support**
-   - Handles conversation threads
-   - Maintains context across multiple messages
-   - Supports incremental information gathering
-
-4. **Data Persistence**
-   - Serializable to/from dictionary format
-   - Supports ticket reconstruction
-   - Maintains complete audit trail
-
-5. **Component Integration**
-   - Provides interfaces for each system component
-   - Ensures data consistency
-   - Facilitates component communication
-   - Controls access to ticket data
-
-#### Usage Example
-```python
-# Ticket lifecycle example
-ticket = Ticket(
-    user_info={"user_id": "U123", "channel_id": "C456"},
-    original_message="Schedule a meeting with John tomorrow"
-)
-
-# Status updates as request processes
-ticket.update_status(TicketStatus.ANALYZING)
-ticket.add_incoming_message("What time should I schedule it for?")
-ticket.update_status(TicketStatus.WAITING_INPUT)
-ticket.add_outgoing_message("What time would you like the meeting?")
-ticket.add_incoming_message("3 PM")
-ticket.update_status(TicketStatus.EXECUTING)
-ticket.add_execution_step({"step": "create_calendar_event", ...})
-ticket.store_step_result(1, {"status": "success", ...})
-ticket.update_status(TicketStatus.COMPLETED)
-```
+5. **Flow Logger** (`src/utils/flow_logger.py`)
+   - Event tracking
+   - Error logging
+   - Execution history
+   - Debug information
 
 ### System Flows
 
-1. **Basic Request Flow**:
+1. **Request Processing Flow**
 ```
-User → Service Analyzer → Agent Core → Tool Registry → Service Executor → Tools → Message Maker → User
-     └── Request      └── Analyze    └── Coordinate └── Load Tools  └── Execute    └── Run   └── Respond
-```
-
-2. **Service Execution Flow**:
-```
-Service Executor → Load Service → Validate Tools → Execute Steps → Handle Results → Update Context
-                └── Version     └── Capabilities └── Sequential └── Success/    └── Store
-                    Check          Check           Execution      Error          Results
+User Message → Slack Interface → Office Assistant → Request Orchestrator → Service Analyzer → Agent Chain → Response
 ```
 
-3. **Tool Execution Flow**:
+2. **Service Analysis Flow**
 ```
-Tool Registry → Load Tool → Validate → Initialize → Execute → Handle Result
-             └── Check    └── Check   └── Setup    └── Run   └── Process
-                Version     Deps        Context      Tool      Output
+Request → GPT Analysis → Service Mapping → Execution Plan → Validation → Agent Chain
 ```
 
-4. **Error Recovery Flow**:
+3. **Service Execution Flow**
 ```
-Error Detection → Check Service Definition → Retry Logic → Alternative Steps → User Update
-               └── Error Type            └── Attempt   └── Fallback      └── Status
-                  Classification            Count         Options          Message
+Execution Plan → Service Registry → Tool Registry → Service Executor → Tool Execution → Results
 ```
+
+4. **Error Recovery Flow**
+```
+Error Detection → Retry Strategy → Alternative Steps → User Notification → Status Update
+```
+
+### Service Configuration
+
+The system uses two complementary service definition files:
+
+1. **Service Index** (`src/services/service_index.json`)
+   Used by GPT for understanding requests:
+   ```json
+   {
+       "service_name": {
+           "name": "Human-Readable Name",
+           "description": "Service description",
+           "examples": ["Example 1", "Example 2"],
+           "required_entities": ["entity1"],
+           "optional_entities": ["optional1"],
+           "outputs": ["output1"]
+       }
+   }
+   ```
+
+2. **Service Definitions** (`src/services/service_definitions.yaml`)
+   Used by the Agent for execution:
+   ```yaml
+   service_name:
+     name: "Service Name"
+     steps:
+       - name: "Step Name"
+         tool: tool_name
+         action: action_name
+         params:
+           param1: value1
+         on_error:
+           - action: retry
+             max_attempts: 3
+   ```
+
+### Error Handling
+
+The system implements multi-level error handling:
+
+1. **Request Level**
+   - Timeout handling
+   - Invalid request detection
+   - Missing information handling
+
+2. **Analysis Level**
+   - GPT response validation
+   - Service mapping errors
+   - Missing parameter detection
+
+3. **Execution Level**
+   - Step retry logic
+   - Alternative service paths
+   - Tool execution errors
+
+4. **System Level**
+   - Component initialization errors
+   - Resource cleanup
+   - Graceful shutdown
+
+### Async Task Management
+
+The system uses asyncio for concurrent operations:
+
+1. **Task Tracking**
+   - Pending task management
+   - Timeout handling
+   - Resource cleanup
+
+2. **Graceful Shutdown**
+   - Signal handling
+   - Task cancellation
+   - Resource cleanup
+
+3. **Error Recovery**
+   - Async retry logic
+   - Parallel execution
+   - State management
 
 ## Authentication and Security
 

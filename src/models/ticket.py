@@ -198,7 +198,7 @@ class Ticket:
         """Update ticket status with validation."""
         # Validate status transition
         valid_transitions = {
-            TicketStatus.CREATED: [TicketStatus.ANALYZING, TicketStatus.SERVICE_CREATION],
+            TicketStatus.CREATED: [TicketStatus.ANALYZING, TicketStatus.SERVICE_CREATION, TicketStatus.ERROR],
             TicketStatus.ANALYZING: [TicketStatus.EXECUTING, TicketStatus.WAITING_INPUT, TicketStatus.ERROR, TicketStatus.SERVICE_CREATION],
             TicketStatus.EXECUTING: [TicketStatus.COMPLETED, TicketStatus.ERROR],
             TicketStatus.WAITING_INPUT: [TicketStatus.ANALYZING],

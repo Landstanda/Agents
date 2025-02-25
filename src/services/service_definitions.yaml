@@ -573,26 +573,4 @@ conditions:
     conditions:
       invalid_field: true
       invalid_condition: true
-      evaluation_error: true
-
-services:
-  test_service:
-    name: "Test Service"
-    required_entities:
-      - test_entity
-    steps:
-      - name: "Test Step"
-        tool: test_tool
-        action: execute
-        params: {}
-        success_criteria:
-          type: "all"
-          conditions:
-            - "response['success'] == True"
-          on_success:
-            next_step: "complete"
-          on_failure:
-            action: "retry"
-            max_attempts: 1
-            params:
-              delay_seconds: 1 
+      evaluation_error: true 
