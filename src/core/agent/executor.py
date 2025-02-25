@@ -48,108 +48,84 @@ class ServiceExecutor:
                 self._service_locks[service_id] = asyncio.Lock()
             return self._service_locks[service_id]
             
-    async def execute_service(self, service_def: Dict[str, Any], ticket: Ticket) -> Dict[str, Any]:
+    async def execute_service(self, service_name: str, ticket: Ticket) -> Dict[str, Any]:
         """Execute a service with the given ticket"""
+        results = []  # Initialize results array outside the try block
         try:
             # Validate service exists
-            service_name = service_def.get('name')
-            if not self.service_registry.get_item(service_name):
+            service_def = self.service_registry.get_item(service_name)
+            if not service_def:
                 error_msg = f"Service '{service_name}' not found"
                 self.logger.error(error_msg)
                 ticket.update_status(TicketStatus.ERROR)
                 return {
                     'status': 'error',
-                    'error': error_msg
+                    'error': error_msg,
+                    'results': results
                 }
+                
+            # Create execution context with service definition
+            context = ExecutionContext(ticket=ticket, service=service_def)
             
-            # Create execution context
-            context = ExecutionContext(ticket, service_def)
+            # Set ticket status to ANALYZING before executing steps
+            ticket.update_status(TicketStatus.ANALYZING)
             
             # Execute each step in sequence
-            results = []
-            for i, step in enumerate(service_def['steps'], 1):
-                context.set_current_step(step, i)
+            for i, step in enumerate(service_def.get('steps', [])):
+                # Set step number
+                step['step_number'] = i + 1
                 
-                # Record start time
-                start_time = context.get_current_time()
+                self.logger.info(f"Executing step {i+1}: {step.get('name', 'Unnamed step')}")
                 
                 # Notify step start
-                if self.on_step_start:
-                    self.on_step_start(step, "start")
+                ticket.update_status(TicketStatus.EXECUTING)
                 
-                # Get tool for step
-                tool_name = step['tool']
-                tool_class = self.tool_registry.get_item(tool_name)
-                if not tool_class:
-                    error_msg = f"Tool '{tool_name}' not found"
-                    self.logger.error(error_msg)
+                # Execute step
+                step_result = await self._execute_step(step, context)
+                results.append(step_result)
+                
+                # Check if step failed
+                if step_result.get('status') == 'error':
+                    self.logger.error(f"Step {i+1} failed: {step_result.get('error', 'Unknown error')}")
                     ticket.update_status(TicketStatus.ERROR)
+                    
+                    # Return early with error
                     return {
                         'status': 'error',
-                        'error': error_msg
+                        'error': step_result.get('error', f"Step {i+1} failed"),
+                        'results': results
                     }
-                    
-                # Create tool instance
-                tool = tool_class() if isinstance(tool_class, type) else tool_class
                 
-                # Execute tool with parameters
-                try:
-                    parameters = step.get('params', {})
-                    parameters['context'] = context
-                    result = await tool.execute(**parameters)
-                    
-                    # Record end time and duration
-                    end_time = context.get_current_time()
-                    duration = (end_time - start_time).total_seconds()
-                    
-                    # Add monitoring data to result
-                    result.update({
-                        'start_time': start_time.isoformat(),
-                        'end_time': end_time.isoformat(),
-                        'duration': duration
-                    })
-                    
-                    # Store result
-                    context.store_result(i, result)
-                    results.append(result)
-                    
-                    # Check if step failed
-                    if not result.get('success', False):
-                        error_msg = result.get('error', 'Step failed without specific error')
-                        self.logger.error(f"Step {i} failed: {error_msg}")
-                        ticket.update_status(TicketStatus.ERROR)
-                        return {
-                            'status': 'error',
-                            'error': error_msg,
-                            'results': []  # Don't include failed steps in results
-                        }
-                    
-                    # Notify step complete
-                    if self.on_step_complete:
-                        self.on_step_complete(step, "complete")
-                    
-                except Exception as e:
-                    error_msg = f"Error executing step {i}: {str(e)}"
-                    self.logger.error(error_msg)
-                    ticket.update_status(TicketStatus.ERROR)
-                    return {
-                        'status': 'error',
-                        'error': error_msg,
-                        'results': results  # Include results up to failure
-                    }
+                # Log step completion
+                self.logger.info(f"Completed step {i+1}: {step.get('name', 'Unnamed step')}")
+                
+                # TODO: Implement success criteria evaluation
+                
+            # All steps completed successfully
+            ticket.update_status(TicketStatus.COMPLETED)
             
-            return {
+            # Create final result object
+            final_result = {
                 'status': 'completed',
                 'results': results
             }
             
+            # Extract event_id from the calendar step result if it exists
+            # This is specifically for the schedule_meeting service
+            if service_def.get('name') == 'Schedule Meeting' and len(results) > 1:
+                calendar_result = results[1]  # The second step is the calendar step
+                if isinstance(calendar_result.get('results'), dict) and 'event_id' in calendar_result.get('results', {}):
+                    final_result['event_id'] = calendar_result['results']['event_id']
+            
+            return final_result
+            
         except Exception as e:
-            error_msg = f"Error executing service: {str(e)}"
-            self.logger.error(error_msg)
+            self.logger.error(f"Error executing service: {str(e)}")
             ticket.update_status(TicketStatus.ERROR)
             return {
                 'status': 'error',
-                'error': error_msg
+                'error': f"Error executing service: {str(e)}",
+                'results': results  # Include the results array even when an exception occurs
             }
 
     async def _execute_step(self, step: Dict[str, Any], context: ExecutionContext) -> Dict[str, Any]:
@@ -164,11 +140,31 @@ class ServiceExecutor:
             # Create tool instance
             tool = tool_class() if isinstance(tool_class, type) else tool_class
             
-            # Execute tool with parameters
-            parameters = step.get('params', {})
-            parameters['context'] = context
+            # Set current step in context
+            step_number = step.get('step_number', 0)
+            context.set_current_step(step, step_number if step_number > 0 else 1)
             
-            result = await tool.execute(**parameters)
+            # If there's an action specified, add it to the ticket entities
+            if 'action' in step:
+                context.ticket.entities['operation'] = step['action']
+            
+            # Execute tool with context only, not passing other parameters directly
+            result = await tool.execute(context=context)
+            
+            # Check if the tool execution was successful
+            if isinstance(result, dict) and result.get('success') is False:
+                self.logger.error(f"Tool execution failed: {result.get('error', 'Unknown error')}")
+                # Update ticket status to reflect the error
+                context.ticket.update_status(TicketStatus.ERROR)
+                return {
+                    'status': 'error',
+                    'error': result.get('error', 'Tool execution failed'),
+                    'results': result
+                }
+            
+            # Store the result in context
+            context.store_result(step_number if step_number > 0 else 1, result)
+            
             return {
                 'status': 'completed',
                 'results': result
@@ -176,6 +172,8 @@ class ServiceExecutor:
             
         except Exception as e:
             self.logger.error(f"Error executing step: {str(e)}")
+            # Update ticket status to reflect the error
+            context.ticket.update_status(TicketStatus.ERROR)
             return {
                 'status': 'error',
                 'error': str(e)

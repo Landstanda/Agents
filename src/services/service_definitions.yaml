@@ -54,19 +54,19 @@ schedule_meeting:
       tool: google_calendar
       action: "create_event"
       params:
-        operation: "create_event"
         summary: "{event_type} Meeting"
-        description: "Scheduled via AI Secretary"
+        description: "{description if description else 'Scheduled via AI Secretary'}"
         start_time: "{date}T{time}:00"
         end_time: "{date}T{time[:2]}:{str(int(time[3:5]) + 60 if ':' in time else '00')}:00"
         timezone: "America/Los_Angeles"
         location: "{location if location else 'Virtual Meeting'}"
         attendees: "{participants if participants else []}"
+        context: context
       success_criteria:
         type: "all"
         conditions:
-          - "response.success == True"
-          - "response.data.event_id is not None"
+          - "response['success'] == True"
+          - "response['event_id'] is not None"
         on_success:
           next_step: "complete"
         on_failure:

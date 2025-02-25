@@ -39,7 +39,7 @@ class GoogleCalendarModule(BaseModule):
                 error_msg = "Authentication failed or no authentication result found"
                 self.logger.error(error_msg)
                 context.ticket.add_error(error_msg, "auth_failed", None)
-                context.ticket.status = TicketStatus.ERROR
+                context.ticket.update_status(TicketStatus.ERROR)
                 return None
 
             # Get credentials from auth result
@@ -50,7 +50,7 @@ class GoogleCalendarModule(BaseModule):
                 error_msg = "No credentials found in authentication result"
                 self.logger.error(error_msg)
                 context.ticket.add_error(error_msg, "missing_credentials", None)
-                context.ticket.status = TicketStatus.ERROR
+                context.ticket.update_status(TicketStatus.ERROR)
                 return None
 
             # Build service
@@ -61,7 +61,7 @@ class GoogleCalendarModule(BaseModule):
                 else:
                     self.logger.error("Invalid credentials format")
                     context.ticket.add_error("Invalid credentials format", "invalid_credentials", None)
-                    context.ticket.status = TicketStatus.ERROR
+                    context.ticket.update_status(TicketStatus.ERROR)
                     return None
                 
                 # Build service
@@ -73,14 +73,14 @@ class GoogleCalendarModule(BaseModule):
                 error_msg = f"Failed to build calendar service: {str(e)}"
                 self.logger.error(error_msg)
                 context.ticket.add_error(error_msg, "service_build_failed", None)
-                context.ticket.status = TicketStatus.ERROR
+                context.ticket.update_status(TicketStatus.ERROR)
                 return None
 
         except Exception as e:
             error_msg = f"Error initializing calendar service: {str(e)}"
             self.logger.error(error_msg)
             context.ticket.add_error(error_msg, "service_init_error", None)
-            context.ticket.status = TicketStatus.ERROR
+            context.ticket.update_status(TicketStatus.ERROR)
             return None
             
     async def execute(self, context: ExecutionContext) -> Dict[str, Any]:
@@ -93,7 +93,7 @@ class GoogleCalendarModule(BaseModule):
         if not service:
             error_msg = "Failed to initialize Google Calendar service"
             ticket.add_error(error_msg, "service_initialization_error", None)
-            ticket.status = TicketStatus.ERROR
+            ticket.update_status(TicketStatus.ERROR)
             return {
                 'success': False,
                 'error': error_msg
@@ -115,11 +115,10 @@ class GoogleCalendarModule(BaseModule):
                 
                 result = await self._create_event(service, event_params)
                 if not result.get('success', False):
-                    ticket.status = TicketStatus.ERROR
+                    ticket.update_status(TicketStatus.ERROR)
                     ticket.add_error(result.get('error', 'Unknown error'), "calendar_operation_failed", None)
                     return result
                     
-                ticket.status = TicketStatus.COMPLETED
                 return result
                 
             elif operation == 'list_events':
@@ -129,7 +128,7 @@ class GoogleCalendarModule(BaseModule):
             else:
                 error_msg = f"Unsupported operation: {operation}"
                 ticket.add_error(error_msg, "unsupported_operation", None)
-                ticket.status = TicketStatus.ERROR
+                ticket.update_status(TicketStatus.ERROR)
                 return {
                     'success': False,
                     'error': error_msg
@@ -138,7 +137,7 @@ class GoogleCalendarModule(BaseModule):
         except Exception as e:
             error_msg = f"Error executing calendar operation: {str(e)}"
             ticket.add_error(error_msg, "execution_error", None)
-            ticket.status = TicketStatus.ERROR
+            ticket.update_status(TicketStatus.ERROR)
             return {
                 'success': False,
                 'error': error_msg

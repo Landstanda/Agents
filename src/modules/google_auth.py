@@ -33,7 +33,19 @@ class GoogleAuthModule(BaseModule):
         logger.debug("✓ GoogleAuthModule initialized")
 
     def _get_client_config(self) -> Dict[str, Any]:
-        """Get client configuration from environment variables"""
+        """Get client configuration from credentials file or environment variables"""
+        # First try to load from credentials.json file
+        credentials_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
+        if os.path.exists(credentials_path):
+            try:
+                with open(credentials_path, 'r') as f:
+                    logger.debug(f"Loading client config from {credentials_path}")
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"Error loading credentials from {credentials_path}: {str(e)}")
+                
+        # Fall back to environment variables
+        logger.debug("Falling back to environment variables for client config")
         return {
             "installed": {
                 "client_id": os.getenv("GOOGLE_CLIENT_ID"),
@@ -74,103 +86,185 @@ class GoogleAuthModule(BaseModule):
             
             # Load existing token if available
             logger.debug("🔄 Attempting to load existing token...")
-            token_data = self.token_manager.load_token(self.service_name)
-            if token_data:
-                logger.debug("✓ Found existing token, deserializing...")
+            
+            # First try to load from the same location as our test script
+            token_path = Path(".auth_tokens/google_workspace_token.pickle")
+            if token_path.exists():
+                logger.debug(f"✓ Found existing token at {token_path}")
                 try:
-                    self.creds = token_data
-                    logger.debug(f"Token loaded. Valid: {self.creds.valid}, Expired: {self.creds.expired}")
+                    with open(token_path, 'r') as f:
+                        token_data = json.load(f)
+                    self.creds = Credentials.from_authorized_user_info(token_data, self.SCOPES)
+                    logger.debug(f"Token loaded directly. Valid: {self.creds.valid}, Expired: {self.creds.expired}")
+                    
+                    # If token is expired but has refresh token, refresh it
+                    if self.creds and self.creds.expired and self.creds.refresh_token:
+                        logger.debug("🔄 Refreshing expired credentials")
+                        await self._refresh_credentials(self.creds)
+                        
+                        # Save the refreshed credentials
+                        if self.creds and self.creds.valid:
+                            token_info = {
+                                'token': self.creds.token,
+                                'refresh_token': self.creds.refresh_token,
+                                'token_uri': self.creds.token_uri,
+                                'client_id': self.creds.client_id,
+                                'client_secret': self.creds.client_secret,
+                                'scopes': self.creds.scopes
+                            }
+                            
+                            with open(token_path, 'w') as token:
+                                json.dump(token_info, token)
+                            logger.debug(f"✓ Refreshed credentials saved to {token_path}")
+                            
+                            # Also save via TokenManager for backup
+                            self.token_manager.store_token(self.service_name, self.creds)
+                            logger.debug("✓ Refreshed credentials also saved via TokenManager")
                 except Exception as e:
-                    logger.error(f"Error deserializing token: {str(e)}")
+                    logger.error(f"Error loading token directly: {str(e)}")
                     self.creds = None
-            else:
-                logger.debug("ℹ️ No existing token found")
+            
+            # If still no valid credentials, try TokenManager
+            if not self.creds or not self.creds.valid:
+                # Fall back to TokenManager
+                token_data = self.token_manager.load_token(self.service_name)
+                if token_data:
+                    logger.debug("✓ Found existing token via TokenManager, deserializing...")
+                    try:
+                        self.creds = token_data
+                        logger.debug(f"Token loaded. Valid: {self.creds.valid}, Expired: {self.creds.expired}")
+                        
+                        # If token is expired but has refresh token, refresh it
+                        if self.creds and self.creds.expired and self.creds.refresh_token:
+                            logger.debug("🔄 Refreshing expired credentials from TokenManager")
+                            await self._refresh_credentials(self.creds)
+                            
+                            # Save the refreshed credentials
+                            if self.creds and self.creds.valid:
+                                self.token_manager.store_token(self.service_name, self.creds)
+                                logger.debug("✓ Refreshed credentials saved via TokenManager")
+                                
+                                # Also save to file for test compatibility
+                                token_info = {
+                                    'token': self.creds.token,
+                                    'refresh_token': self.creds.refresh_token,
+                                    'token_uri': self.creds.token_uri,
+                                    'client_id': self.creds.client_id,
+                                    'client_secret': self.creds.client_secret,
+                                    'scopes': self.creds.scopes
+                                }
+                                
+                                with open(token_path, 'w') as token:
+                                    json.dump(token_info, token)
+                                logger.debug(f"✓ Refreshed credentials also saved to {token_path}")
+                    except Exception as e:
+                        logger.error(f"Error deserializing token: {str(e)}")
+                        self.creds = None
+                else:
+                    logger.debug("ℹ️ No existing token found")
                 
             # If credentials are expired or don't exist, refresh or create new ones
             if not self.creds or not self.creds.valid:
                 logger.debug("🔄 Credentials need refresh or creation")
                 
                 if self.creds and self.creds.expired and self.creds.refresh_token:
-                    logger.debug("🔄 Refreshing expired credentials...")
-                    try:
-                        await self._refresh_credentials(self.creds)
-                        if self.creds:
-                            logger.debug("✓ Credentials refreshed successfully")
-                        else:
-                            logger.info("🔄 Token refresh failed, starting new OAuth2 flow...")
-                    except Exception as e:
-                        logger.error(f"Error refreshing credentials: {str(e)}")
-                        self.creds = None
-
-                if not self.creds or not self.creds.valid:
+                    logger.debug("🔄 Refreshing expired credentials")
+                    await self._refresh_credentials(self.creds)
+                else:
                     logger.debug("🔐 Starting new OAuth2 flow...")
-                    # Start OAuth2 flow with client config from env
+                    
+                    # Get client configuration
                     client_config = self._get_client_config()
                     
-                    try:
-                        # Try specific ports in case some are blocked
-                        for port in [8080, 8090, 8888, 9000]:
-                            try:
-                                logger.info(f"🌐 Attempting to start local server on port {port}...")
-                                flow = InstalledAppFlow.from_client_config(
-                                    client_config,
-                                    self.SCOPES
-                                )
-                                self.creds = await self._run_local_server(flow, port)
-                                logger.debug(f"✓ Successfully authenticated on port {port}")
-                                break
-                            except OSError as e:
-                                logger.warning(f"⚠️ Port {port} failed: {str(e)}")
-                                continue
-                        else:
-                            # If no ports worked, try random port as last resort
-                            logger.info("🔄 Trying random port...")
-                            flow = InstalledAppFlow.from_client_config(
-                                client_config,
-                                self.SCOPES
-                            )
-                            self.creds = await self._run_local_server(flow, 0)
-                            logger.debug("✓ Successfully authenticated on random port")
-                    except Exception as e:
-                        error = f"Failed to start local server: {str(e)}"
-                        context.store_result(1, None, success=False, error=error)
-                        return {"success": False, "error": error}
-
-                # Save the credentials securely
-                logger.debug("💾 Saving new credentials...")
-                try:
-                    self.token_manager.store_token(self.service_name, self.creds)
-                    logger.debug("✓ Credentials saved successfully")
-                except Exception as e:
-                    logger.warning(f"Warning: Error saving credentials: {str(e)}")
-                    # Continue even if saving fails - we still have valid credentials in memory
-
-            # Create result with credential state
-            result = {
-                "success": True,
-                "credentials": self.creds,  # Include the actual credentials object
-                "credential_info": {  # Move credential info to a separate key
-                    "valid": self.creds.valid,
-                    "expired": self.creds.expired,
-                    "has_refresh_token": bool(self.creds.refresh_token),
-                    "scopes": self.creds.scopes,
-                    "token": self.creds.token,
-                    "refresh_token": bool(self.creds.refresh_token),
-                    "token_uri": self.creds.token_uri,
-                    "client_id": self.creds.client_id,
-                    "client_secret": "[REDACTED]"
-                },
-                "scopes": self.SCOPES
+                    # Create OAuth2 flow
+                    flow = InstalledAppFlow.from_client_config(
+                        client_config, 
+                        self.SCOPES,
+                        redirect_uri='http://localhost:8080'
+                    )
+                    
+                    # Try different ports for local server
+                    ports = [8080, 8090, 8888, 9000]
+                    for port in ports:
+                        try:
+                            logger.info(f"🌐 Attempting to start local server on port {port}...")
+                            self.creds = await self._run_local_server(flow, port)
+                            break
+                        except OSError as e:
+                            logger.warning(f"⚠️ Port {port} failed: {str(e)}")
+                            continue
+                    
+                    # If all ports failed, try random port
+                    if not self.creds:
+                        logger.info("🔄 Trying random port...")
+                        self.creds = await self._run_local_server(flow, 0)  # 0 means random port
+                    
+                    # Save the new credentials
+                    if self.creds:
+                        logger.debug("💾 Saving new credentials...")
+                        
+                        # Create token directory if it doesn't exist
+                        token_dir = Path(".auth_tokens")
+                        token_dir.mkdir(exist_ok=True)
+                        
+                        # Save token to file for test compatibility
+                        token_info = {
+                            'token': self.creds.token,
+                            'refresh_token': self.creds.refresh_token,
+                            'token_uri': self.creds.token_uri,
+                            'client_id': self.creds.client_id,
+                            'client_secret': self.creds.client_secret,
+                            'scopes': self.creds.scopes
+                        }
+                        
+                        with open(token_path, 'w') as token:
+                            json.dump(token_info, token)
+                        logger.debug(f"✓ Credentials saved to {token_path}")
+                        
+                        # Also save via TokenManager for backup
+                        self.token_manager.store_token(self.service_name, self.creds)
+                        logger.debug("✓ Credentials also saved via TokenManager")
+                        
+            # If we still don't have valid credentials, authentication failed
+            if not self.creds or not self.creds.valid:
+                error_msg = "Failed to obtain valid credentials"
+                logger.error(f"❌ {error_msg}")
+                return {
+                    'success': False,
+                    'error': error_msg
+                }
+            
+            # Prepare credential info for context
+            credential_info = {
+                'valid': self.creds.valid,
+                'expired': self.creds.expired,
+                'has_refresh_token': bool(self.creds.refresh_token),
+                'scopes': self.creds.scopes,
+                'token': self.creds.token[:50] + '...' if self.creds.token else None,
+                'refresh_token': bool(self.creds.refresh_token),
+                'token_uri': self.creds.token_uri,
+                'client_id': self.creds.client_id,
+                'client_secret': '[REDACTED]'
             }
             
-            # Store result in context
-            context.store_result(1, result, success=True)
-            return result
-
+            # Store credentials in context for other modules to use
+            context.set_variable('google_credentials', self.creds)
+            context.set_variable('google_credential_info', credential_info)
+            
+            return {
+                'success': True,
+                'credentials': self.creds,
+                'credential_info': credential_info,
+                'scopes': self.SCOPES
+            }
+            
         except Exception as e:
-            error = f"Authentication failed: {str(e)}"
-            context.store_result(1, None, success=False, error=error)
-            return {"success": False, "error": error}
+            error_msg = f"Authentication failed: {str(e)}"
+            logger.error(f"❌ {error_msg}")
+            return {
+                'success': False,
+                'error': error_msg
+            }
 
     @property
     def capabilities(self) -> List[str]:

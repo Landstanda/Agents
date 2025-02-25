@@ -70,13 +70,8 @@ class BaseAgent(AgentInterface):
             if not self.executor:
                 raise ValueError("Executor not initialized")
 
-            # Get service definition
-            service_def = self.service_registry.get_item(ticket.service)
-            if not service_def:
-                raise ValueError(f"Service '{ticket.service}' not found")
-
             # Execute service
-            result = await self.executor.execute_service(service_def, ticket)
+            result = await self.executor.execute_service(ticket.service, ticket)
             
             # Update ticket with results
             ticket.execution_results.append(result)
@@ -101,21 +96,17 @@ class BaseAgent(AgentInterface):
             await self.initialize()
             
         try:
-            # Get service definition
-            service_def = self.service_registry.get_item(service_name)
-            if not service_def:
-                raise ValueError(f"Service '{service_name}' not found")
-                
             # Execute service using executor
             if not self.executor:
                 raise ValueError("Executor not initialized")
                 
-            result = await self.executor.execute_service(service_def, ticket)
+            result = await self.executor.execute_service(service_name, ticket)
             return result
             
         except Exception as e:
             self.logger.error(f"Error executing service '{service_name}': {str(e)}")
             return {
                 'status': 'error',
-                'error': str(e)
+                'error': str(e),
+                'results': []  # Include an empty results array
             } 
