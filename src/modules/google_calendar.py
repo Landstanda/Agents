@@ -33,63 +33,25 @@ class GoogleCalendarModule(BaseModule):
     async def _initialize_service(self, context: ExecutionContext) -> Optional[Any]:
         """Initialize the Google Calendar service"""
         try:
-            # First try to get credentials from context variables
             credentials = context.get_variable('google_credentials')
-            
             if not credentials:
-                # Try to get authentication result from step 1
-                auth_result = context.get_result(step_number=1)
-                self.logger.debug(f"Auth result: {auth_result}")
-                
-                if not auth_result or not auth_result.get('success'):
-                    error_msg = "Authentication failed or no authentication result found"
-                    self.logger.error(error_msg)
-                    context.ticket.add_error(error_msg, "auth_failed", None)
-                    context.ticket.update_status(TicketStatus.ERROR)
-                    return None
-
-                # Get credentials from auth result
-                credentials = auth_result.get('credentials')
-                
-            self.logger.debug(f"Credentials found: {credentials is not None}")
-            
-            if not credentials:
-                error_msg = "No credentials found in context or authentication result"
-                self.logger.error(error_msg)
-                context.ticket.add_error(error_msg, "missing_credentials", None)
-                context.ticket.update_status(TicketStatus.ERROR)
+                self.logger.error("No credentials found")
                 return None
 
-            # Build service
-            try:
-                # If credentials is already a Credentials object, use it directly
-                if isinstance(credentials, Credentials):
-                    self.logger.debug("Using existing Credentials object")
-                else:
-                    self.logger.error("Invalid credentials format")
-                    context.ticket.add_error("Invalid credentials format", "invalid_credentials", None)
-                    context.ticket.update_status(TicketStatus.ERROR)
-                    return None
-                
-                # Build service
-                service = build('calendar', 'v3', credentials=credentials)
-                self.logger.debug("Successfully built calendar service")
-                return service
-                
-            except Exception as e:
-                error_msg = f"Failed to build calendar service: {str(e)}"
-                self.logger.error(error_msg)
-                context.ticket.add_error(error_msg, "service_build_failed", None)
-                context.ticket.update_status(TicketStatus.ERROR)
-                return None
+            self.logger.debug("Credentials found: True")
+            self.logger.debug("Using existing Credentials object")
+            
+            # Initialize Calendar service
+            calendar_service = build('calendar', 'v3', credentials=credentials)
+            
+            self.logger.debug("Successfully built calendar service")
+            context.set_variable('calendar_service', calendar_service)
+            return calendar_service
 
         except Exception as e:
-            error_msg = f"Error initializing calendar service: {str(e)}"
-            self.logger.error(error_msg)
-            context.ticket.add_error(error_msg, "service_init_error", None)
-            context.ticket.update_status(TicketStatus.ERROR)
+            self.logger.error(f"Failed to initialize service: {str(e)}")
             return None
-            
+
     async def execute(self, context: ExecutionContext) -> Dict[str, Any]:
         """Execute calendar operations based on ticket entities"""
         ticket = context.ticket
@@ -124,7 +86,7 @@ class GoogleCalendarModule(BaseModule):
                     ticket.entities.get('description', 'Meeting'),
                     ticket.entities.get('participants'),
                     ticket.entities.get('location'),
-                    ticket.entities.get('duration', 60)
+                    ticket.entities.get('duration', '1 hour')
                 )
                 return result
             elif operation == 'list_events':
@@ -150,35 +112,58 @@ class GoogleCalendarModule(BaseModule):
                 "error": error_msg
             }
             
-    async def _create_event(self, context: ExecutionContext, time: str, date: str, description: str, participants=None, location=None, duration: int = 60) -> Dict[str, Any]:
-        """Create a calendar event."""
+    async def _parse_duration(self, duration_str: str) -> int:
+        """Convert a duration string like '2 hours' or '30 minutes' to minutes"""
         try:
-            # Validate required parameters
-            if not time or not date or not description:
-                error_msg = "Missing required parameters: time, date, and description are required"
-                self.logger.error(f"❌ {error_msg}")
-                return {'success': False, 'error': error_msg}
+            if not duration_str:
+                return 60  # default 1 hour
             
-            try:
-                # Calculate start and end times
-                time_obj = await self._calculate_start_time(date, time)
-                end_time = time_obj + timedelta(minutes=duration)
-            except ValueError as e:
-                error_msg = f"Invalid date or time: {str(e)}"
-                self.logger.error(f"❌ {error_msg}")
-                return {'success': False, 'error': error_msg}
+            parts = duration_str.lower().split()
+            if len(parts) != 2:
+                return 60
+            
+            amount = float(parts[0])
+            unit = parts[1].rstrip('s')  # remove plural 's' if present
+            
+            if unit in ['hour', 'hr']:
+                return int(amount * 60)
+            elif unit in ['minute', 'min']:
+                return int(amount)
+            else:
+                return 60
+        except (ValueError, TypeError):
+            return 60
+
+    async def _create_event(self, context: ExecutionContext, time: str, date: str, description: str, participants=None, location=None, duration: str = '1 hour') -> Dict[str, Any]:
+        """Create a calendar event"""
+        try:
+            self.logger.debug("Creating calendar event...")
+            
+            # Get the calendar service
+            calendar_service = await self._initialize_service(context)
+            if not calendar_service:
+                return {'success': False, 'error': 'Failed to initialize calendar service'}
+
+            # Calculate start time
+            start_time = await self._calculate_start_time(date, time)
+            if not start_time:
+                return {'success': False, 'error': 'Invalid start time'}
+
+            # Parse duration and calculate end time
+            duration_minutes = await self._parse_duration(duration)
+            end_time = start_time + timedelta(minutes=duration_minutes)
 
             # Create event details
             event = {
                 'summary': description,
                 'description': description,
                 'start': {
-                    'dateTime': time_obj.isoformat(),
-                    'timeZone': 'UTC',
+                    'dateTime': start_time.isoformat(),
+                    'timeZone': 'America/Los_Angeles',
                 },
                 'end': {
                     'dateTime': end_time.isoformat(),
-                    'timeZone': 'UTC',
+                    'timeZone': 'America/Los_Angeles',
                 },
                 'reminders': {
                     'useDefault': True
@@ -190,123 +175,175 @@ class GoogleCalendarModule(BaseModule):
                 event['location'] = location
             
             # Handle participants
-            attendees = []
-            if participants:
-                # If participants is a string, convert to list
-                if isinstance(participants, str):
-                    # Split by comma if multiple emails in one string
-                    if ',' in participants:
-                        participant_list = [p.strip() for p in participants.split(',')]
-                    else:
-                        participant_list = [participants]
-                elif isinstance(participants, list):
-                    participant_list = participants
-                else:
-                    participant_list = []
-                    
-                # Process each participant
-                for participant in participant_list:
-                    # If it's a string that looks like an email
-                    if isinstance(participant, str) and '@' in participant:
-                        attendees.append({'email': participant})
-                    # If it's a dict with an email key
-                    elif isinstance(participant, dict) and 'email' in participant:
-                        attendees.append(participant)
-                    # If it's just a name, log it but don't add (no email)
-                    elif isinstance(participant, str):
-                        self.logger.warning(f"Participant '{participant}' doesn't have an email address, skipping")
+            send_invites = context.ticket.entities.get('send_invites', False)
             
-            # Add attendees if any
-            if attendees:
-                event['attendees'] = attendees
-                
+            if participants:
+                # Convert to list if string
+                if isinstance(participants, str):
+                    participant_list = [p.strip() for p in participants.split(',')]
+                else:
+                    participant_list = [participants]
+
+                if send_invites:
+                    # Let Google Calendar handle the email lookups and sending invites
+                    event['attendees'] = [{'email': p} if '@' in p else {'displayName': p} for p in participant_list]
+                    event['sendUpdates'] = 'all'
+                else:
+                    # Just add to description if not sending invites
+                    participants_str = ', '.join(participant_list)
+                    event['description'] = f"{event['description']}\n\nAttendees: {participants_str}"
+
             # Create the event
-            try:
-                created_event = await self._execute_api_call(
-                    self.service.events().insert(calendarId='primary', body=event, sendUpdates='all')
-                )
-                
-                self.logger.info(f"✅ Event created: {created_event.get('htmlLink')}")
-                return {
-                    'success': True,
-                    'event_id': created_event.get('id'),
-                    'event_link': created_event.get('htmlLink'),
-                    'summary': created_event.get('summary'),
-                    'start_time': created_event.get('start', {}).get('dateTime'),
-                    'end_time': created_event.get('end', {}).get('dateTime')
-                }
-            except Exception as e:
-                error_msg = f"Failed to create event: {str(e)}"
-                self.logger.error(f"❌ {error_msg}")
-                return {'success': False, 'error': error_msg}
-                
+            created_event = calendar_service.events().insert(
+                calendarId='primary',
+                body=event
+            ).execute()
+
+            self.logger.info(f"✅ Event created: {created_event.get('htmlLink')}")
+            
+            return {
+                'success': True,
+                'event_id': created_event['id'],
+                'event_link': created_event.get('htmlLink'),
+                'attendees_notified': bool(event.get('attendees', []))
+            }
+
         except Exception as e:
             self.logger.error(f"Error creating event: {str(e)}")
             return {'success': False, 'error': str(e)}
 
+    async def _get_next_weekday(self, day_name: str) -> datetime:
+        """Calculate the date of the next occurrence of a given weekday"""
+        weekdays = {
+            'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+            'friday': 4, 'saturday': 5, 'sunday': 6,
+            'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4, 'sat': 5, 'sun': 6
+        }
+        
+        day_name = day_name.lower()
+        if day_name not in weekdays:
+            raise ValueError(f"Invalid day name: {day_name}")
+        
+        target_weekday = weekdays[day_name]
+        current_date = datetime.now()
+        current_weekday = current_date.weekday()
+        
+        # Calculate days until next occurrence
+        days_ahead = target_weekday - current_weekday
+        if days_ahead <= 0:  # Target day already happened this week
+            days_ahead += 7
+        
+        next_date = current_date + timedelta(days=days_ahead)
+        return next_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
     async def _calculate_start_time(self, date_str: str, time_str: str) -> datetime:
-        """Calculate start time from date and time strings"""
+        """Calculate the start time for an event"""
         try:
-            # Handle natural language dates
+            # Get current time for reference
             now = datetime.now()
             
-            # Handle "today", "tomorrow", etc.
+            # Handle time-of-day terms in date_str
+            time_of_day_terms = {
+                'tonight': {'date': 'today', 'default_hour': 19, 'is_pm': True},  # 7 PM
+                'morning': {'date': 'today', 'default_hour': 9, 'is_pm': False},   # 9 AM
+                'afternoon': {'date': 'today', 'default_hour': 14, 'is_pm': False}, # 2 PM
+                'evening': {'date': 'today', 'default_hour': 18, 'is_pm': True},   # 6 PM
+                'midnight': {'date': 'tomorrow', 'default_hour': 0, 'is_pm': False}, # 12 AM tomorrow
+                'noon': {'date': 'today', 'default_hour': 12, 'is_pm': False}       # 12 PM
+            }
+            
+            # Check if date_str is a time-of-day term
+            date_str_lower = date_str.lower()
+            is_pm = False
+            if date_str_lower in time_of_day_terms:
+                term_info = time_of_day_terms[date_str_lower]
+                # If no specific time provided, use the default for this time of day
+                if not time_str:
+                    time_str = f"{term_info['default_hour']}:00"
+                date_str = term_info['date']
+                is_pm = term_info['is_pm']  # Set PM based on time of day
+            
+            # Parse the date
             if date_str.lower() == 'today':
-                date_obj = now.date()
+                event_date = now.date()
             elif date_str.lower() == 'tomorrow':
-                date_obj = (now + timedelta(days=1)).date()
+                event_date = (now + timedelta(days=1)).date()
+            elif date_str.lower() in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                                    'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']:
+                # Handle day names
+                event_date = (await self._get_next_weekday(date_str)).date()
             else:
-                # Try different date formats
-                date_formats = ['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y']
-                date_obj = None
-                
-                for fmt in date_formats:
+                # Try to parse as a date string
+                try:
+                    event_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                except ValueError:
                     try:
-                        date_obj = datetime.strptime(date_str, fmt).date()
-                        break
+                        # Try alternative format MM/DD/YYYY
+                        event_date = datetime.strptime(date_str, '%m/%d/%Y').date()
                     except ValueError:
-                        continue
-                
-                if not date_obj:
-                    raise ValueError(f"Unsupported date format: {date_str}")
+                        raise ValueError(f"Unsupported date format: {date_str}")
             
-            # Handle time formats
-            time_obj = None
-            
-            # Handle natural language time like "7pm"
-            time_match = re.match(r'(\d+)(?::(\d+))?\s*(am|pm)?', time_str.lower())
-            if time_match:
-                hour = int(time_match.group(1))
-                minute = int(time_match.group(2)) if time_match.group(2) else 0
-                ampm = time_match.group(3)
-                
-                # Adjust hour for PM
-                if ampm == 'pm' and hour < 12:
-                    hour += 12
-                elif ampm == 'am' and hour == 12:
-                    hour = 0
-                
-                time_obj = time(hour, minute)
+            # Parse the time
+            time_str = time_str.lower().replace(' ', '')
+            if 'am' in time_str or 'pm' in time_str:
+                # Handle 12-hour format
+                try:
+                    if 'pm' in time_str:
+                        hour = int(time_str.replace('pm', ''))
+                        if hour != 12:
+                            hour += 12
+                    else:  # am
+                        hour = int(time_str.replace('am', ''))
+                        if hour == 12:
+                            hour = 0
+                    minute = 0
+                except ValueError:
+                    # Try parsing with minutes
+                    time_parts = time_str.replace('am', '').replace('pm', '').split(':')
+                    if len(time_parts) == 2:
+                        hour = int(time_parts[0])
+                        minute = int(time_parts[1])
+                        if 'pm' in time_str and hour != 12:
+                            hour += 12
+                        elif 'am' in time_str and hour == 12:
+                            hour = 0
+                    else:
+                        raise ValueError(f"Invalid time format: {time_str}")
             else:
-                # Try standard time formats
-                time_formats = ['%H:%M', '%I:%M%p', '%I%p']
-                
-                for fmt in time_formats:
-                    try:
-                        time_obj = datetime.strptime(time_str, fmt).time()
-                        break
-                    except ValueError:
-                        continue
-                
-                if not time_obj:
-                    raise ValueError(f"Unsupported time format: {time_str}")
+                # Handle 24-hour format or time without AM/PM
+                try:
+                    if ':' in time_str:
+                        hour, minute = map(int, time_str.split(':'))
+                    else:
+                        hour = int(time_str)
+                        minute = 0
+                    
+                    # If time is ambiguous (no AM/PM) and we're in a PM context, adjust hour
+                    if is_pm and hour < 12:
+                        hour += 12
+                except ValueError:
+                    raise ValueError(f"Invalid time format: {time_str}")
             
-            # Combine date and time
-            return datetime.combine(date_obj, time_obj)
+            # Create final datetime
+            event_time = datetime.combine(event_date, time(hour, minute))
+            
+            # Verify the time hasn't passed
+            if event_time < now:
+                if date_str.lower() in ['today', 'tonight', 'morning', 'afternoon', 'evening']:
+                    # For today's events that have passed, move to tomorrow
+                    event_time += timedelta(days=1)
+                elif date_str.lower() in ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+                                      'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']:
+                    # For weekday names, automatically move to next week if time has passed
+                    event_time += timedelta(days=7)
+                else:
+                    raise ValueError("Event time has already passed")
+            
+            return event_time
             
         except Exception as e:
             self.logger.error(f"Error calculating start time: {str(e)}")
-            raise ValueError(f"Failed to parse date '{date_str}' or time '{time_str}': {str(e)}")
+            raise ValueError(f"Error calculating start time: {str(e)}")
 
     async def _calculate_end_time(self, start_time: datetime, duration: int) -> datetime:
         """Calculate the end time based on start time and duration in minutes."""

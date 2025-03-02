@@ -104,14 +104,16 @@ class MessageMaker:
             
         except Exception as e:
             self.logger.error(f"Error sending message: {str(e)}")
-            fallback_msg = self._get_fallback_message(ticket)
-            ticket.add_outgoing_message(fallback_msg)
-            ticket.final_response = fallback_msg  # Set the final response even for fallback
-            await self.slack.chat_postMessage(
-                channel=ticket.channel_id,
-                thread_ts=ticket.thread_ts,
-                text=fallback_msg
-            )
+            # Only send a fallback message if we haven't already sent a message
+            if not ticket.final_response:
+                fallback_msg = self._get_fallback_message(ticket)
+                ticket.add_outgoing_message(fallback_msg)
+                ticket.final_response = fallback_msg
+                await self.slack.chat_postMessage(
+                    channel=ticket.channel_id,
+                    thread_ts=ticket.thread_ts,
+                    text=fallback_msg
+                )
     
     def _create_prompt(self, ticket: Ticket) -> str:
         """Create GPT prompt based on ticket context."""
